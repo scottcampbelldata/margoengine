@@ -20,6 +20,47 @@ export interface AimConstraint extends Omit<LookAt, 'joints' | 'shares'> {
     joint: number;
 }
 
+export interface Anatomy {
+    readonly limits: boolean;
+    readonly parents: readonly number[];
+    readonly joints: readonly AnatomyJoint[];
+    readonly regions: readonly AnatomyRegion[];
+}
+
+export interface AnatomyGate {
+    readonly by: number;
+    readonly from: number;
+    readonly to: number;
+    readonly floor: number;
+}
+
+export interface AnatomyJoint {
+    readonly id: string;
+    readonly bone: number;
+    readonly reference: number;
+    readonly kind: string;
+    readonly limited: boolean;
+    readonly axes: readonly [ArrayLike<number>, ArrayLike<number>, ArrayLike<number>];
+    readonly boneAxes: readonly [ArrayLike<number>, ArrayLike<number>, ArrayLike<number>];
+    readonly frame: ArrayLike<number>;
+    readonly referenceFrame: ArrayLike<number>;
+    readonly neutral: ArrayLike<number>;
+    readonly normal: ArrayLike<number>;
+    readonly structural: ArrayLike<number>;
+    readonly spec: {
+        readonly dofs?: ArrayLike<{
+            readonly gate?: AnatomyGate;
+        }>;
+    };
+}
+
+export interface AnatomyRegion {
+    readonly id: string;
+    readonly joints: readonly number[];
+    readonly normal: ArrayLike<number>;
+    readonly structural: ArrayLike<number>;
+}
+
 export class Animator implements EnginePlugin {
     readonly animation: Animation;
     readonly options: AnimatorOptions;
@@ -166,6 +207,7 @@ export interface CCDChain {
     rotation?: ArrayLike<number> | null;
     pole?: Vec3 | null;
     limits?: readonly (CCDJointLimit | null | undefined)[];
+    body?: Anatomy | null;
     weight?: number;
     iterations?: number;
     tolerance?: number;
@@ -256,6 +298,7 @@ export interface FootPlacement {
     maxPelvisDrop?: number;
     alignFeet?: boolean;
     weight?: number;
+    limits?: boolean;
 }
 
 export interface FootPlacementHandle {
@@ -280,6 +323,7 @@ export interface LookAt {
     worldUp?: Vec3;
     maxAngle?: number;
     weight?: number;
+    limits?: boolean;
 }
 
 export interface PlacedLeg {
@@ -337,9 +381,13 @@ export function addLookAt(animator: Animator, lookAt: LookAt): () => void;
 
 export function addRootMotion(animator: Animator, options: RootMotionOptions): RootMotion;
 
+export function anatomyOf(owner: object): Anatomy | null;
+
 export function blend1D(samples: readonly number[], value: number): Float32Array;
 
 export function blend2D(samples: readonly (readonly [number, number])[], x: number, y: number): Float32Array;
+
+export function setAnatomy(owner: object, body: Anatomy | null): void;
 
 export function solveTwoBoneIK(root: Vec3, knee: Vec3, ankle: Vec3, target: Vec3, pole: Vec3): {
     knee: Vec3;

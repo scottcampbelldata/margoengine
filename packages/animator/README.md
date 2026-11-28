@@ -513,6 +513,60 @@ Each limb takes `target`, `rotation`, `pole`, `weight` (default 1), `pinned` (ho
 
 The torso is a damped Gauss-Newton solve (Levenberg 1944, Marquardt 1963); the centre of mass uses Winter's segment shares and centres (a whole arm's 0.530 of the way from shoulder to wrist, a whole leg's 0.447 from hip to ankle; Winter 2009, Table 4.1), and a limb with no target or pin is weighed where it rides with the body. Since 2026-11-15 a raised or reaching limb shifts the balanced pose by a few millimetres from earlier releases, which put every limb's mass half way down it and weighed a free arm at its animated place. A target past what the pinned feet allow leaves the arm straight toward it and `reached` false, with the feet still down. Balance is about world +Y, and a limb must be a direct chain of three joints.
 
+## Solvers on a fitted body (`margoengine/animator/ik`)
+
+`setAnatomy(animator, body)` tells the Animator which fitted body it is (an `AnatomicalRig` from `fitAnatomy` in `margoengine/rigging/anatomy`, fitted to the model's own nodes, index for index). From then on every solver here holds the body's joint ranges, on by default:
+
+| Solver | On a fitted body | Turn it off |
+|---|---|---|
+| `addFullBodyIK` | Each spine joint stays inside its own range (flexion, side bend and twist each have their own) and the trunk and neck inside theirs as a whole, so a bend is shared across the levels; `maxBend` then defaults to no cap. Arms and legs are finished by `solveLimbIK`; hands, feet and the head stay inside the wrist's, ankle's and neck's ranges. | `limits: false` |
+| `addFootPlacement` | Each knee bends only the anatomical way inside its range; the pole picks the swivel inside the hip's range; the foot's tilt stays inside the ankle's. | `limits: false` |
+| `addLookAt`, `addAimConstraint` | Each bone stays inside its joint's range and the neck inside its range as a whole, so the look falls short of a target the neck cannot turn to. | `limits: false` |
+| `addCCDChain` | A joint with no limit of its own in `limits` takes the body's: an elbow or knee as an exact hinge that stops at straight, any other joint as the nearest cone and then its exact reach. | `body: null`, or `null` in `limits` for one joint |
+| `placeLimb` users (`addWarping`, `addStepping`) | Legs are bent by `solveLimbIK`. | `setAnatomy(animator, null)` |
+
+`solveLimbIK` is the limb solver itself: two-bone IK by swivel angle (Tolani, Goswami and Badler 2000). The hinge turns only about its own axis between straight and its stop; the pole picks the swivel inside the shoulder's or hip's reach and twist; with no pole a bent limb keeps its side and a straight one takes the swivel that leaves the shoulder or hip nearest neutral.
+
+```ts
+import type { RigJoint } from 'margoengine/rigging';
+import { fitAnatomy } from 'margoengine/rigging/anatomy';
+import { human } from 'margoengine/rigging/anatomy/human';
+import { jointOf, solveLimbIK } from 'margoengine/animator/ik';
+
+const rig: RigJoint[] = [
+  { name: 'Hips', parent: -1, position: [0, 1, 0] },
+  { name: 'Spine', parent: 0, position: [0, 1.1, 0] },
+  { name: 'Head', parent: 1, position: [0, 1.6, 0] },
+  { name: 'LeftUpLeg', parent: 0, position: [0.1, 0.95, 0] },
+  { name: 'RightUpLeg', parent: 0, position: [-0.1, 0.95, 0] },
+  { name: 'LeftArm', parent: 1, position: [0.2, 1.45, 0] },
+  { name: 'LeftForeArm', parent: 5, position: [0.48, 1.45, 0] },
+  { name: 'LeftHand', parent: 6, position: [0.74, 1.45, 0] },
+];
+const body = fitAnatomy(rig, { species: human });
+// The left arm, straight out in the rest pose, reaching to a point in front of the chest.
+const solved = solveLimbIK({
+  root: [0.2, 1.45, 0], mid: [0.48, 1.45, 0], end: [0.74, 1.45, 0],
+  upperRotation: [0, 0, 0, 1], lowerRotation: [0, 0, 0, 1],
+  target: [0.25, 1.3, 0.35],
+  hinge: jointOf(body, 6)!, ball: jointOf(body, 5),
+});
+console.log(solved.reached, Math.round(solved.flexion), solved.mid[1] < 1.45); // true 89 true: the elbow hangs below the shoulder
+```
+
+| Function | What it does |
+|---|---|
+| `setAnatomy(owner, body)`, `anatomyOf(owner)` | Names (or forgets, with null) the fitted body of an Animator, a `Skeleton` or a pose; reads it back. |
+| `jointOf(body, bone)` | The limited joint that turns a bone, or null. |
+| `solveLimbIK({ root, mid, end, upperRotation, lowerRotation, target, hinge, ball?, reference?, pole?, tier?, soft?, tolerance? })` | The limb solve above. `tier` defaults to `structural` (the stops), `soft` to 0 (exact; up to 0.5 of the limb's length eases the reach in before full stretch), `tolerance` to 1e-4. Returns the two world rotations, the new joint positions, the flexion in degrees, `reached`, `distance` and `held`. |
+| `jointTurn(joint, reference, bone, out)`, `turnRotation(joint, angles, out)` | A joint's clinical angles (flexion, abduction, twist; degrees) from two world rotations, and back. The same numbers as `jointAngles` in `margoengine/rigging/anatomy`. |
+| `clampTurn(jointOrRegion, angles, tier?)`, `limitRotation(joint, reference, bone, out, tier?)` | Angles, or a world rotation, brought inside a range: the swing inside the ellipse of its quadrant, then the twist (a gated twist by how far its gate is open). |
+| `limitBones(body, bones, access, tier?)` | Holds listed bones of any posed skeleton inside their ranges, then eases a trunk or neck that is past its range as a whole back across its levels. |
+| `ccdLimit(joint, tier?, pastStraight?)` | A joint's range as a `CCDSolver` hinge or cone with the rotation it is measured from. |
+| `solveTwoBoneIK(root, knee, ankle, target, pole)` | The plain two-bone solve on positions, with no body: the knee goes where the pole says. |
+
+Every function but `solveLimbIK`, `limitBones`' first sight of a region and `ccdLimit` allocates nothing. Sources are in [docs/clean-room.md](../../docs/clean-room.md).
+
 ## Motion matching (`margoengine/animator/motion-matching`)
 
 Motion matching needs no state graph. `MotionDatabase.build` turns every frame of your clips into a row of features; `addMotionMatching` then finds, a few times a second, the row that best continues the current pose along the path the character is asked to take, and jumps there with an inertialized blend. Add more clips and the character gets better, with no transitions to wire.

@@ -113,6 +113,47 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   as in components, each part's groups holding one entry; and NodePerformanceTest's parts stay under 16 KiB.
   `parse3MF` reads at most 1,024 model parts, so Margo's own reader still refuses this 10,000-part file (limits.md).
 
+### Fixed 2026-11-28: IK folded elbows and knees backwards, and no solver read a joint range unless the caller built one (KB-RIG-IKANATOMY1, rigging, animator)
+
+- **Repro (before):** a standing body with straight legs; `solvePoseIK` on hip, knee, ankle with a pole behind the
+  leg, or `addFootPlacement` with `pole: [0, 0.5, -4]` on a 15 cm step: the knee folds backwards (flexion -30 degrees
+  and worse). 600 seeded reaches around a hip or a shoulder reversed the hinge in more than 50. `addFullBodyIK` let each
+  spine joint turn 0.8 rad (46 degrees) in any direction; `addLookAt` turned a head to a target behind it (177 degrees
+  at the neck); a free `addCCDChain` bent an elbow past straight. Scott saw it on the human demos: "the elbows are
+  closest to the body".
+- **Cause:** the solvers had no model of a body. `solveTwoBoneIK` and FABRIK put the middle joint wherever the pole
+  said, a straight limb had no bend side at all (`bendSides` returns null for it), limits were opt in per rig
+  ("Omitted joints are free") and the spine had one isotropic `maxBend`.
+- **Fix:** `@margoengine/animator/ik`: `setAnatomy(owner, body)` names the fitted body of an Animator, a Skeleton or
+  a pose, and every solver obeys it by default: `solveLimbIK` (two-bone IK by swivel angle, the hinge about its own
+  axis between straight and its stop, the pole only inside the shoulder's or hip's range), per-joint and shared-region
+  limits in full-body IK, look-at, CCD chains, FABRIK chains and contact IK. `limits: false` turns it off by name
+  (`body: null` on a CCD chain or a contact, where `limits` is the list of limits).
+- **Regression:** `packages/rigging/tests/ik-anatomy.test.js` (10,000 reaches per limb on seven rigs; the same
+  reaches with `limits: false` must still show the fault), `packages/rigging/tests/ik-anatomy-animator.test.js`,
+  the reach sheet `packages/rigging/tests/ik-reach-sheet.browser.mjs` and the Blender referee
+  `packages/rigging/tests/ik-blender-check.mjs`.
+
+### Fixed 2026-11-28: clampPose narrowed a gated twist a second time (KB-RIG-GATEORDER1, rigging)
+
+- **Repro (before):** a knee at flexion 78.7, abduction 44.2, twist 63.1 degrees: `clampPose` leaves the twist at
+  34.98; a second `clampPose` on the result moves it to 34.43.
+- **Cause:** `clampAngles` in `packages/rigging/src/anatomy.ts` read the twist's gate (a knee twists only when
+  bent) from the flexion before the swing was brought inside its ellipse, which lowers the flexion a little.
+- **Fix:** the swing is settled first and the gate is read from it. `clampTurn` in `@margoengine/animator/ik` does
+  the same.
+- **Regression:** `packages/rigging/tests/ik-anatomy.test.js`, "a pose brought inside its ranges once is inside".
+
+### Open 2026-11-28: the Animator's built-in `footIK` option bends a leg by its pole alone, also on a fitted body (KB-ANIM-FOOTIK-ANATOMY1, animator)
+
+- **Repro:** an Animator made with the `footIK` option on a body named by `setAnatomy`, with a pole behind the leg:
+  the knee follows the pole backwards. `addFootPlacement` on the same body bends it the anatomical way.
+- **Cause:** `Animator.foot` in `packages/animator/src/index.ts` calls `solveTwoBoneIK` directly; it is the one
+  limb solve that does not go through `placeLimb`. Moving it there puts the limb solver in the Animator's root entry,
+  so it needs the size of that entry looked at first.
+- **Until then:** use `addFootPlacement`, or `addAnatomyLimits`, which holds the pose inside the body's stops after
+  every solver.
+
 ### Fixed 2026-11-28: on the WebGL2 layer a page linked its synchronous pipelines one at a time (KB-COMPAT-SYNCLINK1, webgl2-compat)
 
 - **Repro (before):** `demos/ten-thousand-trees/?backend=webgl2` on Chrome, ANGLE over Direct3D 11 (RTX A6000, loaded

@@ -169,6 +169,47 @@ const solved = avoid.solve(shoulder, hand, [-0.1, 1.2, 0.35], 0.3, 0.28, 0.05, 0
 console.log(solved.status, solved.elbow, solved.target);
 ```
 
+### IK on a fitted body: limbs that obey anatomy
+
+Give a pose, a `Skeleton` or an Animator its fitted body (`body` on the pose or the chain, or `setAnatomy(owner, body)` once) and every IK solve on it obeys the body's joint ranges. This is on by default wherever a body is present.
+
+- An arm or a leg (a shoulder or hip, a hinge, an end) is solved in closed form by its swivel angle (Tolani, Goswami and Badler 2000). The elbow or knee turns only about its own axis, the anatomical way, between straight and its stop, so a straight limb bends the right way and never folds backwards.
+- The pole only picks the limb's swivel inside the shoulder's or hip's reach and twist. With no pole, a limb that is bent in the pose keeps its side, and a straight one takes the swivel that leaves the shoulder or hip nearest neutral: elbow down, knee forward, whatever pose the rig rests in.
+- A longer chain is solved by FABRIK and each joint is held to the nearest rotation in its range, a trunk or neck the chain runs along as a whole too. A chain that ends in an arm or a leg finishes with the closed-form limb.
+- A target the ranges do not allow is approached as far as they allow, and the result says `held`.
+
+```ts
+import type { RigJoint } from 'margoengine/rigging';
+import { fitAnatomy, jointAngles } from 'margoengine/rigging/anatomy';
+import { human } from 'margoengine/rigging/anatomy/human';
+import { type IKPose, solvePoseIK } from 'margoengine/rigging/ik';
+
+const rig: RigJoint[] = [
+  { name: 'Hips', parent: -1, position: [0, 1, 0] },
+  { name: 'Spine', parent: 0, position: [0, 1.1, 0] },
+  { name: 'Head', parent: 1, position: [0, 1.6, 0] },
+  { name: 'LeftUpLeg', parent: 0, position: [0.1, 0.95, 0] },
+  { name: 'RightUpLeg', parent: 0, position: [-0.1, 0.95, 0] },
+  { name: 'LeftArm', parent: 1, position: [0.2, 1.45, 0] },
+  { name: 'LeftForeArm', parent: 5, position: [0.48, 1.45, 0] },
+  { name: 'LeftHand', parent: 6, position: [0.74, 1.45, 0] },
+];
+const body = fitAnatomy(rig, { species: human });
+// The left hand to a point in front of the chest. The pole sits above and behind the shoulder, where no elbow can
+// point: the elbow goes as far that way as the shoulder allows and still bends forward.
+const pose: IKPose = { parents: body.parents, local: body.rest.slice(), body };
+const result = solvePoseIK(pose, { joints: [5, 6, 7], target: [0.25, 1.3, 0.35], pole: [0.2, 3, -3] });
+console.log(result.reached, jointAngles(body, pose.local).l_elbow.flexion > 0); // true true
+```
+
+| Option | Default | What it does |
+|---|---|---|
+| `body` (chain or pose) | the body `setAnatomy` gave the pose, `Skeleton` or Animator, else none | The fitted body the chain obeys. |
+| `limits` | `true` | `false` solves as if there were no body: FABRIK and the pole alone. |
+| `soft` | `0` | Share of an arm's or leg's length (0 to 0.5) over which the reach eases in before full stretch, so an elbow or knee does not snap straight. At 0 the end meets every target in reach exactly. |
+
+`solvePoseIK`, `solveSkeletonIK` and `addIKChain` take these; `solveContactIK` takes `body` and reads its ranges as the default for `limits` (pass `body: null`, or your own `limits`, to leave the body out). `setAnatomy` and `anatomyOf` are re-exported here from `margoengine/animator/ik`, where the limb solver `solveLimbIK` lives. Proof: `packages/rigging/tests/ik-anatomy.test.js` (10,000 reaches all around the body for an arm and for a leg, on T, A and arms-down rigs, rolled and mirrored: no hinge reversed, no joint past its stop), `ik-anatomy-animator.test.js`, the reach sheet `ik-reach-sheet.browser.mjs` (front, three-quarter and side, with the free solve beside it) and `ik-blender-check.mjs`, which has Blender's own bones and IK solver agree on which way flexion turns and on every hinge angle.
+
 Root motion and look-at / aim constraints live with the Animator: `addRootMotion`, `addLookAt` and `addAimConstraint` in [`@margoengine/animator`](../animator/README.md).
 
 ## Hand and foot contacts (`margoengine/rigging/contact`)

@@ -1,6 +1,8 @@
 // Look-at and aim constraints on an Animator's skeleton: after the pose, a bone (or a spine-neck-head run of bones,
 // each taking a share of the turn) turns so a local axis points at a world target, optionally rolled so a second axis
-// stays toward world up. Kept out of the Animator class so an app that never adds one does not bundle it.
+// stays toward world up. Kept out of the Animator class so an app that never adds one does not bundle it. On a fitted
+// body (`setAnatomy(animator, body)`) each bone that turned is then held inside its joint's range, so a head never turns
+// further than a neck can.
 //
 // No allocation per solve (as ccd.ts): the solve's numbers live in preallocated arrays, and helpers take arrays, never
 // numbers, because a number passed to or returned from a call that the optimizer does not inline is boxed on the heap.
@@ -9,6 +11,7 @@
 import type { Mesh, Vec3 } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { hypotOf, hypotTerms } from '../../shared/hypot.js';
+import { anatomyOf, type BoneAccess, limitBones } from './ik.js';
 import type { Animator } from './index.js';
 
 /** A look-at constraint ({@link addLookAt}). The Animator keeps the object and reads it every frame. */
@@ -39,6 +42,11 @@ export interface LookAt {
   maxAngle?: number;
   /** Blend from the animated pose (0) to the full turn (1); default 1. */
   weight?: number;
+  /**
+   * False ignores the Animator's fitted body. Default true: with a body from `setAnatomy(animator, body)`, each bone
+   * stays inside its joint's range, and the look falls short of a target the neck and spine cannot turn to.
+   */
+  limits?: boolean;
 }
 
 /** An aim constraint on one bone ({@link addAimConstraint}): {@link LookAt} with a single joint. */
@@ -170,7 +178,12 @@ export function addLookAt(animator: Animator, lookAt: LookAt): () => void {
     offset = o != null && (o[0] !== 0 || o[1] !== 0 || o[2] !== 0);
   };
   read();
-  const last = chain[count - 1];
+  const last = chain[count - 1],
+    // How the body's ranges read and turn these bones (limitBones).
+    access: BoneAccess = {
+      read: (bone, out) => rotation(nodes[bone].matrix, out),
+      write: (bone, world) => setBone(nodes[bone], world),
+    };
   return animator.addSolver(() => {
     read();
     if (num[WEIGHT] === 0) return;
@@ -283,7 +296,25 @@ export function addLookAt(animator: Animator, lookAt: LookAt): () => void {
       }
       store.tick(false);
     }
+    // On a fitted body: each bone back inside its joint's range, and the neck and trunk inside theirs as a whole.
+    const body = lookAt.limits === false ? null : anatomyOf(animator);
+    if (body?.limits) limitBones(body, joints, access);
   });
+  /** Gives `bone` the world rotation `world`. */
+  function setBone(bone: Mesh, world: ArrayLike<number>): void {
+    const parent = parents[bone.id];
+    if (parent === -1) {
+      base[0] = base[1] = base[2] = 0;
+      base[3] = 1;
+    } else rotation(engine.meshes.get(parent)!.matrix, base);
+    base[0] = -base[0];
+    base[1] = -base[1];
+    base[2] = -base[2];
+    multiply(base, world, local);
+    normalize(local, local);
+    animator.writeNodeRotation(bone, local);
+    store.tick(false);
+  }
   /**
    * The world direction, from the last bone's origin, of the point on its look ray at num[DISTANCE] from that origin
    * (the ray from `origin` along `axis` in the bone's world frame `m`). Turning it onto the target's direction about
@@ -360,6 +391,9 @@ export function addAimConstraint(animator: Animator, aim: AimConstraint): () => 
     },
     get weight() {
       return aim.weight;
+    },
+    get limits() {
+      return aim.limits;
     },
   };
   return addLookAt(animator, lookAt);

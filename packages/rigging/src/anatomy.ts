@@ -854,19 +854,7 @@ function nearestOnEllipse(p: number, q: number, a: number, b: number): void {
 
 /** Brings the angles `v` inside the range `r`; true when any changed. */
 function clampAngles(v: Float64Array, r: ArrayLike<number>, gate: Gate | null, slot: number): boolean {
-  let changed = false,
-    low = r[4],
-    high = r[5];
-  if (gate && slot === 2) {
-    const open = Math.min(1, Math.max(0, (v[gate.by] - gate.from) / (gate.to - gate.from)));
-    low = -Math.min(-low, Math.max(gate.floor, -low * open));
-    high = Math.min(high, Math.max(gate.floor, high * open));
-  }
-  const twist = v[2] < low ? low : v[2] > high ? high : v[2];
-  if (Math.abs(twist - v[2]) > TOLERANCE) {
-    v[2] = twist;
-    changed = true;
-  }
+  let changed = false;
   // The swing stays inside an ellipse whose half axes are the ranges of the quadrant it is in.
   const f = v[0],
     a = v[1],
@@ -889,6 +877,20 @@ function clampAngles(v: Float64Array, r: ArrayLike<number>, gate: Gate | null, s
   if (Math.abs(nf - f) > TOLERANCE || Math.abs(na - a) > TOLERANCE) {
     v[0] = nf;
     v[1] = na;
+    changed = true;
+  }
+  // The twist, by how far its gate is open at the swing just settled: a gate read before the swing was brought in
+  // would leave a twist that the next clamp narrows again.
+  let low = r[4],
+    high = r[5];
+  if (gate && slot === 2) {
+    const open = Math.min(1, Math.max(0, (v[gate.by] - gate.from) / (gate.to - gate.from)));
+    low = -Math.min(-low, Math.max(gate.floor, -low * open));
+    high = Math.min(high, Math.max(gate.floor, high * open));
+  }
+  const twist = v[2] < low ? low : v[2] > high ? high : v[2];
+  if (Math.abs(twist - v[2]) > TOLERANCE) {
+    v[2] = twist;
     changed = true;
   }
   return changed;

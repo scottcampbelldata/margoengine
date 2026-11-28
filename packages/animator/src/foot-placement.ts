@@ -1,6 +1,8 @@
 // Foot placement: legs follow uneven ground while the clip keeps its stride. Each foot is raised or lowered by how far
 // the ground under it is from the character's flat ground (so a swing foot still lifts), the pelvis drops so the
-// lowest foot can reach, and two-bone IK bends each leg. Kept out of the Animator class so an app that never adds it
+// lowest foot can reach, and two-bone IK bends each leg. On a fitted body (`setAnatomy(animator, body)`) each leg is
+// bent by the swivel-angle limb solver (`solveLimbIK`): the knee turns only the anatomical way inside its range, the
+// pole picks the swivel inside the hip's range, and the foot's tilt stays inside the ankle's range. Kept out of the Animator class so an app that never adds it
 // does not bundle it.
 import type { Mesh, Vec3 } from '@margoengine/core/extension';
 import { multiplyQuaternions } from '@margoengine/math/quat';
@@ -42,6 +44,11 @@ export interface FootPlacement {
   alignFeet?: boolean;
   /** Blend from the animated pose (0) to fully placed (1); default 1. */
   weight?: number;
+  /**
+   * False ignores the Animator's fitted body. Default true: with a body from `setAnatomy(animator, body)`, knees bend
+   * only the anatomical way inside their range, and hips and ankles stay inside theirs.
+   */
+  limits?: boolean;
 }
 
 /** A foot-placement handle: what the last frame did, and its remover. */
@@ -71,7 +78,7 @@ export function addFootPlacement(animator: Animator, placement: FootPlacement): 
   const model = animator.animation.model,
     nodes = model.nodes,
     parents = model.root.engine.store.parents,
-    { rotationOf, setWorldRotation, moveBy, placeLimb } = poseTools(animator, 'Foot placement');
+    { rotationOf, setWorldRotation, moveBy, placeLimb, limitBone } = poseTools(animator, 'Foot placement');
   const node = (index: unknown, label: string): Mesh => {
     if (!Number.isInteger(index) || (index as number) < 0 || (index as number) >= nodes.length)
       throw new RangeError(`Foot placement ${label} ${index} is not one of the model's ${nodes.length} glTF nodes`);
@@ -153,7 +160,7 @@ export function addFootPlacement(animator: Animator, placement: FootPlacement): 
       const { hip, knee, ankle } = chains[i],
         a = animated[i],
         target: Vec3 = [a[0], a[1] + offsets[i], a[2]];
-      placeLimb(hip, knee, ankle, target, legs[i].pole);
+      placeLimb(hip, knee, ankle, target, legs[i].pole, { limits: placement.limits });
       // The foot keeps its animated world orientation (the leg's turn would carry it along), tilted to the slope.
       const normal = normals[i];
       let world = rotations[i];
@@ -162,6 +169,7 @@ export function addFootPlacement(animator: Animator, placement: FootPlacement): 
         world = multiplyQuaternions(weight < 1 ? quaternionBlend([0, 0, 0, 1], tilt, weight) : tilt, world);
       }
       setWorldRotation(ankle, world);
+      if (placement.limits !== false) limitBone(ankle);
     }
   });
   const dispose = () => {

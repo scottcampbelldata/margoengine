@@ -1,5 +1,6 @@
 import type { Animator } from '@margoengine/animator';
 import { type CCDJointLimit, CCDSolver } from '@margoengine/animator/ccd';
+import { type Anatomy, anatomyOf, ccdLimit, jointOf } from '@margoengine/animator/ik';
 import type { Vec3 } from '@margoengine/math';
 import {
   axisAngleToQuaternion,
@@ -62,8 +63,17 @@ export interface ContactIKOptions {
   readonly anchor: Vec3;
   /** Blend toward the contact, default 1. Zero preserves the input pose exactly. */
   readonly weight?: number;
-  /** Anatomical limits for the joints to constrain. Omitted joints are free. */
+  /**
+   * Anatomical limits for the joints to constrain. Default: the ranges of the pose's fitted body (`body`, `pose.body`
+   * or `setAnatomy(pose, body)`) for every joint of the chain, each measured from its anatomical zero. A list given
+   * here is used as it is, and joints not in it are free.
+   */
   readonly limits?: readonly ContactJointLimit[];
+  /**
+   * The fitted body whose joint ranges the chain takes when `limits` is not given. Default: the pose's body. Null
+   * leaves the body out, so with no `limits` every joint is free.
+   */
+  readonly body?: Anatomy | null;
   /** Point on the desired elbow or knee bend side in skeleton space. */
   readonly pole?: Vec3 | null;
   /** Maximum CCD sweeps, from 1 to 1,024. Default 64. */
@@ -109,7 +119,7 @@ function unitRotation(q: Quaternion, label: string): [number, number, number, nu
  */
 export function solveContactIK(pose: IKPose, options: ContactIKOptions): ContactIKResult {
   const { parents, local } = pose;
-  const { joints, point, anchor, rotation, pole, limits = [], clearance } = options;
+  const { joints, point, anchor, rotation, pole, clearance } = options;
   const { weight = 1, iterations = 64, tolerance = 1e-4, angleTolerance = 0.02 } = options;
   if (!Array.isArray(parents) || !(local instanceof Float64Array) || local.length !== parents.length * 10)
     throw new TypeError('Contact IK needs a pose with parents and 10 local values per joint');
@@ -207,6 +217,16 @@ export function solveContactIK(pose: IKPose, options: ContactIKOptions): Contact
     solver.rotations.set(local.subarray(at + 3, at + 7), slot * 4);
     if (joint !== end) solver.scales[slot] = local[at + 7];
   });
+  // The chain's own limits, else the fitted body's ranges: a hinge exact, any other joint as its nearest cone.
+  const body = options.body === null ? null : (options.body ?? pose.body ?? anatomyOf(pose)),
+    limits: readonly ContactJointLimit[] =
+      options.limits ??
+      (body?.limits
+        ? joints.flatMap((bone) => {
+            const joint = jointOf(body, bone);
+            return joint ? [{ joint: bone, ...ccdLimit(joint) }] : [];
+          })
+        : []);
   const constrained = new Set<number>();
   for (const { joint, neutral, limit } of limits) {
     const slot = joints.indexOf(joint);

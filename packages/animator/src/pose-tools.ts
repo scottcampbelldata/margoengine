@@ -8,7 +8,7 @@ import {
   rotationToQuaternion,
 } from '@margoengine/math/quat';
 import { MargoError } from '@margoengine/math/errors';
-import { rotationBetween, solveTwoBoneIK } from './ik.js';
+import { anatomyOf, jointOf, limitRotation, rotationBetween, solveLimbIK, solveTwoBoneIK } from './ik.js';
 import type { Animator } from './index.js';
 
 export const subtract = (a: ArrayLike<number>, b: ArrayLike<number>): [number, number, number] => [
@@ -70,12 +70,74 @@ export function poseTools(animator: Animator, label: string) {
     bone.setPosition([t.x[id] + local[0], t.y[id] + local[1], t.z[id] + local[2]]);
     store.tick(false);
   };
-  /** Bends a direct hip, knee, ankle chain so the ankle reaches `target`, the knee toward `pole`. */
-  const placeLimb = (hip: Mesh, knee: Mesh, ankle: Mesh, target: Vec3, pole: Vec3): void => {
+  // glTF node index by transform id, for finding a bone's joint in the body.
+  let indices: Map<number, number> | null = null;
+  const indexOf = (bone: Mesh): number => {
+    if (!indices) {
+      indices = new Map();
+      const nodes = animator.animation.model.nodes;
+      for (let i = 0; i < nodes.length; i++) indices.set(nodes[i].id, i);
+    }
+    return indices.get(bone.id) ?? -1;
+  };
+  /** The world rotation of the bone a joint is measured against. */
+  const referenceOf = (reference: number): number[] =>
+    reference < 0 ? [0, 0, 0, 1] : rotationOf(animator.animation.model.nodes[reference].matrix);
+  /**
+   * Holds `bone` inside its joint's range when the Animator has a body (`setAnatomy`) with limits on; true when it
+   * turned the bone back.
+   */
+  const limitBone = (bone: Mesh): boolean => {
+    const body = anatomyOf(animator),
+      joint = body?.limits ? jointOf(body, indexOf(bone)) : null;
+    if (!joint) return false;
+    const held = [0, 0, 0, 1];
+    if (!limitRotation(joint, referenceOf(joint.reference), rotationOf(bone.matrix), held)) return false;
+    setWorldRotation(bone, held);
+    return true;
+  };
+  /**
+   * Bends a direct hip, knee, ankle chain so the ankle reaches `target`. When the Animator has a body
+   * (`setAnatomy`) with limits on and the knee is one of its hinges, the knee turns about its own axis the anatomical
+   * way, inside its range, and `pole` only picks the limb's swivel inside the hip's range (a `hint` pole is a guess
+   * for a rig without a body and is then left out). Otherwise the knee bends toward `pole`.
+   */
+  const placeLimb = (
+    hip: Mesh,
+    knee: Mesh,
+    ankle: Mesh,
+    target: Vec3,
+    pole: Vec3,
+    options: { limits?: boolean; hint?: boolean; soft?: number } = {},
+  ): void => {
     const root = position(hip),
-      solved = solveTwoBoneIK(root, position(knee), position(ankle), target, pole);
+      body = options.limits === false ? null : anatomyOf(animator);
+    if (body?.limits) {
+      const upper = indexOf(hip),
+        hinge = jointOf(body, indexOf(knee));
+      if (hinge?.kind === 'hinge' && hinge.reference === upper) {
+        const ball = jointOf(body, upper),
+          solved = solveLimbIK({
+            root,
+            mid: position(knee),
+            end: position(ankle),
+            upperRotation: rotationOf(hip.matrix),
+            lowerRotation: rotationOf(knee.matrix),
+            target,
+            pole: options.hint ? null : pole,
+            hinge,
+            ball,
+            reference: ball ? referenceOf(ball.reference) : undefined,
+            soft: options.soft,
+          });
+        setWorldRotation(hip, solved.upper);
+        setWorldRotation(knee, solved.lower);
+        return;
+      }
+    }
+    const solved = solveTwoBoneIK(root, position(knee), position(ankle), target, pole);
     turn(hip, rotationBetween(subtract(position(knee), root), subtract(solved.knee, root)));
     turn(knee, rotationBetween(subtract(position(ankle), position(knee)), subtract(solved.ankle, position(knee))));
   };
-  return { rotationOf, setWorldRotation, turn, moveBy, placeLimb };
+  return { rotationOf, setWorldRotation, turn, moveBy, placeLimb, limitBone, indexOf, referenceOf };
 }

@@ -19806,3 +19806,54 @@ Margo's own design from these public sources; no engine's or library's source wa
 - E. Hairer, C. Lubich and G. Wanner, *Geometric Numerical Integration*, 2nd ed. (Springer, 2006), §I.1 and §IX.8:
   symplectic Euler on an oscillator keeps a shadow energy within (w h / 2) of the energy, and is stable for w h < 2;
   the held buoyancy's measured bound (0.95 stable, 1.17 growing) sets the refusal at 0.9.
+
+## IK that obeys anatomy: animator/ik, rigging/ik, animator/fbik (2026-11-28)
+
+Scope: `@margoengine/animator/ik` (the fitted body as the solvers read it, the swivel-angle limb solver, the joint and
+region limits), its use by `addFullBodyIK`, `addFootPlacement`, `addLookAt`, `addCCDChain`, `addWarping` and
+`addStepping`, and by `solvePoseIK`, `solveSkeletonIK`, `addIKChain` and `solveContactIK` in
+`@margoengine/rigging`. Written from the papers below. No other engine's, tool's or paper's code was read. Blender is
+run as an outside referee by `packages/rigging/tests/ik-blender-check.mjs` through its Python interface; none of its
+source was read.
+
+The limb: D. Tolani, A. Goswami and N. I. Badler, "Real-time inverse kinematics techniques for anthropomorphic limbs",
+Graphical Models 62(5):353-388, 2000, https://doi.org/10.1006/gmod.2000.0528 (the hinge angle from the distance to the
+target, then one swivel angle about the line from the root to the target); M. Kallmann, "Analytical inverse kinematics
+with body posture control", Computer Animation and Virtual Worlds 19(2):79-91, 2008, https://doi.org/10.1002/cav.176
+(the swivel searched for the nearest value the joint ranges allow).
+
+Joint ranges inside a solve: P. Baerlocher, "Inverse kinematics techniques for the interactive posture control of
+articulated figures", EPFL thesis 2392, 2001 (swing and twist limits); P. Dobrowolski, "Swing-twist decomposition in
+Clifford algebra", 2015, https://arxiv.org/abs/1506.05481 ; F. S. Grassia, "Practical parameterization of rotations
+using the exponential map", J Graphics Tools 3(3):29-48, 1998, https://doi.org/10.1080/10867651.1998.10487493 ;
+J. Wilhelms and A. Van Gelder, "Fast and easy reach-cone joint limits", J Graphics Tools 6(2):27-41, 2001,
+https://doi.org/10.1080/10867651.2001.10487539 ; G. Wu et al., ISB recommendations on joint coordinate systems, J
+Biomech 35(4):543-548, 2002 and 38(5):981-992, 2005 (the axes the angles are read on).
+
+Chains: A. Aristidou and J. Lasenby, "FABRIK: a fast, iterative solver for the inverse kinematics problem", Graphical
+Models 73(5):243-260, 2011, https://doi.org/10.1016/j.gmod.2011.05.003 ; A. Aristidou, Y. Chrysanthou and J. Lasenby,
+"Extending FABRIK with model constraints", Computer Animation and Virtual Worlds 27(1):35-57, 2016,
+https://doi.org/10.1002/cav.1630 (each joint moved to its nearest allowed place between passes); A. Aristidou, J.
+Lasenby, Y. Chrysanthou and A. Shamir, "Inverse kinematics techniques in computer graphics: a survey", Computer
+Graphics Forum 37(6):35-58, 2018, https://doi.org/10.1111/cgf.13310 (compared: analytic, Jacobian, CCD and FABRIK
+families; the analytic limb was taken for arms and legs because only it fixes the hinge angle exactly and leaves the
+swivel as one searchable number).
+
+The default swivel: H. Cruse, E. Wischmeyer, M. Bruwer, P. Brockfeld and A. Dress, "On the cost functions for the
+control of the human arm movement", Biological Cybernetics 62(6):519-528, 1990, https://doi.org/10.1007/BF00205114
+(a cost per joint with its minimum at a comfortable angle; here each angle of the shoulder or hip as a share of its
+clinical range, squared and summed).
+
+The whole body: P. Baerlocher and R. Boulic, "An inverse kinematics architecture enforcing an arbitrary number of
+strict priority levels", The Visual Computer 20:402-417, 2004, https://doi.org/10.1007/s00371-004-0244-4 (the order
+feet, balance, hands, gaze, kept here as weights of one damped least-squares solve, not as strict levels); S. R. Buss
+and J.-S. Kim, "Selectively damped least squares for inverse kinematics", J Graphics Tools 10(3):37-49, 2005,
+https://doi.org/10.1080/2151237X.2005.10129202 (clamping the error near the end of the reach).
+
+Margo's own in this entry: the fitted body read through structural types so the animator package needs no import from
+rigging; the flexion found by bisection on the true root-to-end length, which holds for bones that do not lie on a
+line and for a hinge with a modelled carrying angle; a straight limb's bend side taken from the hinge axis crossed
+with the limb's line; the rule that a bent pose keeps its side and a straight one takes the least-cost swivel; the
+swivel search outward in 5 degree steps with a bisection back to the edge of the range; hinges stopped at straight
+inside a solve while a played pose keeps the structural allowance past it; the gate of a twist read after the swing
+is settled; and a shared region eased across only the bones a solver owns.

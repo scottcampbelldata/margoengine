@@ -5,7 +5,9 @@ import type { Mesh, Vec3 } from '@margoengine/core/extension';
 import { rotationToQuaternion } from '@margoengine/math/quat';
 import { quaternionBlend } from './blend.js';
 import { CCDSolver, type CCDJointLimit, type CCDResult } from './ccd.js';
+import { type Anatomy, anatomyOf, type BoneAccess, ccdLimit, jointOf, limitBones } from './ik.js';
 import type { Animator } from './index.js';
+import { poseTools } from './pose-tools.js';
 
 /**
  * A Cyclic Coordinate Descent chain on the animated skeleton ({@link addCCDChain}). The Animator keeps the object and
@@ -22,8 +24,18 @@ export interface CCDChain {
   rotation?: ArrayLike<number> | null;
   /** World point the chain bends toward (a knee or elbow hint); null or absent for none. */
   pole?: Vec3 | null;
-  /** One limit per joint (index-aligned with `joints`, null for a free joint), relative to the joint's rest rotation. */
+  /**
+   * One limit per joint (index-aligned with `joints`), relative to the joint's rest rotation; null frees a joint. A
+   * joint left out takes its range from the Animator's fitted body (`setAnatomy(animator, body)`) when it has one,
+   * measured from the joint's anatomical zero: an elbow or knee as an exact hinge that stops at straight, any other
+   * joint as the nearest cone and then held to its exact reach.
+   */
   limits?: readonly (CCDJointLimit | null | undefined)[];
+  /**
+   * The fitted body whose ranges the joints without a limit of their own take. Default: the body
+   * `setAnatomy(animator, body)` gave the Animator. Null leaves the body out.
+   */
+  body?: Anatomy | null;
   /** Blend from the animated pose (0) to the solved chain (1); default 1. */
   weight?: number;
   /** Most sweeps per frame (0-1,024, default 16). */
@@ -76,10 +88,47 @@ export function addCCDChain(animator: Animator, chain: CCDChain): () => void {
     pose = [0, 0, 0, 1],
     solved = [0, 0, 0, 1],
     out = [0, 0, 0, 1];
-  joints.forEach((i, j) => {
-    solver.rest.set(animator.restRotation(i), j * 4);
-    solver.setLimit(j, chain.limits?.[j] ?? null);
-  });
+  // Chain bones whose limit came from the body: held to their exact reach, and to the neck's and trunk's shared
+  // ranges, after the solve (a cone only stands in for a reach that is wider one way than the other).
+  const exact: number[] = [],
+    tools = poseTools(animator, 'CCD chain'),
+    scratch = [0, 0, 0, 1],
+    access: BoneAccess = {
+      read: (bone, out) => {
+        const q = tools.rotationOf(nodes[bone].matrix);
+        out[0] = q[0];
+        out[1] = q[1];
+        out[2] = q[2];
+        out[3] = q[3];
+      },
+      write: (bone, world) => {
+        for (let k = 0; k < 4; k++) scratch[k] = world[k];
+        tools.setWorldRotation(nodes[bone], scratch);
+      },
+    };
+  let bound: Anatomy | null | undefined;
+  /** Gives each joint its limit: the chain's own, else the fitted body's range. Again only when the body changes. */
+  const bind = (): void => {
+    const body = chain.body === null ? null : (chain.body ?? anatomyOf(animator)),
+      ranges = body?.limits ? body : null;
+    if (ranges === bound) return;
+    bound = ranges;
+    exact.length = 0;
+    joints.forEach((i, j) => {
+      const own = chain.limits?.[j],
+        joint = own === undefined && ranges ? jointOf(ranges, i) : null;
+      if (joint) {
+        const { neutral, limit } = ccdLimit(joint);
+        solver.rest.set(neutral, j * 4);
+        solver.setLimit(j, limit);
+        exact.push(i);
+      } else {
+        solver.rest.set(animator.restRotation(i), j * 4);
+        solver.setLimit(j, own ?? null);
+      }
+    });
+  };
+  bind();
   solver.rotations.set(solver.rest);
   // Copies the chain's mutable settings into the solver (the solve validates them); returns the validated weight.
   const settings = (): number => {
@@ -99,6 +148,7 @@ export function addCCDChain(animator: Animator, chain: CCDChain): () => void {
   return animator.addSolver(() => {
     const weight = settings();
     if (weight === 0) return;
+    bind();
     const parent = parents[chainNodes[0].id];
     // The solver keeps one scale per joint, so each offset takes what the frame above has beyond that scale per axis.
     let ax = 1,
@@ -166,6 +216,7 @@ export function addCCDChain(animator: Animator, chain: CCDChain): () => void {
       } else animator.writeNodeRotation(chainNodes[j], solved);
     }
     store.tick(false);
+    if (bound && exact.length) limitBones(bound, exact, access);
     chain.onSolve?.(result);
   });
 }

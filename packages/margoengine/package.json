@@ -115,6 +115,10 @@
       "types": "./dist/animator.d.ts",
       "import": "./dist/animator.js"
     },
+    "./animator/ik": {
+      "types": "./dist/animator/ik.d.ts",
+      "import": "./dist/animator/ik.js"
+    },
     "./animator/ccd": {
       "types": "./dist/animator/ccd.d.ts",
       "import": "./dist/animator/ccd.js"

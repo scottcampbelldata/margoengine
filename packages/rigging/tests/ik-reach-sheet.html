@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>IK reach sheet: limbs that obey anatomy</title></head>
+<body>
+<script type="module">
+  // A pose sheet of reaches: one stick body per reach, seen from the front, three-quarter and the side. The top three
+  // rows solve on the fitted body (the default); the bottom three solve the same reaches with `limits: false`, the
+  // solve before the body was read. Upper arms and thighs are blue, forearms and shins orange, hands and feet green,
+  // the nose line and the toes point forward, and each red cross is a target (yellow: a pole).
+  import { Engine } from '/packages/core/dist/index.js';
+  import { createHeadlessCanvas, toPNG } from '/packages/headless/dist/index.js';
+  import { Line, Lines } from '/packages/lines/dist/index.js';
+  import { fitAnatomy, jointAngles } from '../dist/anatomy.js';
+  import { human } from '../dist/anatomy-human.js';
+  import { solvePoseIK } from '../dist/ik.js';
+  import { bodyRig, forward, sub } from './anatomy-fixtures.js';
+
+  const WIDTH = 2200, HEIGHT = 1500, STEP_X = 1.5, STEP_Y = 2.15, DISTANCE = 150;
+  const VIEWS = [['front', 0], ['three-quarter', Math.PI / 4], ['side', Math.PI / 2]];
+  // Targets are offsets from the limb's root (shoulder or hip) for the body's left limb; the right limb mirrors them.
+  const REACHES = [
+    { name: 'rest' },
+    { name: 'hands forward', arm: [0, 0, 0.45] },
+    { name: 'hands overhead', arm: [0, 0.5, 0.12] },
+    { name: 'across the chest', arm: [-0.3, 0, 0.2] },
+    { name: 'hands behind the back', arm: [-0.08, -0.35, -0.2] },
+    { name: 'hands to the mouth', arm: [-0.12, 0.12, 0.12] },
+    { name: 'step up', leg: [0, -0.5, 0.25], oneLeg: true },
+    { name: 'foot back', leg: [0, -0.5, -0.4], oneLeg: true },
+    { name: 'foot out to the side', leg: [0.45, -0.55, 0], oneLeg: true },
+    { name: 'squat', leg: [0.05, -0.5, 0.05], arm: [0, -0.1, 0.4] },
+    { name: 'pole behind: hands forward, step up', arm: [0, 0, 0.45], leg: [0, -0.5, 0.25], pole: [0, 0.3, -3], oneLeg: true },
+  ];
+  const COLORS = { trunk: [0.72, 0.72, 0.72], upper: [0.2, 0.45, 1], lower: [1, 0.5, 0.1], end: [0.2, 0.8, 0.3] };
+  const colorOf = (name) =>
+    /ForeArm|Leg$/.test(name) && !/UpLeg/.test(name) ? COLORS.lower
+      : /Arm$|UpLeg/.test(name) ? COLORS.upper
+        : /Hand|Foot|Toe/.test(name) ? COLORS.end : COLORS.trunk;
+
+  function plainRig(options) {
+    const joints = bodyRig({ fingers: false, ...options }),
+      rest = new Float64Array(joints.length * 10);
+    joints.forEach((joint, i) => {
+      const from = joint.parent < 0 ? [0, 0, 0] : joints[joint.parent].position;
+      rest.set([...sub(joint.position, from), 0, 0, 0, 1, 1, 1, 1], i * 10);
+    });
+    return { names: joints.map((joint) => joint.name), parents: joints.map((joint) => joint.parent), rest };
+  }
+
+  /** Solves one reach on a body; returns joint positions, the targets and what the hinges read. */
+  function pose(rig, body, reach, limits) {
+    const local = rig.rest.slice(),
+      rest = forward(rig.parents, rig.rest).pos,
+      bone = (name) => rig.names.indexOf(name),
+      targets = [], poles = [], results = [];
+    for (const [side, s] of [['Left', 1], ['Right', -1]]) {
+      for (const [kind, parts] of [['arm', ['Arm', 'ForeArm', 'Hand']], ['leg', ['UpLeg', 'Leg', 'Foot']]]) {
+        const offset = reach[kind];
+        if (!offset || (kind === 'leg' && reach.oneLeg && s < 0)) continue;
+        const joints = parts.map((part) => bone(side + part)),
+          root = rest[joints[0]],
+          target = [root[0] + offset[0] * s, root[1] + offset[1], root[2] + offset[2]],
+          pole = reach.pole ? [root[0] + reach.pole[0] * s, root[1] + reach.pole[1], root[2] + reach.pole[2]] : null,
+          result = solvePoseIK({ parents: rig.parents, local, body }, { joints, target, pole, limits });
+        targets.push(target);
+        if (pole) poles.push([root[0], root[1] + 0.25, root[2] - 0.5]);
+        results.push({ limb: `${side} ${kind}`, reached: result.reached, held: result.held ?? false, distance: result.distance });
+      }
+    }
+    const angles = jointAngles(body, local);
+    return {
+      positions: forward(rig.parents, local).pos, targets, poles, results,
+      hinges: { l_elbow: angles.l_elbow.flexion, r_elbow: angles.r_elbow.flexion, l_knee: angles.l_knee.flexion, r_knee: angles.r_knee.flexion },
+    };
+  }
+
+  window.renderSheet = async (options = {}) => {
+    const rig = plainRig({ arms: options.arms ?? 0 }),
+      body = fitAnatomy(rig, { species: human }),
+      rows = [...VIEWS.map((view) => [...view, true]), ...VIEWS.map((view) => [...view, false])],
+      width = REACHES.length * STEP_X,
+      height = rows.length * STEP_Y,
+      engine = await Engine.create(createHeadlessCanvas({ width: WIDTH, height: HEIGHT }), {
+        backend: 'webgpu',
+        camera: { fov: 2 * Math.atan(height / 2 / DISTANCE) * 180 / Math.PI * 1.04, position: [0, 0, DISTANCE], target: [0, 0, 0], near: 1, far: DISTANCE * 2 },
+      });
+    engine.stop();
+    engine.scene.background = '#101418';
+    const errors = [];
+    engine.gpu?.addEventListener?.('uncapturederror', ({ error }) => errors.push(error.message));
+    const lines = Lines.attach(engine), positions = [], colors = [], report = [];
+    const segment = (a, b, color) => { positions.push(...a, ...b); colors.push(...color, ...color); };
+    rows.forEach(([view, angle, limits], row) => {
+      REACHES.forEach((reach, column) => {
+        const solved = pose(rig, body, reach, limits),
+          c = Math.cos(angle), s = Math.sin(angle),
+          // Turn the body about its vertical axis (the camera goes round to its left), then stand it in its cell.
+          place = (p) => [
+            p[0] * c - p[2] * s + (column + 0.5) * STEP_X - width / 2,
+            p[1] + height / 2 - (row + 1) * STEP_Y + 0.15,
+            p[0] * s + p[2] * c,
+          ];
+        rig.parents.forEach((parent, i) => {
+          if (parent >= 0) segment(place(solved.positions[parent]), place(solved.positions[i]), colorOf(rig.names[parent]));
+        });
+        const head = solved.positions[rig.names.indexOf('Head')];
+        segment(place(head), place([head[0], head[1], head[2] + 0.12]), [1, 1, 1]);
+        for (const [points, color] of [[solved.targets, [1, 0.15, 0.15]], [solved.poles, [1, 0.9, 0.1]]])
+          for (const p of points)
+            for (const axis of [[0.04, 0, 0], [0, 0.04, 0], [0, 0, 0.04]])
+              segment(place([p[0] - axis[0], p[1] - axis[1], p[2] - axis[2]]), place([p[0] + axis[0], p[1] + axis[1], p[2] + axis[2]]), color);
+        if (row % 3 === 0) report.push({ reach: reach.name, limits, hinges: solved.hinges, results: solved.results });
+      });
+      // A floor line under each row, and a brighter one between the two halves.
+      const y = height / 2 - (row + 1) * STEP_Y + 0.15;
+      segment([-width / 2, y, 0], [width / 2, y, 0], row === 2 ? [0.9, 0.9, 0.9] : [0.3, 0.3, 0.3]);
+    });
+    lines.add(new Line({ mode: 'segments', positions, colors, width: 4, cap: 'round' }));
+    engine.render({ delta: 0 });
+    engine.render({ delta: 0 });
+    const png = await toPNG(engine);
+    let binary = '';
+    for (let i = 0; i < png.length; i += 0x8000) binary += String.fromCharCode(...png.subarray(i, i + 0x8000));
+    return { png: btoa(binary), report, errors, reaches: REACHES.map((reach) => reach.name), views: rows.map(([view, , limits]) => `${view}, ${limits ? 'fitted body' : 'limits: false'}`) };
+  };
+</script>
+</body>
+</html>

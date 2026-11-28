@@ -9,6 +9,15 @@
 // close to the smallest change. When the torso is settled, each limb is finished by the analytic two-bone solver, so its
 // bones keep their lengths and the bend follows its pole.
 //
+// On a fitted body (`setAnatomy(animator, body)`) the solve obeys anatomy. Each spine joint stays inside its own range
+// (flexion, side bend and twist each have their own, where one `maxBend` allowed 46 degrees any way), and a run of
+// joints that shares a range (the trunk, the neck) is eased back together when the run as a whole passes it, so the
+// bend is shared across the levels. Arms and legs are finished by the swivel-angle limb solver (`solveLimbIK`), which
+// bends an elbow or knee only the anatomical way and keeps the shoulder or hip in range; hands, feet and the head are
+// held inside the wrist's, ankle's and neck's ranges. The wishes keep the order of importance of P. Baerlocher and R.
+// Boulic ("An inverse kinematics architecture enforcing an arbitrary number of strict priority levels", The Visual
+// Computer 20:402-417, 2004) as weights: feet, then balance, then hands and gaze.
+//
 // The centre of mass uses a fixed share of the body per segment (D. A. Winter, "Biomechanics and Motor Control of Human
 // Movement", 4th ed. 2009, Table 4.1 after Dempster 1955): head 8.1 percent, trunk 49.7, each arm 5, each leg 16.1, each over
 // the total of the segments the rig lists, so a rig without a head or arms still has its centre of mass inside the body.
@@ -19,6 +28,16 @@ import { multiplyQuaternions, rotateByQuaternion } from '@margoengine/math/quat'
 import { finiteVector } from '@margoengine/math/validate';
 import { quaternionBlend } from './blend.js';
 import type { Animator } from './index.js';
+import {
+  type Anatomy,
+  type AnatomyJoint,
+  type AnatomyRegion,
+  anatomyOf,
+  clampTurn,
+  jointOf,
+  jointTurn,
+  turnRotation,
+} from './ik.js';
 import { position, poseTools, subtract } from './pose-tools.js';
 
 /** One arm or leg of {@link FullBodyIK}: a direct chain of three joints. Everything but the joints is read every frame. */
@@ -73,8 +92,16 @@ export interface FullBodyIK {
   balance?: boolean;
   /** How far the centre of mass may stand outside the supports, world units. Default a tenth of the first leg's length: the size of a foot. */
   supportRadius?: number;
-  /** Most a spine joint turns from the animated pose, radians (default 0.8). */
+  /**
+   * Most a spine joint turns from the animated pose, radians. Default 0.8 on a rig without a body; no cap on a fitted
+   * body (`setAnatomy`), where each spine joint holds its own range and the trunk and neck share theirs.
+   */
   maxBend?: number;
+  /**
+   * False ignores the Animator's fitted body. Default true: with a body from `setAnatomy(animator, body)`, the spine,
+   * the limbs, the hands, the feet and the head stay inside its joint ranges and elbows and knees bend the anatomical way.
+   */
+  limits?: boolean;
   /** Fraction of a limb's length the torso plans for, 0.5-1 (default 0.98), so a limb is not left locked straight. */
   reach?: number;
   /** Most torso steps per frame, 1-64 (default 12). */
@@ -292,9 +319,14 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
     headLink = headBone ? linkOf(headBone) : -1;
   if (headBone && headLink === -1)
     throw new TypeError('Full-body IK head joint is not below the pelvis; pass a joint that hangs from it');
+  /** The Animator's fitted body, when its limits are on and the rig has not turned them off. */
+  const fitted = (): Anatomy | null => {
+    const body = rig.limits === false ? null : anatomyOf(animator);
+    return body?.limits ? body : null;
+  };
   const read = () => {
     const weight = rig.weight ?? 1,
-      maxBend = rig.maxBend ?? 0.8,
+      maxBend = rig.maxBend ?? (fitted() ? Math.PI : 0.8),
       reach = rig.reach ?? 0.98,
       iterations = rig.iterations ?? 12,
       tolerance = rig.tolerance ?? 0.001;
@@ -331,7 +363,58 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
     turns: number[][] = links.map(() => [0, 0, 0, 1]),
     start: Point[] = links.map(() => [0, 0, 0]),
     relative: number[][] = links.map(() => [0, 0, 0, 1]),
-    worlds: number[][] = links.map(() => [0, 0, 0, 1]);
+    worlds: number[][] = links.map(() => [0, 0, 0, 1]),
+    // On a fitted body, per link: its joint, the link its reference bone is or hangs from (-1 for none), that bone, and
+    // the bone's animated world rotation this frame.
+    spineJoints: (AnatomyJoint | null)[] = links.map(() => null),
+    spineLinks: number[] = links.map(() => -1),
+    spineBones: (Mesh | null)[] = links.map(() => null),
+    spineFrames: number[][] = links.map(() => [0, 0, 0, 1]),
+    angles = [0, 0, 0],
+    before = [0, 0, 0],
+    ease = [1, 1, 1],
+    held = [0, 0, 0, 1];
+  // The runs of spine links that share one range, with the frames their whole turn is measured in.
+  let spans: {
+      region: AnatomyRegion;
+      members: number[];
+      axes: AnatomyJoint['axes'];
+      frame: ArrayLike<number>;
+      referenceFrame: ArrayLike<number>;
+    }[] = [],
+    bound: Anatomy | null | undefined;
+  /** Finds the body's joints and shared regions on the spine links; again only when the body changes. */
+  const bind = (body: Anatomy | null): void => {
+    if (body === bound) return;
+    bound = body;
+    spans = [];
+    for (let j = 0; j < count; j++) {
+      const joint = body && j ? jointOf(body, rig.spine[j - 1]) : null,
+        bone = joint && joint.reference >= 0 ? nodes[joint.reference] : null,
+        own = bone ? links.indexOf(bone) : -1;
+      spineJoints[j] = joint;
+      spineBones[j] = bone;
+      spineLinks[j] = bone ? (own !== -1 ? own : linkOf(bone)) : -1;
+    }
+    if (!body) return;
+    for (const region of body.regions) {
+      const members: number[] = [];
+      for (let j = 1; j < count; j++) {
+        const joint = spineJoints[j];
+        if (joint && region.joints.includes(body.joints.indexOf(joint))) members.push(j);
+      }
+      // The run's whole turn can be measured only when both of its ends are solved here.
+      const first = body.joints[region.joints[0]],
+        last = body.joints[region.joints[region.joints.length - 1]];
+      if (members.length && spineJoints[members[0]] === first && spineJoints[members[members.length - 1]] === last)
+        spans.push({ region, members, axes: first.axes, frame: last.frame, referenceFrame: first.referenceFrame });
+    }
+  };
+  /** The world rotation, as the solve has it now, of the bone link `j`'s joint is measured against. */
+  const referenceNow = (j: number): number[] =>
+    spineLinks[j] < 0 || spineLinks[j] >= j
+      ? spineFrames[j]
+      : multiplyQuaternions(turns[spineLinks[j]], spineFrames[j]);
   const result: FullBodyResult = {
     reached: true,
     distance: 0,
@@ -370,14 +453,43 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
         for (let b = 0; b < size; b++) normal[a * size + b] += wish * value * j[axis * size + b];
       }
   };
-  /** Rebuilds every link from the pelvis's place and the turns between links, holding each within `maxBend`. */
-  const rebuild = (maxBend: number): void => {
+  /**
+   * Rebuilds every link from the pelvis's place and the turns between links, holding each within `maxBend` and, on a
+   * fitted body, inside its joint's range. With `members`, those links' angles are first scaled by `ease`.
+   */
+  const settle = (maxBend: number, members: readonly number[] | null): void => {
     for (let j = 1; j < count; j++) {
       const angle = angleOf(relative[j]);
       if (angle > maxBend) relative[j] = scaleRotation(relative[j], maxBend / angle);
       turns[j] = multiplyQuaternions(relative[j], turns[j - 1]);
+      const joint = spineJoints[j];
+      if (joint) {
+        const reference = referenceNow(j),
+          eased = members?.includes(j) ?? false;
+        jointTurn(joint, reference, multiplyQuaternions(turns[j], worlds[j]), angles);
+        if (eased) for (let s = 0; s < 3; s++) angles[s] *= ease[s];
+        if (clampTurn(joint, angles) || eased) {
+          turnRotation(joint, angles, held);
+          turns[j] = multiplyQuaternions(multiplyQuaternions(reference, held), conjugate(worlds[j]));
+          relative[j] = multiplyQuaternions(turns[j], conjugate(turns[j - 1]));
+        }
+      }
       places[j] = add(places[j - 1], rotateByQuaternion(subtract(start[j], start[j - 1]), turns[j - 1]));
     }
+  };
+  /** {@link settle}, then each shared run (trunk, neck) eased back across its links while the run passes its range. */
+  const rebuild = (maxBend: number): void => {
+    settle(maxBend, null);
+    for (const span of spans)
+      for (let pass = 0; pass < 4; pass++) {
+        const first = span.members[0],
+          last = span.members[span.members.length - 1];
+        jointTurn(span, referenceNow(first), multiplyQuaternions(turns[last], worlds[last]), angles);
+        for (let s = 0; s < 3; s++) before[s] = angles[s];
+        if (!clampTurn(span.region, angles)) break;
+        for (let s = 0; s < 3; s++) ease[s] = Math.abs(before[s]) > 1e-9 ? angles[s] / before[s] : 1;
+        settle(maxBend, span.members);
+      }
   };
   let removed = false;
   const remove = animator.addSolver(() => {
@@ -398,6 +510,14 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
       relative[j] = [0, 0, 0, 1];
       worlds[j] = tools.rotationOf(links[j].matrix);
     }
+    const body = fitted();
+    bind(body);
+    for (let j = 1; j < count; j++) {
+      const bone = spineBones[j];
+      spineFrames[j] = bone ? tools.rotationOf(bone.matrix) : [0, 0, 0, 1];
+    }
+    // A clip may hold the spine outside what a body can do: bring it in before anything is solved on it.
+    if (body) rebuild(maxBend);
     const facing = model.root.matrix,
       forward: Point = [facing[8], facing[9], facing[10]],
       // Down and back: a straight arm's elbow, away from every reach but one down behind the body.
@@ -560,6 +680,7 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
             end,
             aim,
             limb.pole ?? [knee[0] + turned[0] * length, knee[1] + turned[1] * length, knee[2] + turned[2] * length],
+            { limits: rig.limits, hint: !limb.pole },
           );
           const left = distance(position(end), aim);
           result.distance = Math.max(result.distance, left);
@@ -569,6 +690,7 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
         if (wanted) {
           const influence = limb.rotation ? (limb.weight ?? 1) * weight : 1;
           tools.setWorldRotation(end, influence < 1 ? quaternionBlend(rest, wanted, influence) : wanted);
+          if (body) tools.limitBone(end);
         }
         if (limb.avoidance) {
           const root = position(upper),
@@ -586,12 +708,14 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
             Math.abs(distance(next, tip) - distance(knee, tip)) > tolerance
           )
             throw new RangeError('Full-body IK avoidance must preserve both bone lengths; return a legal knee or null');
-          tools.placeLimb(upper, lower, end, tip, next);
-          if (wanted)
+          tools.placeLimb(upper, lower, end, tip, next, { limits: rig.limits });
+          if (wanted) {
             tools.setWorldRotation(
               end,
               limb.rotation ? quaternionBlend(rest, wanted, (limb.weight ?? 1) * weight) : wanted,
             );
+            if (body) tools.limitBone(end);
+          }
         }
       }
       if (headBone) {
@@ -600,6 +724,7 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
             headBone,
             quaternionBlend(tools.rotationOf(headBone.matrix), rig.head!.rotation, (rig.head!.weight ?? 1) * weight),
           );
+        if (body) tools.limitBone(headBone);
         if (headAim) {
           const left = distance(position(headBone), headAim);
           result.distance = Math.max(result.distance, left);

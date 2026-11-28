@@ -35,6 +35,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./ik": {
+      "types": "./dist/ik.d.ts",
+      "import": "./dist/ik.js"
+    },
     "./ccd": {
       "types": "./dist/ccd-entry.d.ts",
       "import": "./dist/ccd-entry.js"

@@ -3,6 +3,18 @@
 // joint onto the line to its neighbour at the bone's length. After each pair of passes every inner joint turns about
 // the line through its two neighbours (which keeps both bone lengths) toward the pole. Results become joint rotations
 // by turning each bone from its old direction to its new one with the shortest arc.
+//
+// On a fitted body (`setAnatomy`, or `body` on the chain) the chain obeys anatomy. An arm or a leg (a shoulder or
+// hip, a hinge, an end) is solved in closed form by its swivel angle (D. Tolani, A. Goswami and N. Badler, "Real-time
+// inverse kinematics techniques for anthropomorphic limbs", Graphical Models 62(5):353-388, 2000; M. Kallmann,
+// "Analytical inverse kinematics with body posture control", Computer Animation and Virtual Worlds 19(2):79-91, 2008):
+// the hinge turns about its own axis inside its range, and the pole picks the swivel inside the range of the joint
+// above. A longer chain is solved by FABRIK and each joint is then brought to the nearest rotation its range allows
+// (its swing inside the reach of its quadrant, J. Wilhelms and A. Van Gelder, "Fast and easy reach-cone joint
+// limits", J Graphics Tools 6(2):27-41, 2001; its twist inside its range, P. Baerlocher, EPFL thesis 2392, 2001), the
+// two steps taking turns until the end stops gaining, as A. Aristidou, Y. Chrysanthou and J. Lasenby move each joint to
+// its nearest allowed place between passes ("Extending FABRIK with model constraints", Computer Animation and Virtual
+// Worlds 27(1):35-57, 2016). A chain that ends in an arm or a leg finishes with the closed-form limb.
 import type { Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
 import {
@@ -12,10 +24,23 @@ import {
   rotateByQuaternion,
   rotationToQuaternion,
 } from '@margoengine/math/quat';
-import type { Mesh } from '@margoengine/core/extension';
 import type { Animator } from '@margoengine/animator';
 import type { ElbowEvaluator } from '@margoengine/kinematics-constraints';
+import {
+  type Anatomy,
+  type AnatomyJoint,
+  anatomyOf,
+  clampTurn,
+  jointOf,
+  jointTurn,
+  limitBones,
+  solveLimbIK,
+  turnRotation,
+} from '@margoengine/animator/ik';
 import { parentOrder } from './rig.js';
+
+export { anatomyOf, setAnatomy } from '@margoengine/animator/ik';
+export type { Anatomy } from '@margoengine/animator/ik';
 
 /** Settings shared by every FABRIK solve. */
 export interface FABRIKOptions {
@@ -35,6 +60,8 @@ export interface FABRIKResult {
   distance: number;
   /** Iterations run. */
   iterations: number;
+  /** On a fitted body: a joint stopped at its range and the end is short of the target. */
+  held?: boolean;
 }
 
 const settings = (options: FABRIKOptions = {}) => {
@@ -264,6 +291,18 @@ export interface IKChain extends FABRIKOptions {
    * (default true). A straight inner joint follows the pole as before. False lets the pole fold any joint either way.
    */
   keepBend?: boolean;
+  /**
+   * The fitted body whose joint ranges the chain obeys (an `AnatomicalRig` from `fitAnatomy`). Default: the body
+   * `setAnatomy` gave the pose, skeleton or Animator, else none.
+   */
+  body?: Anatomy | null;
+  /** False solves as if there were no body. Default true: a fitted body's limits are on. */
+  limits?: boolean;
+  /**
+   * On a fitted arm or leg: the share of the limb's length over which the reach eases in before full stretch, so the
+   * elbow or knee does not snap straight (0-0.5, default 0: the end meets every target in reach exactly).
+   */
+  soft?: number;
 }
 
 /**
@@ -273,12 +312,20 @@ export interface IKChain extends FABRIKOptions {
 export interface IKPose {
   readonly parents: readonly number[];
   readonly local: Float64Array;
+  /** The fitted body of these bones; its limits are on unless the chain says `limits: false`. */
+  readonly body?: Anatomy | null;
 }
 
 /**
  * Solves an IK chain on a pose without an engine: turns the chain's joints (all but the last) so the last reaches
  * `target`, bending toward `pole`. Writes the new rotations into `pose.local`. Bones need positive scales. An uneven
  * scale stretches the bones under it as they turn, so the last joint lands as close as that stretch allows.
+ *
+ * When the pose has a fitted body (`chain.body`, `pose.body` or `setAnatomy(pose, body)`) with limits on, the chain
+ * obeys it: an elbow or knee bends only the anatomical way and stops at its range, even from a straight limb; the pole
+ * only picks the limb's swivel inside the shoulder's or hip's range; every other joint of the chain stays inside its
+ * range. A target the ranges do not allow is approached as closely as they allow, and `held` is true.
+ * `limits: false` on the chain solves as if there were no body.
  * @throws RangeError for an invalid chain or pose.
  */
 export function solvePoseIK(pose: IKPose, chain: IKChain): FABRIKResult {
@@ -325,34 +372,193 @@ export function solvePoseIK(pose: IKPose, chain: IKChain): FABRIKResult {
     }
     return { position, rotation };
   };
-  const frames = joints.map(world),
-    parentOfFirst = parents[joints[0]],
-    base = parentOfFirst >= 0 ? world(parentOfFirst).rotation : [0, 0, 0, 1],
-    points = new Float64Array(joints.length * 3);
-  frames.forEach((frame, i) => points.set(frame.position, i * 3));
-  const before = points.slice(),
-    bends = chain.keepBend === false ? null : bendSides(before, joints.length),
-    result = solveFABRIK(points, chain.target, chain);
-  if (bends) keepBendSides(points, bends);
-  const rotations = chainRotations(
-    before,
-    points,
-    frames.map((f) => f.rotation),
-    chain.weight ?? 1,
-  );
-  // Local rotation of each turned joint: inverse(parent's new world rotation) x its new world rotation.
-  for (let i = 0; i < joints.length - 1; i++) {
-    const parent = i === 0 ? base : rotations[i - 1],
-      l = joints[i] * 10,
-      q = normalizeQuaternion(multiplyQuaternions([-parent[0], -parent[1], -parent[2], parent[3]], rotations[i]));
-    local.set(q, l + 3);
-  }
+  const body = chain.limits === false ? null : (chain.body ?? pose.body ?? anatomyOf(pose)),
+    result = solveChain(
+      {
+        world,
+        above: (bone) => (parents[bone] >= 0 ? world(parents[bone]).rotation : [0, 0, 0, 1]),
+        local: (bone) => quaternionAt(local, bone * 10 + 3),
+        write: (bone, rotation) => local.set(rotation, bone * 10 + 3),
+        flush: () => {},
+      },
+      joints,
+      chain,
+      body,
+    );
   // Under an uneven scale the posed bones stretch as they turn, so the end is measured on the posed skeleton, not on
   // FABRIK's points.
   const posed = world(joints[joints.length - 1]).position,
     t = chain.target,
     distance = Math.hypot(posed[0] - t[0], posed[1] - t[1], posed[2] - t[2]);
-  return { reached: distance <= settings(chain).tolerance, distance, iterations: result.iterations };
+  return { ...result, reached: distance <= settings(chain).tolerance, distance };
+}
+
+/** What the chain solver needs of a posed skeleton: world frames to read and local rotations to write. */
+interface ChainRig {
+  /** A bone's world position and rotation in the pose as it is now. */
+  world(bone: number): { position: ArrayLike<number>; rotation: number[] };
+  /** The world rotation of a bone's parent, [0, 0, 0, 1] at the top. */
+  above(bone: number): number[];
+  /** A bone's local rotation. */
+  local(bone: number): number[];
+  /** Sets a bone's local rotation. */
+  write(bone: number, rotation: number[]): void;
+  /** Makes what was written show in `world`. */
+  flush(): void;
+}
+
+type ChainSettings = FABRIKOptions & Pick<IKChain, 'target' | 'weight' | 'keepBend' | 'soft'>;
+
+/** A hinge straighter than this many degrees is started this far bent, so the solve knows its side. */
+const HINGE_SEED = 3;
+
+/** The elbow or knee at `mid` with the shoulder or hip at `upper`, when the body has that limb. */
+function limbOf(body: Anatomy, upper: number, mid: number): { hinge: AnatomyJoint; ball: AnatomyJoint | null } | null {
+  const hinge = jointOf(body, mid);
+  return hinge?.kind === 'hinge' && hinge.reference === upper ? { hinge, ball: jointOf(body, upper) } : null;
+}
+
+const inverse = (q: ArrayLike<number>): number[] => [-q[0], -q[1], -q[2], q[3]];
+
+/**
+ * Solves a chain on a posed skeleton: FABRIK alone without a body, and with a body the closed-form limb and the
+ * joint ranges described at the top of this file.
+ */
+function solveChain(
+  rig: ChainRig,
+  joints: readonly number[],
+  chain: ChainSettings,
+  body: Anatomy | null,
+): FABRIKResult {
+  const n = joints.length,
+    weight = chain.weight ?? 1,
+    { tolerance } = settings(chain);
+  const fabrik = (blend: number): FABRIKResult => {
+    const frames = joints.map((joint) => rig.world(joint)),
+      base = rig.above(joints[0]),
+      points = new Float64Array(n * 3);
+    frames.forEach((frame, i) => points.set(frame.position, i * 3));
+    const before = points.slice(),
+      bends = chain.keepBend === false ? null : bendSides(before, n),
+      result = solveFABRIK(points, chain.target, chain);
+    if (bends) keepBendSides(points, bends);
+    const rotations = chainRotations(
+      before,
+      points,
+      frames.map((f) => f.rotation),
+      blend,
+    );
+    // Local rotation of each turned joint: inverse(parent's new world rotation) x its new world rotation.
+    for (let i = 0; i < n - 1; i++)
+      rig.write(
+        joints[i],
+        normalizeQuaternion(multiplyQuaternions(inverse(i === 0 ? base : rotations[i - 1]), rotations[i])),
+      );
+    rig.flush();
+    return result;
+  };
+  if (!body?.limits) return fabrik(weight);
+  const turning = joints.slice(0, n - 1),
+    start = weight < 1 ? turning.map((joint) => rig.local(joint)) : null,
+    end = joints[n - 1],
+    gap = (): number => {
+      const p = rig.world(end).position,
+        t = chain.target;
+      return Math.hypot(p[0] - t[0], p[1] - t[1], p[2] - t[2]);
+    },
+    referenceOf = (joint: AnatomyJoint): number[] =>
+      joint.reference >= 0 ? rig.world(joint.reference).rotation : [0, 0, 0, 1],
+    setWorld = (bone: number, rotation: ArrayLike<number>): void => {
+      rig.write(bone, normalizeQuaternion(multiplyQuaternions(inverse(rig.above(bone)), rotation as number[])));
+      rig.flush();
+    },
+    /**
+     * Brings every turning joint of the chain inside its range, the nearest to the body first, and a trunk or neck
+     * the chain runs along inside its range as a whole; true when one moved.
+     */
+    clamp = (): boolean =>
+      limitBones(body, turning, {
+        read: (bone, out) => {
+          const q = rig.world(bone).rotation;
+          out[0] = q[0];
+          out[1] = q[1];
+          out[2] = q[2];
+          out[3] = q[3];
+        },
+        write: setWorld,
+      }),
+    limb = (upper: number, mid: number, tip: number, parts: NonNullable<ReturnType<typeof limbOf>>): boolean => {
+      const u = rig.world(upper),
+        m = rig.world(mid),
+        solved = solveLimbIK({
+          root: u.position,
+          mid: m.position,
+          end: rig.world(tip).position,
+          upperRotation: u.rotation,
+          lowerRotation: m.rotation,
+          target: chain.target,
+          pole: chain.pole ?? null,
+          hinge: parts.hinge,
+          ball: parts.ball,
+          reference: parts.ball ? referenceOf(parts.ball) : undefined,
+          soft: chain.soft,
+          tolerance,
+        });
+      setWorld(upper, solved.upper);
+      setWorld(mid, solved.lower);
+      return solved.held;
+    };
+  let iterations = 0,
+    stopped = false;
+  const tail = n >= 3 ? limbOf(body, joints[n - 3], joints[n - 2]) : null;
+  if (n === 3 && tail) stopped = limb(joints[0], joints[1], joints[2], tail);
+  else {
+    // A straight hinge has no side for FABRIK to keep: start it a little bent, the anatomical way.
+    const v = [0, 0, 0],
+      turn = [0, 0, 0, 1];
+    for (let i = 1; i < n - 1; i++) {
+      const joint = jointOf(body, joints[i]);
+      if (joint?.kind !== 'hinge') continue;
+      const reference = referenceOf(joint);
+      jointTurn(joint, reference, rig.world(joints[i]).rotation, v);
+      if (v[0] >= HINGE_SEED) continue;
+      v[0] = HINGE_SEED;
+      clampTurn(joint, v);
+      turnRotation(joint, v, turn);
+      setWorld(joints[i], multiplyQuaternions(reference, turn));
+    }
+    // FABRIK and the ranges take turns while the end keeps gaining; the best pose inside the ranges is kept.
+    let best = Number.POSITIVE_INFINITY,
+      kept: number[][] | null = null;
+    for (let round = 0; round < 8; round++) {
+      iterations += fabrik(1).iterations;
+      const moved = clamp(),
+        left = gap();
+      stopped ||= moved;
+      if (left < best - 1e-12) {
+        best = left;
+        kept = turning.map((joint) => rig.local(joint));
+      } else break;
+      if (!moved || left <= tolerance) break;
+    }
+    if (kept) {
+      turning.forEach((joint, i) => rig.write(joint, kept![i]));
+      rig.flush();
+    }
+    if (tail) stopped = limb(joints[n - 3], joints[n - 2], end, tail) || stopped;
+  }
+  if (start) {
+    // Part of the way from the pose to the solve, then back inside the ranges.
+    turning.forEach((joint, i) => {
+      const solved = rig.local(joint),
+        delta = partial(multiplyQuaternions(inverse(start[i]), solved), weight);
+      rig.write(joint, normalizeQuaternion(multiplyQuaternions(start[i], delta)));
+    });
+    rig.flush();
+    clamp();
+  }
+  const distance = gap();
+  return { reached: distance <= tolerance, distance, iterations, held: stopped && distance > tolerance };
 }
 
 /**
@@ -570,7 +776,7 @@ export interface IKSkeleton {
 /**
  * Solves an IK chain on a `Skeleton` (`@margoengine/animation`): reads its current pose, turns the chain's joints so
  * the last reaches `target` (in skeleton space) bending toward `pole`, and sets their rotations. Joints may be bone
- * indices or names.
+ * indices or names. A body given by `chain.body` or `setAnatomy(skeleton, body)` is obeyed as in {@link solvePoseIK}.
  */
 export function solveSkeletonIK(
   skeleton: IKSkeleton,
@@ -587,7 +793,7 @@ export function solveSkeletonIK(
     local.set(scale, b * 10 + 7);
   }
   const joints = (chain?.joints ?? []).map((joint) => (typeof joint === 'string' ? names.indexOf(joint) : joint));
-  const result = solvePoseIK({ parents, local }, { ...chain, joints });
+  const result = solvePoseIK({ parents, local, body: chain?.body ?? anatomyOf(skeleton) }, { ...chain, joints });
   for (let i = 0; i < joints.length - 1; i++)
     skeleton.setPose(joints[i], { rotation: quaternionAt(local, joints[i] * 10 + 3) });
   return result;
@@ -661,6 +867,12 @@ export interface AnimatorIKChain extends FABRIKOptions {
   weight?: number;
   /** Keep each bent elbow or knee on the side the animation bends it to, as {@link IKChain.keepBend}; default true. */
   keepBend?: boolean;
+  /** The fitted body the chain obeys, as {@link IKChain.body}. Default: the body `setAnatomy` gave the Animator. */
+  body?: Anatomy | null;
+  /** False solves as if there were no body, as {@link IKChain.limits}. */
+  limits?: boolean;
+  /** Eases a fitted limb's reach in before full stretch, as {@link IKChain.soft}. */
+  soft?: number;
   /** Called after each frame's solve with its result. */
   onSolve?: (result: FABRIKResult) => void;
 }
@@ -670,7 +882,12 @@ export interface AnimatorIKChain extends FABRIKOptions {
  * pose, additive layers and foot IK: the chain's joints turn so the last joint reaches `chain.target`, the bend facing
  * `chain.pole`. The last joint keeps its animated local rotation. Joints and their ancestors need positive scales;
  * rotations commit through the Animator's `writeRotation` when it has one. Returns a function that removes
- * the chain. For joint limits, use `addCCDChain` from `@margoengine/animator`.
+ * the chain.
+ *
+ * When the Animator has a fitted body (`chain.body`, or `setAnatomy(animator, body)`) with limits on, the chain obeys
+ * it as {@link solvePoseIK} does: elbows and knees bend the anatomical way inside their range, the pole only picks the
+ * swivel inside the shoulder's or hip's range, and every joint of the chain stays in range. `limits: false` on the
+ * chain turns that off.
  */
 export function addIKChain(animator: Animator, chain: AnimatorIKChain): () => void {
   const nodes = animator.animation.model.nodes,
@@ -681,33 +898,29 @@ export function addIKChain(animator: Animator, chain: AnimatorIKChain): () => vo
   settings(chain);
   if (chain.onSolve !== undefined && typeof chain.onSolve !== 'function')
     throw new TypeError('IK chain onSolve must be a function');
-  const chainNodes: Mesh[] = joints.map((i) => nodes[i]),
-    points = new Float64Array(joints.length * 3),
-    before = new Float64Array(joints.length * 3);
+  const t = store.transforms,
+    rig: ChainRig = {
+      world: (bone) => {
+        const m = nodes[bone].matrix;
+        return { position: [m[12], m[13], m[14]], rotation: worldRotation(m) };
+      },
+      above: (bone) => {
+        const parent = parents[nodes[bone].id];
+        return parent === -1 ? [0, 0, 0, 1] : worldRotation(engine.meshes.get(parent)!.matrix);
+      },
+      local: (bone) => {
+        const id = nodes[bone].id;
+        return [t.qx[id], t.qy[id], t.qz[id], t.qw[id]];
+      },
+      write: (bone, rotation) => animator.writeNodeRotation(nodes[bone], rotation),
+      flush: () => store.tick(false),
+    };
   return animator.addSolver(() => {
     const weight = chain.weight ?? 1;
     if (!(weight >= 0 && weight <= 1)) throw new RangeError('IK weight must be from 0 to 1');
     if (weight === 0) return;
-    const rotations = chainNodes.map((node, i) => {
-      const m = node.matrix;
-      points.set([m[12], m[13], m[14]], i * 3);
-      return worldRotation(m);
-    });
-    before.set(points);
-    const bends = chain.keepBend === false ? null : bendSides(before, joints.length),
-      result = solveFABRIK(points, chain.target, chain);
-    if (bends) keepBendSides(points, bends);
-    const turned = chainRotations(before, points, rotations, weight),
-      parent = parents[chainNodes[0].id],
-      base = parent === -1 ? [0, 0, 0, 1] : worldRotation(engine.meshes.get(parent)!.matrix);
-    for (let i = 0; i < chainNodes.length - 1; i++) {
-      const p = i === 0 ? base : turned[i - 1];
-      animator.writeNodeRotation(
-        chainNodes[i],
-        normalizeQuaternion(multiplyQuaternions([-p[0], -p[1], -p[2], p[3]], turned[i])),
-      );
-    }
-    store.tick(false);
+    const body = chain.limits === false ? null : (chain.body ?? anatomyOf(animator)),
+      result = solveChain(rig, joints, chain, body);
     chain.onSolve?.(result);
   });
 }

@@ -29,6 +29,7 @@ export interface FullBodyIK {
     balance?: boolean;
     supportRadius?: number;
     maxBend?: number;
+    limits?: boolean;
     reach?: number;
     iterations?: number;
     tolerance?: number;

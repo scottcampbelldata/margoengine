@@ -7,11 +7,16 @@ import { Animator } from "@margoengine/animator";
 import { Vec3 } from "@margoengine/core";
 import { ElbowEvaluator } from "@margoengine/kinematics-constraints";
 
+export { Anatomy } from "@margoengine/animator";
+
 export interface AnimatorIKChain extends FABRIKOptions {
     joints: readonly number[];
     target: Vec3;
     weight?: number;
     keepBend?: boolean;
+    body?: Anatomy | null;
+    limits?: boolean;
+    soft?: number;
     onSolve?: (result: FABRIKResult) => void;
 }
 
@@ -25,6 +30,7 @@ export interface FABRIKResult {
     reached: boolean;
     distance: number;
     iterations: number;
+    held?: boolean;
 }
 
 export interface IKChain extends FABRIKOptions {
@@ -32,11 +38,15 @@ export interface IKChain extends FABRIKOptions {
     target: Vec3;
     weight?: number;
     keepBend?: boolean;
+    body?: Anatomy | null;
+    limits?: boolean;
+    soft?: number;
 }
 
 export interface IKPose {
     readonly parents: readonly number[];
     readonly local: Float64Array;
+    readonly body?: Anatomy | null;
 }
 
 export interface IKSkeleton {
@@ -54,9 +64,13 @@ export interface IKSkeleton {
 
 export function addIKChain(animator: Animator, chain: AnimatorIKChain): () => void;
 
+export { anatomyOf } from "@margoengine/animator";
+
 export function elbowEvaluator(upperLength: number, lowerLength: number, pole: Vec3 | (() => Vec3)): ElbowEvaluator;
 
 export function rotationBetween(from: ArrayLike<number>, to: ArrayLike<number>): [number, number, number, number];
+
+export { setAnatomy } from "@margoengine/animator";
 
 export function solveFABRIK(points: Float64Array | number[], target: Vec3, options?: FABRIKOptions): FABRIKResult;
 
