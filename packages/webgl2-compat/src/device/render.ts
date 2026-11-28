@@ -1465,6 +1465,12 @@ export function origin(o: GPUOrigin3D | undefined): [number, number, number] {
  */
 interface Sub {
   readonly key: string;
+  /**
+   * What decides a framebuffer's completeness for this subresource (CompatDevice.framebufferStatus): its kind (texture
+   * target, or renderbuffer with its sample count), internal format and size. Subresources of one signature in the same
+   * points give framebuffers of the same status.
+   */
+  readonly sig: string;
   readonly owner: CompatTexture;
   readonly info: FormatInfo;
   readonly level: number;
@@ -1861,8 +1867,10 @@ export class Replayer {
     for (let level = 0; level < levels && complete; level++)
       for (let layer = 0, n = layersAt(level); layer < n; layer++) {
         attach(level, layer, texture);
+        // One attachment of a non-zero size: its target, format and point decide (CompatDevice.framebufferStatus).
         if (level === 0 && layer === 0)
-          complete = gl.checkFramebufferStatus(gl.DRAW_FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+          complete =
+            this.device.framebufferStatus(`zero ${target}.${info.internal}.${point}`) === gl.FRAMEBUFFER_COMPLETE;
         if (!complete) break;
         if (hasDepth(info) && hasStencil(info)) gl.clearBufferfi(gl.DEPTH_STENCIL, 0, 0, 0);
         else if (hasDepth(info)) gl.clearBufferfv(gl.DEPTH, 0, [0]);
@@ -1971,9 +1979,11 @@ export class Replayer {
 
   private makeSub(s: TextureStorage, level: number, layer: number): Sub {
     const gl = this.gl;
+    const t = s.texture;
     return {
       key: `s${s.id}.${level}.${layer}`,
-      owner: s.texture,
+      sig: `t${s.target}.${s.info.internal}.${Math.max(1, t.width >> level)}x${Math.max(1, t.height >> level)}`,
+      owner: t,
       info: s.info,
       level,
       attach: (point) => {
@@ -2008,6 +2018,7 @@ export class Replayer {
     const gl = this.gl,
       sub: Sub = {
         key: `r${t.id}`,
+        sig: `r${t.sampleCount}.${t.storageInfo.internal}.${t.width}x${t.height}`,
         owner: t,
         info: t.storageInfo,
         level: 0,
@@ -2038,6 +2049,7 @@ export class Replayer {
       texture = t.sliceStandIn(s);
     return {
       key: `z${s.id}.${level}`,
+      sig: `t${gl.TEXTURE_2D}.${s.info.internal}.${Math.max(1, t.width >> level)}x${Math.max(1, t.height >> level)}`,
       owner: t,
       info: s.info,
       level,
@@ -2091,6 +2103,9 @@ export class Replayer {
       device = this.device,
       buffers = own.map((c, i) => (c ? gl.COLOR_ATTACHMENT0 + i : gl.NONE)),
       key = `${own.map((c) => c?.key ?? '-').join(',')}|${depth?.key ?? ''}`,
+      // The same subresource at two colour points is its own case (WebGL 2.0: FRAMEBUFFER_UNSUPPORTED): each colour
+      // signature carries the first point that holds it.
+      signature = `${own.map((c) => (c ? `${c.sig}@${own.indexOf(c)}` : '-')).join(',')}|${depth?.sig ?? ''}`,
       owners = [...own.filter((c): c is Sub => !!c), ...(depth ? [depth] : [])].map((c) => c.owner);
     const record = device.framebuffer(key, owners, (fbo, made) => {
       device.state.bindDrawFramebuffer(fbo);
@@ -2099,7 +2114,7 @@ export class Replayer {
       gl.drawBuffers(buffers);
       // Once, when made: the same attachments again keep their completeness (see CompatDevice.framebuffer).
       if (!made) return;
-      const status = gl.checkFramebufferStatus(gl.DRAW_FRAMEBUFFER);
+      const status = device.framebufferStatus(signature);
       if (status !== gl.FRAMEBUFFER_COMPLETE)
         device.validationError(
           `The render pass attachments do not form a complete WebGL2 framebuffer (status 0x${status.toString(16)})`,
@@ -2462,6 +2477,7 @@ export class Replayer {
     const gl = this.gl,
       sub: Sub = {
         key: `q${own ? 's' : ''}${t.id}`,
+        sig: `t${gl.TEXTURE_2D}.${t.storageInfo.internal}.${t.width}x${t.height}`,
         owner: t,
         info: t.storageInfo,
         level: 0,

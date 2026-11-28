@@ -389,6 +389,29 @@ export class CompatDevice extends EventTarget {
   private linkTimer: ReturnType<typeof setTimeout> | 0 = 0;
   /** Cached framebuffers by attachment key, with how to attach them again and the frame they were last attached in. */
   private readonly framebuffers = new Map<string, FramebufferRecord>();
+  /** checkFramebufferStatus answers by attachment signature (see {@link framebufferStatus}). */
+  private readonly statuses = new Map<string, number>();
+
+  /**
+   * @internal The completeness of the framebuffer bound to DRAW_FRAMEBUFFER, whose attachments have the signature
+   * `signature`: checked once per signature and reused (KB-COMPAT-FBSTATUS1). GL ES 3.0.6 section 4.4.4 makes
+   * completeness a function of what is attached, never of which object: each attachment's internal format and point,
+   * its object type and RENDERBUFFER_SAMPLES, and (for a texture that is not immutable, which the layer never makes)
+   * its level; WebGL 2.0 adds equal widths and heights across attachments and one image at one colour point at most
+   * ("checkFramebufferStatus may return FRAMEBUFFER_INCOMPLETE_DIMENSIONS", "Framebuffer color attachments"). A
+   * signature holds all of those, so two framebuffers of one signature have the same status, and the implementation's
+   * own FRAMEBUFFER_UNSUPPORTED depends only on the combination of formats. Each check waits for the GPU process to run
+   * every command before it: ten-thousand-trees' first frame made 2,473 of them, 1.7 s of its longest task. An answer
+   * read on a lost context (0, an error) is not kept.
+   */
+  framebufferStatus(signature: string): number {
+    const known = this.statuses.get(signature);
+    if (known !== undefined) return known;
+    const gl = this.gl,
+      status = gl.checkFramebufferStatus(gl.DRAW_FRAMEBUFFER);
+    if (status && !gl.isContextLost()) this.statuses.set(signature, status);
+    return status;
+  }
   /**
    * @internal Frames this device's canvases have shown (CompatCanvasContext.present). A cached framebuffer is attached
    * again on its first use in each new frame: see {@link framebuffer}.

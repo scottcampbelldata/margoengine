@@ -371,6 +371,24 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `packages/headless/tests/look-clean.test.js` (a bar moving 2 px under a 12 px camera sweep, drawn sharp,
   fails by the camera's motion and passes by its velocity; the same bar really moving 12 px still fails).
 
+### Fixed 2026-11-28: the WebGL2 layer read checkFramebufferStatus for every new framebuffer and every new texture (KB-COMPAT-FBSTATUS1, webgl2-compat)
+
+- **Repro:** `scripts/web-demos/startup-profile.mjs ten-thousand-trees --backend=webgl2` on main 4469d88656: 2,878 to
+  2,954 `checkFramebufferStatus` calls in the start (1.6 to 2.7 s), 2,473 of them inside one 4.3 s task of a probe
+  build (Chrome on ANGLE Direct3D 11). Each call waits for the GPU process to run every command before it.
+- **Cause:** `Replayer.makeFramebuffer` checked each framebuffer it made, and `Replayer.zero` (`clearLevels`) checked
+  the scratch framebuffer each time it zeroed a new texture: every bind group's storage texture and every buffer's data
+  texture is one. Completeness depends only on what kind of image is attached where (GL ES 3.0.6 section 4.4.4: each
+  attachment's object type, internal format, renderbuffer samples and, for a mutable texture, its level; WebGL 2.0
+  adds equal widths and heights and one image per colour point), never on which texture it is.
+- **Fix:** `CompatDevice.framebufferStatus(signature)` checks once per attachment signature (kind, internal format,
+  size, point, and the first colour point of a repeated image) and reuses the answer; an incomplete signature is still
+  reported for every framebuffer that has it, with the same text. A status read on a lost context is not kept. Paired
+  A/B of the start, main against the warm-frame route of KB-QUALITY-WARMSERIAL1 with this fix, taking turns, 4 rounds:
+  2,878 to 2,954 reads before, 109 to 113 after.
+- **Regression:** `packages/webgl2-compat/test/framebuffer-status.test.js` (6 framebuffers of one signature: 12 reads
+  before, 2 after); `packages/webgl2-compat/test/passes.test.js` gives its second stand-in format a signature of its own.
+
 ### Open 2026-11-28: warmUp makes ten-thousand-trees take 33 s instead of 18 s to start on the WebGL2 layer (KB-QUALITY-WARMSERIAL1, quality, webgl2-compat)
 
 - **Repro:** a paired A/B of `scripts/web-demos/startup-profile.mjs ten-thousand-trees --backend=webgl2`, the build of

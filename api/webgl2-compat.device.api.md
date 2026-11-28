@@ -245,6 +245,7 @@ export class CompatDevice extends EventTarget {
     onuncapturederror: ((event: Event) => void) | null;
     readonly loadSampler: WebGLSampler;
     readonly linking: Set<CompatRenderPipeline>;
+    framebufferStatus(signature: string): number;
     frame: number;
     readonly presents: {
         present(): void;
@@ -1599,6 +1600,7 @@ interface StorageSlot {
 
 interface Sub {
     readonly key: string;
+    readonly sig: string;
     readonly owner: CompatTexture;
     readonly info: FormatInfo;
     readonly level: number;

@@ -51,7 +51,7 @@ test('a cached framebuffer is attached again each frame but checked for complete
     check = d.gl.checkFramebufferStatus;
   d.gl.checkFramebufferStatus = (target) => (counts.check++, check(target));
   // One colour subresource as the replayer makes them for a pass's attachment.
-  const sub = { key: 't1.0', owner: { framebuffers: new Set() }, info: { kind: 'color' }, level: 0 },
+  const sub = { key: 't1.0', sig: 'rgba8', owner: { framebuffers: new Set() }, info: { kind: 'color' }, level: 0 },
     target = { ...sub, attach: () => counts.attach++ };
   const fbo = r.single(target);
   assert.deepEqual(counts, { check: 1, attach: 1 }, 'made, attached and checked');
@@ -62,13 +62,14 @@ test('a cached framebuffer is attached again each frame but checked for complete
     assert.equal(r.single(target), fbo);
   }
   assert.deepEqual(counts, { check: 1, attach: 4 }, 'attached again in each new frame, never checked again');
-  // An incomplete framebuffer is still reported, once, when it is made.
+  // An incomplete framebuffer is still reported, once, when it is made (a format of its own: one signature has one
+  // status, KB-COMPAT-FBSTATUS1).
   const errors = [];
   d.gl.checkFramebufferStatus = () => (counts.check++, 0x8cd6);
   d.addEventListener('uncapturederror', (e) => (e.preventDefault(), errors.push(e.error.message)));
-  r.single({ ...sub, key: 't2.0', attach: () => counts.attach++ });
+  r.single({ ...sub, key: 't2.0', sig: 'r32float', attach: () => counts.attach++ });
   d.frame++;
-  r.single({ ...sub, key: 't2.0', attach: () => counts.attach++ });
+  r.single({ ...sub, key: 't2.0', sig: 'r32float', attach: () => counts.attach++ });
   // The layer dispatches uncapturederror in a task of its own, as WebGPU does.
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(counts.check, 2);
