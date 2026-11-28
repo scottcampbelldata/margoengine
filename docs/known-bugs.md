@@ -6,6 +6,26 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: a figure under reduced motion kept a picture without its axes and ignored input (KB-VC-SCIVIZ-VOL, -SURF, -WIND, -HEAD, sciviz)
+
+- **Repro:** `node scripts/visual-compat.mjs --only=sciviz-volume,sciviz-surface,sciviz-wind,sciviz-head` several times on
+  b291d946f3 (RTX A6000, Edge 158). Captures of the reduced-motion still frame came in two forms at random, on native
+  WebGPU and on the WebGL2 layer alike: with the axes, or without them (d > 2 on 0.71% to 1.42% of pixels, max d 199);
+  once the surface page showed only its background (59%). So the "layer differences" were the same fault landing on the
+  layer's capture.
+- **Cause:** the accessibility view's reduced-motion setting suspended the engine's frame loop (`engine.pace`) and nothing
+  drew afterwards. The view attaches on a 250 ms scan, often before the axes' lazy imports (or the first frame) had
+  drawn, and the canvas kept that frame. Dragging, the wheel and the page's controls drew nothing either, since the
+  controls apply input in a frame.
+- **Fix:** a suspended figure draws each change after its pending work, and each input gets one frame with damping off
+  (`packages/sciviz/src/figure.ts`, `a11y.ts`). Regression: `packages/sciviz/tests/a11y.test.js` ('a figure under
+  reduced motion draws its changes and answers input with one frame'), which fails without the fix.
+- **Second cause (the check):** with the axes fixed, the volume and wind pages still differed between two native loads
+  by one level on a few pixels of the page itself (a slider thumb, select corners, the CSS colour bar), from Chromium's
+  partial raster; 24 loads of each gave 2 to 4 distinct pictures, and 1 with `--disable-partial-raster`. The
+  comparison run captures with that flag (`captureArgs`, `scripts/support/visual-compat-pages.js`; regression
+  `tests/visual-compat-pages.test.js`). Thresholds and the exact-frame rule are unchanged.
+
 ### Open: GPULiquid's accurate profile moves momentum at a free surface (KB-LIQUID-SURFMOM1, water)
 
 - **Repro:** `GPULiquid` CPU twin, `profile: 'accurate'`, no gravity, free-slip walls (`walls: 'slip'`), a layer 4
@@ -18,6 +38,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   corners no longer cancel: the surface cells' pressure is a net force on the liquid. A first-order free surface (the
   pressure is zero in the air cells, not at the surface itself); a ghost-fluid surface (Gibou et al. 2002) would place
   the zero pressure at the surface and shrink it.
+
 ### Open 2026-11-28: a rung under its own weight no longer cracks in the remeshing test (KB-SOFT-LADDERCRACKS1, physics soft tests)
 
 - **Repro:** `node --test packages/physics/tests/coupling/volumetric-solids.test.js`, "automatic cracks remain finite when

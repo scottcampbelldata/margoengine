@@ -5,7 +5,7 @@ import { figureAtCanvas, registerFigureCleanup } from './publication-labels.js';
 import { fault, rangeError } from '../../shared/errors.js';
 import { multiplyMatrices, projectPoint } from '@margoengine/math/mat4';
 import type { Engine } from '@margoengine/core/extension';
-import { reducedMotionFigures } from './motion-state.js';
+import { reducedMotionFigures, stillRedraws } from './motion-state.js';
 
 /** A native or application-defined row, in data units. */
 export interface AccessibleDatum {
@@ -738,13 +738,38 @@ export function attachAccessibility(figure: Figure, options: AccessibilityOption
   const contrast =
     typeof matchMedia === 'function' ? matchMedia('(prefers-contrast: more), (forced-colors: active)') : undefined;
   const engine = figure.engine as unknown as Engine;
-  const suspended = () => false;
+  // Reduced motion stops the animation, not the picture: the figure draws its own changes, and each input gets one
+  // frame, so dragging, zooming and the page's controls still answer.
+  let input = false;
+  const suspended = () => {
+    const draw = input;
+    input = false;
+    return draw;
+  };
+  const touched = (event: Event) => {
+    if (event.type !== 'pointermove' || (event as PointerEvent).buttons) input = true;
+  };
+  for (const type of [
+    'pointerdown',
+    'pointermove',
+    'pointerup',
+    'wheel',
+    'keydown',
+    'keyup',
+    'input',
+    'change',
+    'click',
+  ])
+    on(doc, type, touched, true);
   let motionApplied = false,
-    originalPace: Engine['pace'];
+    originalPace: Engine['pace'],
+    damped: boolean | undefined;
   const restoreMotion = () => {
     if (!motionApplied) return;
     reducedMotionFigures.delete(figure);
     if (engine.pace === suspended) engine.pace = originalPace;
+    if (figure.controls && damped !== undefined) figure.controls.enableDamping = damped;
+    damped = undefined;
     motionApplied = false;
   };
   const motion = () => {
@@ -754,11 +779,22 @@ export function attachAccessibility(figure: Figure, options: AccessibilityOption
       engine.pace = suspended;
       reducedMotionFigures.add(figure);
       motionApplied = true;
+      // Damping glides on over later frames; without them the view must take each drag whole.
+      if (figure.controls) {
+        damped = figure.controls.enableDamping;
+        figure.controls.enableDamping = false;
+      }
+      stillRedraws.get(figure)?.();
     } else if (!active) restoreMotion();
     root.dataset.reducedMotion = String(active);
   };
   motion();
   if (reduced) on(reduced, 'change', motion as EventListener);
+  if (typeof ResizeObserver === 'function') {
+    const resized = new ResizeObserver(() => stillRedraws.get(figure)?.());
+    resized.observe(canvas);
+    off.push(() => resized.disconnect());
+  }
   let originalTheme = { ...figure.theme };
   let contrastApplied = false;
   const applyTheme = (theme: Theme) => {

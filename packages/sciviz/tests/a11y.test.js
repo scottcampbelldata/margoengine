@@ -248,6 +248,49 @@ test('reduced motion suspends timeline frames while preserving playback and canc
     f.restore();
   }
 });
+// KB-VC-SCIVIZ-STILL: the view suspended the frame loop and nothing drew afterwards, so a page that attached before
+// the axes (or the first frame) had drawn kept a picture without them, and dragging or the page's controls did nothing.
+test('a figure under reduced motion draws its changes and answers input with one frame', async () => {
+  const f = domFixture();
+  try {
+    let draws = 0;
+    f.engine.render = () => draws++;
+    const controls = { enableDamping: true };
+    Object.defineProperty(f.fig, 'controls', { configurable: true, get: () => controls });
+    const settle = async () => {
+      for (let i = 0; i < 20; i++) await Promise.resolve();
+    };
+    const a = attachAccessibility(f.fig, { reducedMotion: true, series: [] });
+    await a.ready;
+    await settle();
+    assert.ok(draws > 0, 'the figure as it stood at attach was never drawn');
+    assert.equal(controls.enableDamping, false);
+    let before = draws;
+    f.fig.addLayer({ bounds: [0, 1, 0, 1, 0, 1], setModel() {}, draw() {}, restore() {}, dispose() {} });
+    await settle();
+    assert.ok(draws > before, 'an added layer was never drawn');
+    before = draws;
+    await f.fig.ready();
+    assert.ok(draws > before, 'ready() left the change undrawn');
+    assert.equal(f.engine.pace(0), false);
+    for (const type of ['pointerdown', 'wheel', 'input', 'change']) {
+      f.canvas.dispatchEvent(new f.dom.window.Event(type, { bubbles: true }));
+      assert.equal(f.engine.pace(0), true, `${type} got no frame`);
+      assert.equal(f.engine.pace(0), false, `${type} left the loop running`);
+    }
+    f.canvas.dispatchEvent(new f.dom.window.Event('pointermove', { bubbles: true }));
+    assert.equal(f.engine.pace(0), false, 'a move without a pressed button is not input');
+    a.dispose();
+    assert.equal(controls.enableDamping, true);
+    await settle();
+    before = draws;
+    await f.fig.ready();
+    assert.equal(draws, before, 'a running loop needs no extra draw');
+  } finally {
+    f.restore();
+  }
+});
+
 test('keyboard movement, full table paging, live descriptions, weak discovery and figure-owned cleanup', async () => {
   const f = domFixture();
   try {

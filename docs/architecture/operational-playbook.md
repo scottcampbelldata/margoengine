@@ -2448,6 +2448,9 @@ output rather than skipped tests or passing substitute numbers. Repeated EXR,
 USDZ and polygon comparisons do no timing work in the build phase. The million-
 voxel paste scene keeps its equality checks in correctness without best-of rounds.
 
+The WebGL2 layer's pixel comparison (`visual:compat`) captures with Chromium's partial raster off, so the page's
+own painting cannot make a still frame differ between two loads (KB-VC-SCIVIZ, 2026-11-27).
+
 Biome flythrough and object-camera correctness run as ordinary GPU checks. Separate
 `flythrough-speed.mjs` and `objects-frame-speed.mjs` retain the original speed
 scenes, sampling, baselines and assertions. The

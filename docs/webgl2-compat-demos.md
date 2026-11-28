@@ -8,7 +8,8 @@ downloads the layer only then, and a browser with WebGPU downloads none of it.
 How it is measured: `npm run visual:compat` ([scripts/visual-compat.mjs](../scripts/visual-compat.mjs)) removes
 `navigator.gpu` before a site page loads, so the page loads the layer exactly as a visitor's browser would. Each demo is
 captured natively twice (its run-to-run noise) and on the layer once, at its desktop view (the gallery's model view),
-as the still frame the visual check uses (prefers-reduced-motion). Per pixel, d is the largest RGB channel difference
+as the still frame the visual check uses (prefers-reduced-motion), with Chromium's partial raster off
+(`captureArgs`: a repainted rectangle of the page itself can differ by one level from load to load). Per pixel, d is the largest RGB channel difference
 (0 to 255). "Same pixels" is the roadmap's parity rule: at most 0.1% of pixels with d > 2 and a mean d of at most 0.25.
 "Runs with differences" states the numbers, and "refused" quotes what the page shows: the part of the demo that needs
 WebGPU refuses the layer with MargoError code `unsupported`. Frame work is the main-thread time of one animation

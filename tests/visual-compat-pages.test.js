@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
-import { allCases } from '../scripts/support/visual-compat-pages.js';
+import { allCases, captureArgs } from '../scripts/support/visual-compat-pages.js';
 
 const root = resolve(import.meta.dirname, '..');
 
@@ -74,4 +74,11 @@ test('every case whose page takes ?date= names one, so its still frame does not 
     assert.match(c.demo.path, /[?&]date=\d{4}-\d{2}-\d{2}/, `${c.id} opens on today's date`);
   }
   assert.ok(dated.includes('orrery'), 'the orrery takes ?date=');
+});
+
+test('the pixel comparison captures with partial raster off, so the page itself paints the same every load', () => {
+  assert.ok(captureArgs.includes('--disable-partial-raster'));
+  assert.ok(captureArgs.includes('--enable-unsafe-webgpu'));
+  const run = readFileSync(resolve(root, 'scripts/visual-compat.mjs'), 'utf8');
+  assert.match(run, /launchBrowser\(\{ headless: true, args: captureArgs \}\)/);
 });

@@ -27,7 +27,7 @@ import { dataToClip, nearestPoint, screenRay, selectPoints, type SelectRegion } 
 import { packColour, RectsLayer } from './rects.js';
 import { formatValue } from './ticks.js';
 import { Timeline, type TimelineFrame, type PlayOptions, type TimelineOptions } from './timeline.js';
-import { timelineFigures } from './motion-state.js';
+import { reducedMotionFigures, stillRedraws, timelineFigures } from './motion-state.js';
 import { Legend, type LegendEntry, type LegendPosition } from './legend.js';
 import { axisScale, type Scale, type ScaleType } from './scales.js';
 import type { PNGOptions, SVGOptions } from './export.js';
@@ -426,6 +426,7 @@ export class Figure extends EventTarget {
   readonly #dataUpdates = new WeakMap<LineLayer | ScatterLayer, Promise<LineLayer | ScatterLayer>>();
   // Axis updates run after one another; ready() waits for them and reports their errors.
   #pending: Promise<void> = Promise.resolve();
+  #redrawQueued = false;
   #disposed = false;
 
   /** Adds a figure to `engine` (WebGPU backend). The engine's camera, controls and background are left to you. */
@@ -501,6 +502,7 @@ export class Figure extends EventTarget {
     this.theme = { ...colors, ...(colors.palette ? { palette: [...colors.palette] } : {}) };
     this.#options = options;
     this.renderer = renderer ?? new SciRenderer();
+    stillRedraws.set(this, () => this.#redrawStill());
     (engine as unknown as Engine).use(this.renderer);
     this.renderer.add(this.#lifetime);
     if (options.axes ?? true)
@@ -986,7 +988,39 @@ export class Figure extends EventTarget {
    * the error if one failed.
    */
   ready(): Promise<void> {
+    // Under reduced motion no frame follows by itself: what ready() waited for is drawn here.
+    return this.#settled().then(() => this.#paintStill());
+  }
+
+  #settled(): Promise<void> {
     return Promise.all([this.#pending, this.renderer.ready()]).then(() => {});
+  }
+
+  #paintStill(): void {
+    if (!this.#disposed && reducedMotionFigures.has(this)) this.render();
+  }
+
+  // One draw for the changes made in a turn, after the axes work they started; again if more was queued meanwhile.
+  #redrawStill(): void {
+    if (this.#redrawQueued || !reducedMotionFigures.has(this)) return;
+    this.#redrawQueued = true;
+    let waited: Promise<void> | undefined;
+    // The microtask lets the caller finish changing the figure before its pending work is read.
+    void Promise.resolve()
+      .then(() => {
+        waited = this.#pending;
+        return this.#settled();
+      })
+      .then(
+        () => {
+          this.#redrawQueued = false;
+          this.#paintStill();
+          if (this.#pending !== waited) this.#redrawStill();
+        },
+        () => {
+          this.#redrawQueued = false; // ready() reports the failure to the caller
+        },
+      );
   }
 
   /** The layers, in the order they were added. */
@@ -1047,6 +1081,7 @@ export class Figure extends EventTarget {
         return this.#axes?.update(this.#bounds, this.#model, this.#flat, this.#scales);
       });
     }
+    this.#redrawStill();
   }
 
   #add<L extends Layer>(layer: L): L {

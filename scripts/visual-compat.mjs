@@ -20,7 +20,7 @@ import { decodePNG } from '../tests/support/png.js';
 import { browserLabel, launchBrowser } from './lib/browser.mjs';
 import { closeAll } from './support/shutdown.mjs';
 import { rewriteTable, stampPixels } from './support/visual-compat-doc.js';
-import { openCase, selectCases, startServers, withQuery } from './support/visual-compat-pages.js';
+import { captureArgs, openCase, selectCases, startServers, withQuery } from './support/visual-compat-pages.js';
 import { gateProblems, record, SAME, verdict } from './support/visual-compat-status.js';
 import { compare, downsample, encodePNG } from './support/visual-image.js';
 
@@ -74,7 +74,7 @@ async function compareAll() {
     await mkdir(out, { recursive: true });
     const started = await startServers(cases);
     servers = started.servers;
-    browser = await launchBrowser({ headless: true, args: ['--enable-unsafe-webgpu'] });
+    browser = await launchBrowser({ headless: true, args: captureArgs });
     const environment = { browser: `${browserLabel()} ${browser.version()}` };
     const expected = JSON.parse(await readFile(expectedPath, 'utf8').catch(() => '{"demos":{}}'));
     const rows = [];

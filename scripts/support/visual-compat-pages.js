@@ -10,6 +10,11 @@ import { demos } from './visual-demos.js';
 
 const root = resolve(import.meta.dirname, '../..');
 
+// The browser flags of a pixel capture. Chromium's partial raster repaints only a tile's invalidated rectangles, so an
+// anti-aliased edge of the page itself (a form control's corner, a CSS gradient) comes out one level different from
+// load to load, by the order the page changed in, and a still frame stops being exact (KB-VC-SCIVIZ-VOL and -WIND).
+export const captureArgs = ['--enable-unsafe-webgpu', '--disable-partial-raster'];
+
 const iphone =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1';
 const views = {
