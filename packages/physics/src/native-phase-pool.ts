@@ -95,6 +95,11 @@ type NativePhaseSolver =
       readonly subject: 'Wave transport';
       readonly phaseExport: 'wave_transport_thread_phase';
       readonly phase: 'spectral flux sweeps';
+    }
+  | {
+      readonly subject: 'Surf force';
+      readonly phaseExport: 'surf_force_thread_phase';
+      readonly phase: 'wave moments and stress divergence';
     };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };

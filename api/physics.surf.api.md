@@ -9,6 +9,19 @@ export const SURF_FIELD: FieldDescriptor;
 
 export const SURF_LAYOUT = 1;
 
+export interface SurfForceWorkCounts extends SurfForceWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly SurfForceWorkerWork[];
+}
+
+export interface SurfForceWorkerWork {
+    readonly momentCells: number;
+    readonly pairedMoments: number;
+    readonly directionalBins: number;
+    readonly divergenceCells: number;
+    readonly pairedDivergence: number;
+}
+
 export type SurfIncident = {
     readonly height: number;
     readonly period: number;
@@ -21,6 +34,7 @@ export type SurfIncident = {
 
 export interface SurfParams {
     readonly water: ShallowWaterSolver;
+    readonly originCellSize?: number;
     readonly incident: SurfIncident;
     readonly side?: SurfSide;
     readonly alongshore?: 'open' | 'periodic';
@@ -44,6 +58,9 @@ export type SurfSide = 'minX' | 'maxX' | 'minZ' | 'maxZ';
 
 export class SurfSolver implements Solver<SurfParams> {
     constructor(id?: string);
+    static load(id?: string, native?: SurfSolverNativeOptions): Promise<SurfSolver>;
+    readNativeWork(): SurfForceWorkCounts | undefined;
+    [Symbol.dispose](): void;
     describe(): SolverDescription;
     init(host: SolverHost, params: SurfParams): void;
     step(context: StepContext, dt: number): void;
@@ -67,6 +84,11 @@ export class SurfSolver implements Solver<SurfParams> {
     undertow(x: number, z: number): [number, number];
     runUp(at?: readonly [number, number]): number;
     wetSand(x: number, z: number, window?: number): boolean;
+}
+
+export interface SurfSolverNativeOptions {
+    readonly threads?: 1 | 2 | 4;
+    readonly signal?: AbortSignal;
 }
 
 // Not exported from this entry, but used by the exports above:

@@ -12160,3 +12160,7 @@ The nonlinear sea evaluates second-order pair terms in SIMD and reduces them in 
 ### SEA-01 accepted spectral transport and wave-field rendering
 
 Spatial fluxes are independent across transverse lines and spectral bins. Optional native participants use the same scalar limiter and preserve the split sequence, returning finite candidates before the wave solver publishes its clock, friction and field. The WebGPU and WebGL2 cutaway draws the propagating spectrum after an upwind gust ends and checks the resulting buoy motion and exact replay. The physical source terms and angular refraction stay on the caller. [Evidence and commands](../whitepaper/reproduce.md#sea-01-accepted-wave-transport-and-lake-george)
+
+### SEA-05 accepted radiation stress and wet sand
+
+The surf solver computes native directional moments in canonical order, then synchronizes before the divergence pass. Forcing, wave energy, roller and wet history publish together only after validation. The two-renderer cutaway reads the accepted shallow-water surface and wet-sand history. [Evidence and commands](../whitepaper/reproduce.md#sea-05-accepted-surf-and-boers-flume-gauges)

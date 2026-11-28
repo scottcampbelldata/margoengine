@@ -15722,8 +15722,8 @@
         "gzip": 13774
       },
       "./surf": {
-        "raw": 18940,
-        "gzip": 7413
+        "raw": 33457,
+        "gzip": 12495
       },
       "./rogue": {
         "raw": 32082,
@@ -20304,6 +20304,16 @@
       "raw": 4150,
       "gzip": 1971,
       "brotli": 1821
+    },
+    "packages/physics/dist/surf-force-kernel.wasm": {
+      "raw": 4696,
+      "gzip": 2362,
+      "brotli": 2184
+    },
+    "packages/physics/dist/surf-force-kernel-shared.wasm": {
+      "raw": 4696,
+      "gzip": 2362,
+      "brotli": 2217
     }
   },
   "splits": {

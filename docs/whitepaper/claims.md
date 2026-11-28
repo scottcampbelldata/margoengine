@@ -7082,3 +7082,7 @@ One, two and four native participants reproduce the scalar height and full norma
 ### SEA-01 accepted native sweeps and wind cutoff
 
 The directional spectrum, wave clock and friction remain unchanged when a later wind input or native flux fails. Real native helpers preserve scalar output and signed-origin replay. In the fixed-camera cutaway, a wave packet continues downstream after wind cutoff and raises a floating buoy. Both renderers repeat accepted state and full images. Independent Lake George measurements show persistent overprediction at the farther gauges. [Evidence and limits](../limits.md#accepted-wave-transport-and-independent-lake-george-gauges-sea-01)
+
+### SEA-05 accepted surf and wet sand
+
+Native radiation moments and divergence reproduce scalar forcing in signed coupled worlds. The fixed-camera shore advances 8 m in the grouped case, retreats with seaward flow, and leaves a dark sand mark where the accepted water column has dropped below the visible cutoff. WebGPU and WebGL2 independently reproduce complete frames and accepted state. Independent Boers measurements show an unresolved setup overprediction at 27 m in all three regimes. [Evidence and bounds](../limits.md#native-surf-forcing-accepted-swash-and-measured-setup-sea-05)

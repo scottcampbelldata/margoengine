@@ -5291,3 +5291,14 @@ node scripts/run-with-timeout.mjs --max=4 -- node packages/physics/scripts/sea01
 ```
 
 The Lake George comparison uses a simple along-fetch strip with periodic cross-fetch boundaries. The winds come from the station-6 anemometer and the published Taylor–Lee reconstruction. The bathymetry uses the reported station depths. In one boundary setup only the upstream station contributes its measured significant height and peak frequency. The other setup starts at the calm coast. Stations 2, 4, 6 and 8 supply the separate scored wave measurements. Their confidence bounds come from the original published plot with readout allowance. Peak frequency has a reported value but no per-station interval. Two joint spatial/time resolutions and 6–9 h persistence quantify model sensitivity. The comparison does not infer frequency confidence bounds from grid sensitivity.
+
+### SEA-05 accepted surf and Boers flume gauges
+
+```sh
+node scripts/run-with-timeout.mjs --max=6 -- node --test packages/physics/tests/surf.test.js packages/physics/tests/coupling/surf.test.js packages/physics/tests/coupling/surf-force-workers.test.js
+node scripts/run-with-timeout.mjs --max=2 -- npm run test:gpu:surf-force-workers -w @margoengine/physics
+node scripts/run-with-timeout.mjs --max=3 -- npm run test:gpu:swash-film -w @margoengine/water
+node scripts/run-with-timeout.mjs --max=2 -- node packages/physics/scripts/sea05-boers-measured.mjs
+```
+
+The independent flume diagnostic runs the finite-volume shallow water and the phase-averaged surf solver with the measured offshore depth, period and height. It evaluates five separate gauges in each of three regimes, using the reported concrete bed and a steady offshore envelope. The two resolutions are 0.4 and 0.2 m, 20 and 40 Hz, and 9 and 17 bins, with 60–120 s and 120–180 s averages. The local allowances combine plot readout, gauge position and observed numerical sensitivity. The reproduction lacks published gauge repeatability and finite-record confidence bounds. [Measurements](https://doi.org/10.3390/jmse8050308)

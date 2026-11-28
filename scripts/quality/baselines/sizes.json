@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22005238,
+  "total": 22010439,
   "history": [
     {
       "date": "2026-10-24",
@@ -15821,6 +15821,12 @@
       "commit": "6c36d467c7",
       "reason": "procedural/forbs: alpine wildflowers (new entry); scatter: exact reach and inside clearings",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "sea-05-native-radiation-stress",
+      "reason": "SEA-05 @margoengine/physics/surf 7413 to 12495 B gzip, ceiling 7669 to 12870 B. The optional surf entry owns accepted shore marks, directional moments and the force port. A separate solver would duplicate boundary and roller state. Native modules and helpers load only when used. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16746,7 +16752,7 @@
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 65533,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 127671,
     "@margoengine/physics/strands": 6171,
-    "@margoengine/physics/surf": 7669,
+    "@margoengine/physics/surf": 12870,
     "@margoengine/physics/surge": 4689,
     "@margoengine/physics/synoptic": 6633,
     "@margoengine/physics/terramechanics": 16590,

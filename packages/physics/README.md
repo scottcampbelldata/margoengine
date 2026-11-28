@@ -5079,7 +5079,7 @@ console.log(foam.spray(0, 0, 1) >= 0); // true: droplets per m^2 s um where the 
 - with `groups`, it surges with the wave groups (surf beat) and runs up and down the beach.
 
 This is the phase-averaged "surfbeat" chain of XBeach (Roelvink et al. 2009). The solver keeps each line's highest run-up and when each cell was last wet, so the wet sand's edge is known. Couple it before the water: `world.couple(['surf', 'water'], 'staggered')`, and give the water an open sea at its offshore side (`sides: {minX: {sea: 0}}`), so the long waves the surf makes can leave. Its settings:
-- `water`: the `ShallowWaterSolver`, added to the world first;
+- `water`: the `ShallowWaterSolver`, added to the world first. Align its grid with the surf solver. For an incident spectrum in a different cell, match `originCellSize` to the scene (4096 m by default);
 - `incident`: the waves coming in, `{height, period, direction, spreading = 10, gamma = 3.3}` (significant height and peak period of a JONSWAP sea) or `{waves}`, a `WaveSpectrumField` (`WaveSolver.field`) sampled at the offshore side;
 - `side`, the offshore side they come in over (default `'minX'`), and `alongshore`, `'open'` (default) or `'periodic'` for a coast that goes on the same way (give the water periodic sides there too);
 - `groups` (default true): the incoming energy comes in groups, the envelope of the sea's components, so the water answers with surf beat and swash; off, it is steady. Feed the groups' bound long wave to the water's open sea, `sides: {minX: {sea: 0, incoming: (t, x, z) => surf.boundWave(t, x, z)}}`, so the long waves come in with them (Longuet-Higgins and Stewart's zeta_b = (2n - 1/2)(E - mean E) / (rho (c_g^2 - g h)));
@@ -5095,7 +5095,7 @@ It publishes the field `surf` (per cell, H_rms, the mean direction and the rolle
 - `runUp2(at?)`, the run-up exceeded by 2 percent of the swash, Stockdon et al.'s R2 = 1.1 (<eta> + sqrt(S_inc^2 + S_IG^2) / 2) with the set-up and the infragravity swash from the water's own shoreline and the short waves' `incidentSwash(at?)` from Stockdon's law;
 - `wetSand(x, z, window = 600)`, whether a spot was wet within the window, the short waves' uprush (half the incident swash above the shoreline) included.
 
-The water's own `sample` gives the set-up and the currents.
+The water's own `sample` gives the set-up and the currents. The surf advances its energy, roller, forcing and shore marks together. An invalid sample or flux leaves the previously accepted outputs intact and reports a code and a fix. `SurfSolver.load(id?, {threads, signal})` selects optional exact native radiation-stress moments and divergence. One participant is the default. Use Node or an isolated browser worker for two or four. Dispose the loaded solver after the world finishes. `readNativeWork()` gives the accepted cell and direction counts.
 
 ```ts
 import {bedSurface} from 'margoengine/physics/earth';
@@ -5109,7 +5109,7 @@ const elevations = new Float64Array((columns + 1) * (rows + 1));
 for (let c = 0; c <= columns; c++)
   for (let r = 0; r <= rows; r++) elevations[r + (rows + 1) * c] = -1.6 + 0.02 * ((width * c) / columns);
 const water = new ShallowWaterSolver();
-const surf = new SurfSolver();
+using surf = await SurfSolver.load();
 const world = new PhysicsWorld({rate: {num: 30, den: 1}})
   .add(water, {
     bed: bedSurface({columns, rows, width, depth, centre: [60, 4]}, elevations),

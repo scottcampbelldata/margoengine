@@ -110,6 +110,8 @@
 <tr><th scope="row"><code>rogue-pair-kernel-shared.wasm</code></th><td>Rust SIMD second-order wave pairs with helper workers</td><td class="num">4,672</td><td class="num">2,019</td><td class="num">1,712</td><td>NonlinearSea.load() with threads: 2 or 4 from the optional /rogue entry</td></tr>
 <tr><th scope="row"><code>wave-transport-kernel.wasm</code></th><td>Rust SIMD QUICKEST wave transport</td><td class="num">4,150</td><td class="num">1,971</td><td class="num">1,821</td><td>WaveSolver.load() from the optional /waves entry</td></tr>
 <tr><th scope="row"><code>wave-transport-kernel-shared.wasm</code></th><td>Rust SIMD QUICKEST wave transport with helper workers</td><td class="num">4,150</td><td class="num">1,971</td><td class="num">1,821</td><td>WaveSolver.load() with threads: 2 or 4 from the optional /waves entry</td></tr>
+<tr><th scope="row"><code>surf-force-kernel.wasm</code></th><td>Rust SIMD surf radiation-stress moments and divergence</td><td class="num">4,696</td><td class="num">2,362</td><td class="num">2,184</td><td>SurfSolver.load() from the optional /surf entry</td></tr>
+<tr><th scope="row"><code>surf-force-kernel-shared.wasm</code></th><td>Rust SIMD surf radiation stress with helper workers</td><td class="num">4,696</td><td class="num">2,362</td><td class="num">2,217</td><td>SurfSolver.load() with threads: 2 or 4 from the optional /surf entry</td></tr>
 <tr><th scope="row"><code>loads-kernel.wasm</code></th><td>Rust SIMD batch for hydrodynamic wrenches</td><td class="num">7,761</td><td class="num">2,926</td><td class="num">2,525</td><td>LoadSolver.load() from the optional /loads entry</td></tr>
 <tr><th scope="row"><code>loads-kernel-shared.wasm</code></th><td>Rust SIMD batch for hydrodynamic wrenches, shared world memory</td><td class="num">7,761</td><td class="num">2,926</td><td class="num">2,524</td><td>LoadSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>thin-film-kernel-shared.wasm</code></th><td>Rust SIMD conservative thin-film flow and capillarity, shared world memory</td><td class="num">32,746</td><td class="num">12,619</td><td class="num">10,892</td><td>ThinFilmSolver.load() with shared world memory support</td></tr>
@@ -5022,7 +5024,7 @@
 <tr><td><code>./tracers</code></td><td class="num">60,307</td><td class="num">22,152</td></tr>
 <tr><td><code>./hydro</code></td><td class="num">62,589</td><td class="num">22,362</td></tr>
 <tr><td><code>./foam</code></td><td class="num">36,300</td><td class="num">13,774</td></tr>
-<tr><td><code>./surf</code></td><td class="num">18,940</td><td class="num">7,413</td></tr>
+<tr><td><code>./surf</code></td><td class="num">33,457</td><td class="num">12,495</td></tr>
 <tr><td><code>./rogue</code></td><td class="num">32,082</td><td class="num">12,255</td></tr>
 <tr><td><code>./ship</code></td><td class="num">90,317</td><td class="num">36,541</td></tr>
 <tr><td><code>./loads</code></td><td class="num">202,704</td><td class="num">74,569</td></tr>

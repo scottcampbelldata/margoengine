@@ -678,3 +678,7 @@ Its figures, PDF, fitted curves and software are absent from the package.
 ### MARINTEK rogue-wave flume comparison (SEA-03)
 
 `packages/physics/scripts/sea03-flume-crests-measured.mjs` transcribes three published gauge crest counts, threshold definitions and wavemaker settings separately from Dematteis, Grafke, Onorato and Vanden-Eijnden, [Experimental Evidence of Hydrodynamic Instantons: The Universal Route to Rogue Waves](https://doi.org/10.1103/PhysRevX.9.041057), Physical Review X 9, 041057, published in 2019 by the American Physical Society. The authors released the paper under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). No raw recordings or figures are included.
+
+### Boers barred beach measurements (SEA-05)
+
+`packages/physics/scripts/sea05-boers-measured.mjs` records sparse physical bed coordinates and actual Boers flume wave-height and water-level markers. The observation markers and separate offshore height and period are adapted with metric rounding and datum adjustment from figure 10 and Table 3 of [Moghimi et al. 2020](https://doi.org/10.3390/jmse8050308), licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The physical bed facts come from figure 2 of [Daly et al. 2012](https://doi.org/10.1016/j.coastaleng.2011.08.001). The original figures and time series are outside the repository.

@@ -24014,3 +24014,7 @@ A placed wave changes the component amplitudes with position. The previous norma
 ### Fixed: SEA-01 could accept a partially advanced spectrum after invalid wind
 
 The step wrote its clock, outgoing spectrum and prior cells' friction before reading every wind sample. It also used forcing coordinates as if wind and wave fields always shared an origin. It now advances private candidates through every owed interval, reads wind in its own signed cell, and publishes only after the candidate is finite. The spectrum field reports the current solver cell immediately after origin shifts and restore. A failed JONSWAP normalization also leaves the caller's output untouched. Regressions run in `packages/physics/tests/coupling/waves.test.js` and `packages/physics/tests/waves.test.js`.
+
+### Fixed: SEA-05 could publish partial surf outputs and read stale wave height after restore
+
+The surf previously changed step memory before validating its shallow-water samples, and its height query read output scratch from the last advanced step. It now prepares the energy, roller, radiation-stress forcing, wet sand and shore statistics in candidates before publication. Height and angle queries use the stored directional energy, including after restoring a checkpoint. The coupled rejection and rewind tests are in `packages/physics/tests/coupling/surf.test.js`.

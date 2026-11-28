@@ -141,6 +141,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'nearshore-surf',
+    title: '@margoengine/physics/surf nearshore waves and run-up',
+    kind: 'family',
+    messages: [],
+    cause: 'The incoming spectrum, water sample, cell origin, shoreline record or optional force pass could not be resolved.',
+    fix: 'Add valid shallow water before surf. Provide a resolved incident sea, finite depths and signed coordinates, and a finite world step. Reduce extreme waves or shorten the step when fluxes exceed numeric range. Load a fresh solver after disposal.',
+  },
+  {
     id: 'wave-spectrum',
     title: '@margoengine/physics/waves directional spectrum, forcing and transport',
     kind: 'family',

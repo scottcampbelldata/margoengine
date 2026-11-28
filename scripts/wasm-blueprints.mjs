@@ -382,6 +382,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'surf-force-kernel',
+    crate: 'packages/physics/surf-force-kernel',
+    blueprint: 'packages/physics/src/surf/surf-force-kernel.wasm',
+    script: 'packages/physics/scripts/build-surf-force-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'surf-force-kernel-shared',
+    crate: 'packages/physics/surf-force-kernel',
+    blueprint: 'packages/physics/src/surf/surf-force-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-surf-force-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'viscoplastic-kernel',
     crate: 'packages/physics/viscoplastic-kernel',
     blueprint: 'packages/physics/src/viscoplastic/viscoplastic-kernel.wasm',

@@ -194,6 +194,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/surf-force-kernel.wasm',
+    label: 'surf-force-kernel.wasm',
+    kind: 'Rust SIMD surf radiation-stress moments and divergence',
+    measure: 'file',
+    when: 'SurfSolver.load() from the optional /surf entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/surf-force-kernel-shared.wasm',
+    label: 'surf-force-kernel-shared.wasm',
+    kind: 'Rust SIMD surf radiation stress with helper workers',
+    measure: 'file',
+    when: 'SurfSolver.load() with threads: 2 or 4 from the optional /surf entry',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/loads-kernel.wasm',
     label: 'loads-kernel.wasm',
     kind: 'Rust SIMD batch for hydrodynamic wrenches',

@@ -35,12 +35,16 @@ import type { WaveSpectrumField } from '@margoengine/math/fields';
 import { cos, exp, pow, sin } from '@margoengine/math/pinned';
 import { RandomStream, solverNumber } from '@margoengine/math/random';
 import type { BedShape } from '../earth/bed.js';
-import { FORCING_WORDS, SURFACE_WATER_FORCING_FIELD, type ShallowWaterSolver } from '../hydro/index.js';
+import {
+  FORCING_WORDS,
+  SURFACE_WATER_FORCING_FIELD,
+  type ShallowWaterSolver,
+  type WaterSample,
+} from '../hydro/index.js';
 import { angleOf } from '../flight.js';
 import { bandWidth, wavenumber } from '../waves/spectral.js';
 import { regionWords } from '../world/memory.js';
 import {
-  type Cell,
   type FieldDescriptor,
   type Port,
   type RateLevel,
@@ -51,6 +55,10 @@ import {
   type SolverHost,
   type StepContext,
 } from '../world/solver.js';
+import { surfError } from './errors.js';
+import { loadSurfForce, type SurfForceBuild, type SurfForceKernel, type SurfForceWorkCounts } from './force-kernel.js';
+
+export type { SurfForceWorkCounts, SurfForceWorkerWork } from './force-kernel.js';
 
 /** The registry field of the surf: per cell, the short waves' H_rms (m), mean direction (rad) and roller energy (J/m^2), f32. */
 export const SURF_FIELD: FieldDescriptor = {
@@ -94,6 +102,8 @@ export type SurfIncident =
 export interface SurfParams {
   /** The shallow water the waves come ashore over (its grid, depth and flow). */
   readonly water: ShallowWaterSolver;
+  /** Metres per cell for sampling an incident spectrum in another origin (default 4096). */
+  readonly originCellSize?: number;
   /** The waves coming in. */
   readonly incident: SurfIncident;
   /** The offshore side they come in over (default 'minX'). */
@@ -121,13 +131,45 @@ export interface SurfParams {
   readonly rate?: RateLevel;
 }
 
-const ORIGIN: Cell = [0, 0, 0];
+interface SurfCandidate {
+  readonly energy: Float64Array;
+  readonly roller: Float64Array;
+  readonly forces: Float64Array;
+  readonly published: Float32Array;
+  readonly high: Float64Array;
+  readonly wet: Float64Array;
+  readonly swash: Float64Array;
+}
+
+function finiteSurf(value: number): number {
+  if (!Number.isFinite(value))
+    throw surfError(
+      'failed',
+      'A surf flux, wave or shoreline record exceeds numeric range; reduce the incident waves or refine the step.',
+    );
+  return value;
+}
+
+/** Optional native radiation-stress settings for a surf solver. */
+export interface SurfSolverNativeOptions {
+  /** Native participants including the caller. Default 1. Use Node or an isolated browser worker for 2 or 4. */
+  readonly threads?: 1 | 2 | 4;
+  /** Cancels loading and releases active helpers on abort. */
+  readonly signal?: AbortSignal;
+}
 
 /** The surf zone over a shallow water, a framework solver. `id` is `'surf'` unless a world holds more. */
 export class SurfSolver implements Solver<SurfParams> {
   private readonly id: string;
   private host!: SolverHost;
-  private cell: Cell = ORIGIN;
+  private stepping = false;
+  private initialized = false;
+  private disposed = false;
+  private nativeBuild: SurfForceBuild | undefined;
+  private nativeForce: SurfForceKernel | undefined;
+  private nativeWork: SurfForceWorkCounts | undefined;
+  private candidate!: SurfCandidate;
+  private readonly sampledWater: WaterSample = { depth: 0, surface: 0, velocity: [0, 0] };
   private water!: ShallowWaterSolver;
   private nx = 0;
   private nz = 0;
@@ -138,6 +180,11 @@ export class SurfSolver implements Solver<SurfParams> {
   private nd = 36;
   private dtheta = Math.PI / 36;
   private dirs!: Float64Array;
+  private directionX!: Float64Array;
+  private directionZ!: Float64Array;
+  private faceX!: Float64Array;
+  private faceZ!: Float64Array;
+  private readonly summary: [height: number, direction: number] = [0, 0];
   private g = 9.80665;
   private rho = 1025;
   private side: SurfSide = 'minX';
@@ -154,6 +201,7 @@ export class SurfSolver implements Solver<SurfParams> {
   private peakPeriod = 10;
   private height = 1;
   private stillLevel = 0;
+  private originCellSize = 4096;
   private wrapX = false;
   private wrapZ = false;
   private currents = true;
@@ -184,6 +232,24 @@ export class SurfSolver implements Solver<SurfParams> {
     this.id = id;
   }
 
+  /** Load the optional native radiation-stress calculation. Dispose it when the world finishes. */
+  static async load(id = 'surf', native: SurfSolverNativeOptions = {}): Promise<SurfSolver> {
+    const solver = new SurfSolver(id);
+    solver.nativeBuild = await loadSurfForce(native);
+    return solver;
+  }
+
+  /** Native moment and divergence work from the last accepted surf step. */
+  readNativeWork(): SurfForceWorkCounts | undefined {
+    const work = this.nativeWork;
+    return work && { ...work, workers: work.workers.map((worker) => ({ ...worker })) };
+  }
+
+  [Symbol.dispose](): void {
+    this.nativeBuild?.[Symbol.dispose]();
+    this.disposed = true;
+  }
+
   describe(): SolverDescription {
     return {
       id: this.id,
@@ -197,16 +263,38 @@ export class SurfSolver implements Solver<SurfParams> {
   }
 
   init(host: SolverHost, params: SurfParams): void {
+    if (this.disposed) throw surfError('disposed', 'This surf solver was disposed; construct or load another solver.');
+    if (this.initialized)
+      throw surfError('attached', 'This surf solver already belongs to a world; add a new solver instead.');
     const { water, incident } = params ?? ({} as SurfParams);
     if (!water || typeof water.sample !== 'function')
-      throw new TypeError(
+      throw surfError(
+        'unsupported',
         'Surf comes ashore over a shallow water: pass {water}, a ShallowWaterSolver added to the world first.',
       );
     const shape: BedShape = water.shape;
+    if (
+      !(
+        shape?.columns > 0 &&
+        Number.isSafeInteger(shape.columns) &&
+        shape.rows > 0 &&
+        Number.isSafeInteger(shape.rows) &&
+        shape.width > 0 &&
+        shape.depth > 0 &&
+        shape.centre?.length === 2 &&
+        [shape.width, shape.depth, ...shape.centre].every(Number.isFinite)
+      )
+    )
+      throw surfError(
+        'unsupported',
+        'Surf needs the water grid dimensions, cells and local centre; add it over a valid water grid.',
+      );
     this.water = water;
     this.host = host;
     const [gx, gy, gz] = host.gravity;
     this.g = Math.sqrt(gx * gx + gy * gy + gz * gz);
+    if (!(this.g > 0 && Number.isFinite(this.g)))
+      throw surfError('unsupported', 'Surf needs finite gravity above zero; set gravity on the world.');
     this.nx = shape.columns;
     this.nz = shape.rows;
     this.dx = shape.width / shape.columns;
@@ -215,23 +303,34 @@ export class SurfSolver implements Solver<SurfParams> {
     this.z0 = shape.centre[1] - shape.depth / 2;
     const side = params.side ?? 'minX';
     if (side !== 'minX' && side !== 'maxX' && side !== 'minZ' && side !== 'maxZ')
-      throw new RangeError(`The waves come in over 'minX', 'maxX', 'minZ' or 'maxZ' (got ${String(side)}); pass one.`);
+      throw surfError(
+        'unsupported',
+        `The waves come in over 'minX', 'maxX', 'minZ' or 'maxZ' (got ${String(side)}); pass one.`,
+      );
     this.side = side;
     const nd = params.directions ?? 36;
     if (!(Number.isInteger(nd) && nd >= 4 && nd <= 360))
-      throw new RangeError(`Surf has 4 to 360 directions (got ${nd}); pass a whole number.`);
+      throw surfError('unsupported', `Surf has 4 to 360 directions (got ${nd}); pass a whole number.`);
     this.nd = nd;
     // The incoming half-plane, +-90 degrees about the shoreward direction (as XBeach's directional sector): bins of pi / nd.
     const inward = { minX: 0, maxX: Math.PI, minZ: Math.PI / 2, maxZ: -Math.PI / 2 }[side];
     this.dtheta = Math.PI / nd;
     this.dirs = new Float64Array(nd).map((_, j) => inward - Math.PI / 2 + (j + 0.5) * this.dtheta);
+    this.directionX = Float64Array.from(this.dirs, cos);
+    this.directionZ = Float64Array.from(this.dirs, sin);
+    this.faceX = Float64Array.from(this.dirs, (direction) => cos(direction - this.dtheta / 2));
+    this.faceZ = Float64Array.from(this.dirs, (direction) => sin(direction - this.dtheta / 2));
     const density = params.density ?? 1025;
     if (!(density > 0 && Number.isFinite(density)))
-      throw new RangeError(`Water's density is a finite number of kg/m^3 above 0 (got ${density}); pass one.`);
+      throw surfError(
+        'unsupported',
+        `Water's density is a finite number of kg/m^3 above 0 (got ${density}); pass one.`,
+      );
     this.rho = density;
     const { gamma = 0.55, alpha = 1, n = 10 } = params.breaking ?? {};
     if (!(gamma > 0 && gamma <= 2 && alpha > 0 && alpha <= 10 && n >= 1 && n <= 50))
-      throw new RangeError(
+      throw surfError(
+        'unsupported',
         `Breaking takes gamma in (0, 2], alpha in (0, 10] and n from 1 to 50 (got ${gamma}, ${alpha}, ${n}); pass them, or leave them for 0.55, 1 and 10.`,
       );
     this.gamma = gamma;
@@ -241,25 +340,32 @@ export class SurfSolver implements Solver<SurfParams> {
     else {
       const beta = params.roller?.beta ?? 0.1;
       if (!(beta > 0 && beta < 1))
-        throw new RangeError(`The roller's slope beta lies in (0, 1) (got ${beta}); pass one, or leave it for 0.1.`);
+        throw surfError(
+          'unsupported',
+          `The roller's slope beta lies in (0, 1) (got ${beta}); pass one, or leave it for 0.1.`,
+        );
       this.beta = beta;
     }
     this.groups = params.groups ?? true;
     this.currents = params.currents ?? true;
     const still = params.level ?? 0;
     if (!Number.isFinite(still))
-      throw new RangeError(`The still water level is a finite height in metres (got ${still}); pass one.`);
+      throw surfError('unsupported', `The still water level is a finite height in metres (got ${still}); pass one.`);
     this.stillLevel = still;
+    this.originCellSize = params.originCellSize ?? 4096;
+    if (!(this.originCellSize > 0 && Number.isFinite(this.originCellSize)))
+      throw surfError('unsupported', 'The surf origin cell size is finite metres above zero; use the scene cell size.');
     const alongshore = params.alongshore ?? 'open';
     if (alongshore !== 'open' && alongshore !== 'periodic')
-      throw new RangeError(`The coast along the shore is 'open' or 'periodic' (got ${String(alongshore)}); pass one.`);
-    if (alongshore === 'periodic') {
-      if (side === 'minX' || side === 'maxX') this.wrapZ = true;
-      else this.wrapX = true;
-    }
+      throw surfError(
+        'unsupported',
+        `The coast along the shore is 'open' or 'periodic' (got ${String(alongshore)}); pass one.`,
+      );
+    this.wrapX = alongshore === 'periodic' && (side === 'minZ' || side === 'maxZ');
+    this.wrapZ = alongshore === 'periodic' && (side === 'minX' || side === 'maxX');
     const level = params.rate ?? 0;
     if (!(Number.isInteger(level) && level >= 0 && level <= 7))
-      throw new RangeError(`A rate level is a whole number from 0 to 7 (got ${level}); pass one.`);
+      throw surfError('unsupported', `A rate level is a whole number from 0 to 7 (got ${level}); pass one.`);
     this.level = level as RateLevel;
     this.incoming(incident, host);
     const count = this.nx * this.nz;
@@ -283,12 +389,39 @@ export class SurfSolver implements Solver<SurfParams> {
     this.sig = new Float64Array(count);
     this.ux = new Float64Array(count);
     this.uz = new Float64Array(count);
+    this.candidate = {
+      energy: new Float64Array(count * nd),
+      roller: new Float64Array(count),
+      forces: new Float64Array(count * FORCING_WORDS),
+      published: new Float32Array(count * 3),
+      high: new Float64Array(lines),
+      wet: new Float64Array(count),
+      swash: new Float64Array(lines * 3),
+    };
+    this.nativeForce = this.nativeBuild?.bind({
+      nx: this.nx,
+      nz: this.nz,
+      dx: this.dx,
+      dz: this.dz,
+      density: this.rho,
+      gravity: this.g,
+      wetDepth: WET,
+      dtheta: this.dtheta,
+      directionX: this.directionX,
+      directionZ: this.directionZ,
+      wrapX: this.wrapX,
+      wrapZ: this.wrapZ,
+    });
+    this.initialized = true;
   }
 
   /** The incoming sea: its representative period, mean energy, directional share and the wave groups' components. */
   private incoming(incident: SurfIncident, host: SolverHost): void {
     if (!incident || typeof incident !== 'object')
-      throw new TypeError('Surf needs the waves coming in: pass {incident: {height, period}} or {incident: {waves}}.');
+      throw surfError(
+        'unsupported',
+        'Surf needs the waves coming in: pass {incident: {height, period}} or {incident: {waves}}.',
+      );
     const nd = this.nd,
       dtheta = this.dtheta,
       inward = { minX: 0, maxX: Math.PI, minZ: Math.PI / 2, maxZ: -Math.PI / 2 }[this.side];
@@ -301,22 +434,52 @@ export class SurfSolver implements Solver<SurfParams> {
       binWidth = this.dtheta;
     if ('waves' in incident) {
       if (!incident.waves || typeof incident.waves.sample !== 'function')
-        throw new TypeError('An incident spectrum is a WaveSpectrumField: pass {waves}.');
+        throw surfError('unsupported', 'An incident spectrum is a WaveSpectrumField: pass {waves}.');
       const [cx, cz] = this.sideCentre(),
-        spectrum = incident.waves.sample(cx, cz);
-      fs = spectrum.frequencies;
-      ds = spectrum.directions;
+        from = host.cell,
+        to = incident.waves.cell;
+      if (!(to?.length === 3 && to.every(Number.isSafeInteger)))
+        throw surfError(
+          'unsupported',
+          'An incident wave field needs an integer origin; pass a valid WaveSpectrumField.',
+        );
+      const x = cx + (from[0] - to[0]) * this.originCellSize,
+        z = cz + (from[2] - to[2]) * this.originCellSize;
+      if (!(Number.isFinite(x) && Number.isFinite(z)))
+        throw surfError(
+          'unsupported',
+          'The incident spectrum coordinates exceed numeric range; align the wave field and surf origins.',
+        );
+      const spectrum = incident.waves.sample(x, z);
+      fs = spectrum?.frequencies;
+      ds = spectrum?.directions;
+      if (
+        !(
+          fs?.length &&
+          ds?.length &&
+          spectrum.energy?.length === fs.length * ds.length &&
+          fs.every((frequency, i) => Number.isFinite(frequency) && frequency > (i ? fs[i - 1]! : 0)) &&
+          ds.every(Number.isFinite) &&
+          spectrum.energy.every((e) => e >= 0 && Number.isFinite(e))
+        )
+      )
+        throw surfError(
+          'unsupported',
+          'The incident spectrum needs ordered finite frequencies, finite directions and nonnegative energy in every bin; pass a resolved wave spectrum.',
+        );
       nf = fs.length;
       density = (i, j) => spectrum.energy[i * ds.length + j]!;
       binWidth = TWO_PI / ds.length;
     } else {
       const { height, period, direction = inward, spreading = 10, gamma = 3.3 } = incident;
       if (!(height > 0 && Number.isFinite(height) && period > 0 && Number.isFinite(period)))
-        throw new RangeError(
+        throw surfError(
+          'unsupported',
           `Incoming waves have a height and a period, finite and above 0 (got ${height} m and ${period} s); pass both.`,
         );
       if (!(spreading >= 0.5 && spreading <= 1000) || !Number.isFinite(direction) || !(gamma >= 1 && gamma <= 10))
-        throw new RangeError(
+        throw surfError(
+          'unsupported',
           `Incoming waves' spreading s is 0.5 to 1000, their direction finite and gamma 1 to 10 (got ${spreading}, ${direction}, ${gamma}); pass them.`,
         );
       // A JONSWAP spectrum of the height and period over 0.5 to 3 times the peak, cos^2s spread about the direction.
@@ -361,8 +524,11 @@ export class SurfSolver implements Solver<SurfParams> {
         share[into]! += e;
       }
     }
-    if (!(m0 > 0))
-      throw new RangeError('The incoming sea carries no energy toward the shore; pass waves that come in.');
+    if (!(m0 > 0 && m1 > 0 && Number.isFinite(m0) && Number.isFinite(m1)))
+      throw surfError(
+        'unsupported',
+        'The incoming sea carries no finite energy toward the shore; pass resolved waves that come in.',
+      );
     this.period = m0 / m1;
     this.sigma = TWO_PI / this.period;
     // The peak period and the significant height, for the incident swash (Stockdon et al. 2006).
@@ -379,6 +545,8 @@ export class SurfSolver implements Solver<SurfParams> {
     this.peakPeriod = 1 / peak;
     this.height = 4 * Math.sqrt(m0);
     this.meanEnergy = this.rho * this.g * m0;
+    if (!(Number.isFinite(this.meanEnergy) && this.sigma > 0 && Number.isFinite(this.sigma)))
+      throw surfError('unsupported', 'The incoming waves exceed numeric range; pass a resolved height and period.');
     for (let j = 0; j < nd; j++) this.spread[j] = share[j]! / m0 / dtheta;
     // The wave groups' components: COMPONENTS draws of (frequency, direction) by energy, each of equal variance, with the
     // world's random numbers (seed 0 here; the step re-keys by the world's seed).
@@ -396,7 +564,6 @@ export class SurfSolver implements Solver<SurfParams> {
       }
     this.draws = { cumulative, bins, sum, m0 };
     this.drawComponents(0);
-    void host;
   }
 
   /** The inputs of the wave groups' components, kept to draw them again under the world's seed. */
@@ -458,26 +625,72 @@ export class SurfSolver implements Solver<SurfParams> {
     return 0.5 * this.rho * this.g * (re * re + im * im);
   }
 
+  private checkInitialized(): void {
+    if (this.disposed) throw surfError('disposed', 'This surf solver was disposed; construct or load another solver.');
+    if (!this.initialized)
+      throw surfError('state', 'The surf grid is not initialized; add its water and the surf solver to a world.');
+  }
+
+  private readWater(x: number, z: number): WaterSample {
+    const sample = this.water.sample(x, z, this.sampledWater);
+    if (
+      !(
+        sample?.depth >= 0 &&
+        Number.isFinite(sample.depth) &&
+        Number.isFinite(sample.surface) &&
+        sample.velocity?.length === 2 &&
+        sample.velocity.every(Number.isFinite)
+      )
+    )
+      throw surfError(
+        'unsupported',
+        'The shallow water returned invalid depth, surface or velocity; supply a finite shallow-water sample.',
+      );
+    return sample;
+  }
+
   private words(region: Region): Float64Array {
     return regionWords(this.host.memory, region) as Float64Array;
   }
 
   step(context: StepContext, dt: number): void {
-    this.cell = context.cell;
+    this.checkInitialized();
+    if (!(dt > 0 && Number.isFinite(dt)))
+      throw surfError('unsupported', 'The surf step needs finite seconds above zero; advance it with the world clock.');
+    if (this.stepping)
+      throw surfError('state', 'The surf step is already running; read the accepted surf without advancing it again.');
+    const previousSeed = this.seed,
+      previousComponents = this.components;
+    this.stepping = true;
+    try {
+      this.advance(context, dt);
+    } catch (error) {
+      this.seed = previousSeed;
+      this.components = previousComponents;
+      throw error;
+    } finally {
+      this.stepping = false;
+    }
+  }
+
+  private advance(context: StepContext, dt: number): void {
     if (this.seed !== context.seed) this.drawComponents(context.seed);
-    const time = context.tick / rateOf(context.level),
-      { nx, nz, nd } = this,
+    const time = finiteSurf(context.tick / rateOf(context.level)),
+      { nx, nz } = this,
       n = nx * nz,
-      E = this.words(this.energy),
-      Er = this.words(this.roller),
-      forces = this.words(this.forces);
+      { energy: E, roller: Er, forces, published: p, high, wet, swash } = this.candidate;
+    E.set(this.words(this.energy));
+    Er.set(this.words(this.roller));
+    high.set(this.words(this.shorelines));
+    wet.set(this.words(this.wetted));
+    swash.set(this.words(this.swash));
     // The water now: depth, bed, and the waves' wavenumber and speeds at the representative period.
     for (let j = 0; j < nz; j++)
       for (let i = 0; i < nx; i++) {
         const k = i + nx * j,
-          s = this.water.sample(this.x0 + (i + 0.5) * this.dx, this.z0 + (j + 0.5) * this.dz);
+          s = this.readWater(this.x0 + (i + 0.5) * this.dx, this.z0 + (j + 0.5) * this.dz);
         this.depth[k] = s.depth;
-        this.bed[k] = s.surface - s.depth;
+        this.bed[k] = finiteSurf(s.surface - s.depth);
         const u = this.currents && s.depth > WAVE_DEPTH ? s.velocity[0] : 0,
           w = this.currents && s.depth > WAVE_DEPTH ? s.velocity[1] : 0;
         this.ux[k] = u;
@@ -491,32 +704,38 @@ export class SurfSolver implements Solver<SurfParams> {
       const rate = (this.cg[k]! + Math.abs(this.ux[k]!)) / this.dx + (this.cg[k]! + Math.abs(this.uz[k]!)) / this.dz;
       if (rate > fastest) fastest = rate;
     }
-    const steps = Math.max(1, Math.ceil((fastest * dt) / 0.5)),
-      sub = dt / steps;
+    const steps = Math.max(1, Math.ceil((fastest * dt) / 0.5));
+    if (!Number.isSafeInteger(steps))
+      throw surfError(
+        'failed',
+        'The surf Courant substeps exceed numeric range; shorten the step or resolve the current and grid data.',
+      );
+    const sub = dt / steps;
     for (let s = 0; s < steps; s++) {
       this.propagate(E, sub, time + s * sub);
       this.dissipate(E, Er, sub);
-      if (this.beta !== undefined) this.carryRoller(Er, sub);
+      if (this.beta !== undefined) this.carryRoller(E, Er, sub);
     }
     this.force(E, Er, forces);
-    this.shore(time);
-    // Published: H_rms, mean direction, roller energy.
-    const p = regionWords(this.host.memory, this.published) as Float32Array,
-      dtheta = this.dtheta;
+    this.shore(time, high, wet, swash);
+    // Prepare H_rms, mean direction and roller energy as finite f32 before accepting any result.
     for (let k = 0; k < n; k++) {
-      let ew = 0,
-        cx = 0,
-        cz = 0;
-      for (let b = 0; b < nd; b++) {
-        const e = E[k * nd + b]! * dtheta;
-        ew += e;
-        cx += e * cos(this.dirs[b]!);
-        cz += e * sin(this.dirs[b]!);
-      }
-      p[3 * k] = Math.sqrt((8 * ew) / (this.rho * this.g));
-      p[3 * k + 1] = ew > 0 ? angleOf(cz, cx) : 0;
-      p[3 * k + 2] = Er[k]!;
+      const [height, direction] = this.waveSummary(E, k);
+      p[3 * k] = height;
+      p[3 * k + 1] = direction;
+      p[3 * k + 2] = finiteSurf(Math.fround(Er[k]!));
     }
+    if (!forces.every(Number.isFinite))
+      throw surfError('failed', 'Surf forcing exceeds numeric range; reduce the waves or refine the water grid.');
+    this.words(this.energy).set(E);
+    this.words(this.roller).set(Er);
+    this.words(this.forces).set(forces);
+    this.words(this.shorelines).set(high);
+    this.words(this.wetted).set(wet);
+    this.words(this.swash).set(swash);
+    this.words(this.clock)[0] = time;
+    (regionWords(this.host.memory, this.published) as Float32Array).set(p);
+    if (this.nativeForce) this.nativeWork = this.nativeForce.workCounts();
   }
 
   /**
@@ -531,14 +750,14 @@ export class SurfSolver implements Solver<SurfParams> {
     let cx = 0,
       cz = 0;
     for (let b = 0; b < nd; b++) {
-      cx += E[k * nd + b]! * cos(this.dirs[b]!);
-      cz += E[k * nd + b]! * sin(this.dirs[b]!);
+      cx += E[k * nd + b]! * this.directionX[b]!;
+      cz += E[k * nd + b]! * this.directionZ[b]!;
     }
     const norm = Math.sqrt(cx * cx + cz * cz),
       along =
         norm > 0
           ? (this.ux[k]! * cx + this.uz[k]! * cz) / norm
-          : this.ux[k]! * cos(this.dirs[nd >> 1]!) + this.uz[k]! * sin(this.dirs[nd >> 1]!);
+          : this.ux[k]! * this.directionX[nd >> 1]! + this.uz[k]! * this.directionZ[nd >> 1]!;
     let kk = wavenumber(omega / TWO_PI, depth, g);
     let blocked = false;
     for (let it = 0; it < 30 && along !== 0; it++) {
@@ -602,8 +821,8 @@ export class SurfSolver implements Solver<SurfParams> {
       speedZ = (k: number, cz: number) => (cg[k]! > 0 ? cg[k]! * cz + this.uz[k]! : 0),
       upwind = (vl: number, vr: number, al: number, ar: number) => (vl + vr >= 0 ? vl * al : vr * ar);
     for (let b = 0; b < nd; b++) {
-      const cx = cos(this.dirs[b]!),
-        cz = sin(this.dirs[b]!);
+      const cx = this.directionX[b]!,
+        cz = this.directionZ[b]!;
       // Along x: the flux through each face from its upwind side.
       for (let j = 0; j < nz; j++)
         for (let f = this.wrapX ? 1 : 0; f <= nx; f++) {
@@ -671,9 +890,8 @@ export class SurfSolver implements Solver<SurfParams> {
         if (factor === 0 && uxx === 0 && uxz === 0 && uzx === 0 && uzz === 0) continue;
         // Face b between bins b - 1 and b, at the direction halfway; the half-plane's edges are closed.
         for (let b = 1; b < nd; b++) {
-          const theta = this.dirs[b]! - dtheta / 2,
-            cs = cos(theta),
-            sn = sin(theta),
+          const cs = this.faceX[b]!,
+            sn = this.faceZ[b]!,
             ct = factor * (dhx * sn - dhz * cs) + cs * (sn * uxx - cs * uxz) + sn * (sn * uzx - cs * uzz),
             from = ct >= 0 ? b - 1 : b;
           flux[b] = ct * before[k * nd + from]!;
@@ -683,7 +901,12 @@ export class SurfSolver implements Solver<SurfParams> {
     // Back to energy. No short waves in water too shallow for them, or where a current blocks them: what reaches there is spent.
     for (let k = 0; k < nx * nz; k++)
       if (!(cg[k]! > 0)) for (let b = 0; b < nd; b++) E[k * nd + b] = 0;
-      else for (let b = 0; b < nd; b++) E[k * nd + b] = E[k * nd + b]! > 0 ? E[k * nd + b]! * sig[k]! : 0;
+      else
+        for (let b = 0; b < nd; b++) {
+          const at = k * nd + b,
+            value = finiteSurf(E[at]!);
+          E[at] = value > 0 ? finiteSurf(value * sig[k]!) : 0;
+        }
   }
 
   private fieldAt(field: Float64Array, i: number, j: number, fallback: number): number {
@@ -714,7 +937,7 @@ export class SurfSolver implements Solver<SurfParams> {
       let ew = 0;
       for (let b = 0; b < nd; b++) ew += E[k * nd + b]! * dtheta;
       if (!(ew > 0)) continue;
-      let hrms = Math.sqrt((8 * ew) / rhoG);
+      let hrms = finiteSurf(Math.sqrt((8 * ew) / rhoG));
       // At most H_rms = 2 h.
       if (hrms > 2 * h) {
         const f = ((2 * h) / hrms) * ((2 * h) / hrms);
@@ -726,16 +949,15 @@ export class SurfSolver implements Solver<SurfParams> {
         // D_w / E_w = 2 alpha Q_b H_rms / (T h).
         // T the waves' intrinsic period here, 2 pi / sigma.
         rate = (2 * this.alpha * qb * hrms * this.sig[k]!) / (TWO_PI * h),
-        keep = 1 / (1 + rate * dt);
+        keep = 1 / finiteSurf(1 + rate * dt);
       for (let b = 0; b < nd; b++) E[k * nd + b]! *= keep;
       if (this.beta !== undefined) Er[k]! += ew * (1 - keep);
     }
   }
 
   /** The roller over `dt`: carried at c along the waves' mean direction, losing 2 beta g E_r / c, implicitly. */
-  private carryRoller(Er: Float64Array, dt: number): void {
+  private carryRoller(E: Float64Array, Er: Float64Array, dt: number): void {
     const { nx, nz, dx, dz, nd } = this,
-      E = this.words(this.energy),
       before = Er.slice(),
       dirX = new Float64Array(nx * nz),
       dirZ = new Float64Array(nx * nz);
@@ -743,8 +965,8 @@ export class SurfSolver implements Solver<SurfParams> {
       let cx = 0,
         cz = 0;
       for (let b = 0; b < nd; b++) {
-        cx += E[k * nd + b]! * cos(this.dirs[b]!);
-        cz += E[k * nd + b]! * sin(this.dirs[b]!);
+        cx += E[k * nd + b]! * this.directionX[b]!;
+        cz += E[k * nd + b]! * this.directionZ[b]!;
       }
       const norm = Math.sqrt(cx * cx + cz * cz);
       dirX[k] = norm > 0 ? cx / norm : 0;
@@ -778,12 +1000,17 @@ export class SurfSolver implements Solver<SurfParams> {
     const beta = this.beta!;
     for (let k = 0; k < nx * nz; k++) {
       const c = this.c[k]!;
-      Er[k] = c > 0 && Er[k]! > 0 ? Er[k]! / (1 + (dt * 2 * beta * this.g) / c) : 0;
+      const carried = finiteSurf(Er[k]!);
+      Er[k] = c > 0 && carried > 0 ? carried / finiteSurf(1 + (dt * 2 * beta * this.g) / c) : 0;
     }
   }
 
   /** The waves' forcing on the water: -div S over the density, the Stokes drift and the orbital velocity, per cell. */
   private force(E: Float64Array, Er: Float64Array, out: Float64Array): void {
+    if (this.nativeForce) {
+      this.nativeForce.force(E, Er, this.cg, this.c, this.depth, this.k, this.sig, out);
+      return;
+    }
     const { nx, nz, nd, dx, dz } = this,
       n = nx * nz,
       dtheta = this.dtheta,
@@ -802,8 +1029,8 @@ export class SurfSolver implements Solver<SurfParams> {
         mz = 0;
       for (let b = 0; b < nd; b++) {
         const e = E[k * nd + b]! * dtheta,
-          cs = cos(this.dirs[b]!),
-          sn = sin(this.dirs[b]!);
+          cs = this.directionX[b]!,
+          sn = this.directionZ[b]!;
         xx += (ratio * (1 + cs * cs) - 0.5) * e;
         xz += ratio * sn * cs * e;
         zz += (ratio * (1 + sn * sn) - 0.5) * e;
@@ -846,16 +1073,12 @@ export class SurfSolver implements Solver<SurfParams> {
   }
 
   /** The shoreline of each line across the shore, its highest water, and the time each cell was last wet. */
-  private shore(time: number): void {
-    this.words(this.clock)[0] = time;
+  private shore(time: number, high: Float64Array, wetted: Float64Array, swash: Float64Array): void {
     const { nx, nz } = this,
-      high = this.words(this.shorelines),
-      wetted = this.words(this.wetted),
       across = this.side === 'minX' || this.side === 'maxX',
       lines = across ? nz : nx,
       length = across ? nx : nz;
-    const swash = this.words(this.swash),
-      reach = this.incidentSwash() / 2;
+    const reach = this.estimateIncidentSwash(this.foreshore(undefined, true)) / 2;
     for (let k = 0; k < nx * nz; k++) if (this.depth[k]! > WET) wetted[k] = time;
     for (let line = 0; line < lines; line++) {
       // Landward from the offshore side: the last wet cell.
@@ -869,10 +1092,11 @@ export class SurfSolver implements Solver<SurfParams> {
       const k = cellOf(last),
         level = this.bed[k]! + this.depth[k]!,
         above = level - this.stillLevel;
-      if (level + reach > high[line]!) high[line] = level + reach;
+      const highest = finiteSurf(level + reach);
+      if (highest > high[line]!) high[line] = highest;
       swash[3 * line]! += 1;
-      swash[3 * line + 1]! += above;
-      swash[3 * line + 2]! += above * above;
+      swash[3 * line + 1] = finiteSurf(swash[3 * line + 1]! + above);
+      swash[3 * line + 2] = finiteSurf(swash[3 * line + 2]! + above * above);
       // The short waves' uprush, which the shallow water does not resolve, wets the sand up to half the incident swash
       // height above the shoreline.
       for (let p = last + 1; p < length; p++) {
@@ -887,8 +1111,8 @@ export class SurfSolver implements Solver<SurfParams> {
 
   exportPorts(tick: number): readonly Port[] {
     return [
-      { field: SURF_FIELD.name, region: this.published, tick, cell: this.cell },
-      { field: SURFACE_WATER_FORCING_FIELD.name, region: this.forces, tick, cell: this.cell },
+      { field: SURF_FIELD.name, region: this.published, tick, cell: this.host.cell },
+      { field: SURFACE_WATER_FORCING_FIELD.name, region: this.forces, tick, cell: this.host.cell },
     ];
   }
 
@@ -901,6 +1125,9 @@ export class SurfSolver implements Solver<SurfParams> {
   }
 
   private cellOf(x: number, z: number): number {
+    this.checkInitialized();
+    if (!(Number.isFinite(x) && Number.isFinite(z)))
+      throw surfError('unsupported', 'A surf query needs finite local metres; pass finite x and z in the surf cell.');
     const i = Math.min(this.nx - 1, Math.max(0, Math.floor((x - this.x0) / this.dx))),
       j = Math.min(this.nz - 1, Math.max(0, Math.floor((z - this.z0) / this.dz)));
     return i + this.nx * j;
@@ -916,7 +1143,12 @@ export class SurfSolver implements Solver<SurfParams> {
    */
   boundWave(t: number, x: number, z: number): [number, number, number] {
     if (!this.groups || !this.host) return [0, 0, 0];
-    const h = this.water.sample(x, z).depth;
+    if (![t, x, z].every(Number.isFinite))
+      throw surfError(
+        'unsupported',
+        'The bound-wave query needs finite seconds and local metres; pass finite time, x and z.',
+      );
+    const h = this.readWater(x, z).depth;
     if (!(h > WAVE_DEPTH)) return [0, 0, 0];
     const kk = wavenumber(1 / this.period, h, this.g),
       kh = kk * h,
@@ -928,12 +1160,12 @@ export class SurfSolver implements Solver<SurfParams> {
     let cx = 0,
       cz = 0;
     for (let b = 0; b < this.nd; b++) {
-      cx += this.spread[b]! * cos(this.dirs[b]!);
-      cz += this.spread[b]! * sin(this.dirs[b]!);
+      cx += this.spread[b]! * this.directionX[b]!;
+      cz += this.spread[b]! * this.directionZ[b]!;
     }
     const norm = Math.sqrt(cx * cx + cz * cz) || 1,
       speed = (cg * zeta) / h;
-    return [zeta, (speed * cx) / norm, (speed * cz) / norm];
+    return [finiteSurf(zeta), finiteSurf((speed * cx) / norm), finiteSurf((speed * cz) / norm)];
   }
 
   /**
@@ -943,17 +1175,20 @@ export class SurfSolver implements Solver<SurfParams> {
    * the beach's slope at the shoreline.
    */
   incidentSwash(at?: readonly [number, number]): number {
-    const slope = this.foreshore(at);
+    return this.estimateIncidentSwash(this.foreshore(at));
+  }
+
+  private estimateIncidentSwash(slope: number): number {
     if (!(slope > 0)) return 0;
     const g = this.g,
       tp = this.peakPeriod,
       [cx, cz] = this.sideCentre(),
-      h = this.water.sample(cx, cz).depth,
+      h = this.readWater(cx, cz).depth,
       deep = (g * tp) / (4 * Math.PI),
       here = h > 0 ? groupSpeed(TWO_PI / tp, h, g) : deep,
       offshore = this.height * Math.sqrt(here / deep),
       wavelength = (g * tp * tp) / TWO_PI;
-    return 0.75 * slope * Math.sqrt(offshore * wavelength);
+    return finiteSurf(0.75 * slope * Math.sqrt(offshore * wavelength));
   }
 
   /**
@@ -975,6 +1210,7 @@ export class SurfSolver implements Solver<SurfParams> {
 
   /** The line of cells across the shore through `at`, or the middle one. */
   private lineOf(at?: readonly [number, number]): number {
+    this.checkInitialized();
     const across = this.side === 'minX' || this.side === 'maxX',
       lines = across ? this.nz : this.nx;
     if (!at) return lines >> 1;
@@ -983,20 +1219,39 @@ export class SurfSolver implements Solver<SurfParams> {
   }
 
   /** The beach's slope at the mean shoreline of the line through `at`: the bed's rise over a cell each side of it. */
-  private foreshore(at?: readonly [number, number]): number {
+  private foreshore(at?: readonly [number, number], step = false): number {
     const line = this.lineOf(at),
       { nx, nz } = this,
       across = this.side === 'minX' || this.side === 'maxX',
       length = across ? nx : nz,
-      step = across ? this.dx : this.dz,
+      spacing = across ? this.dx : this.dz,
       cellOf = (p: number) => {
         const q = this.side === 'minX' || this.side === 'minZ' ? p : length - 1 - p;
         return across ? q + nx * line : line + nx * q;
       };
     let last = -1;
-    for (let p = 0; p < length; p++) if (this.depth[cellOf(p)]! > WET) last = p;
+    for (let p = 0; p < length; p++) {
+      const k = cellOf(p);
+      if ((step ? this.depth[k]! : this.shoreWater(k).depth) > WET) last = p;
+    }
     if (last < 1 || last >= length - 1) return 0;
-    return (this.bed[cellOf(last + 1)]! - this.bed[cellOf(last - 1)]!) / (2 * step);
+    const before = cellOf(last - 1),
+      after = cellOf(last + 1);
+    return finiteSurf(
+      ((step ? this.bed[after]! : this.bedHeight(after)) - (step ? this.bed[before]! : this.bedHeight(before))) /
+        (2 * spacing),
+    );
+  }
+
+  private shoreWater(index: number): WaterSample {
+    const x = this.x0 + ((index % this.nx) + 0.5) * this.dx,
+      z = this.z0 + (Math.floor(index / this.nx) + 0.5) * this.dz;
+    return this.readWater(x, z);
+  }
+
+  private bedHeight(index: number): number {
+    const sample = this.shoreWater(index);
+    return finiteSurf(sample.surface - sample.depth);
   }
 
   /** The representative frequency of the incoming waves, 1 / T_m01, Hz: the short waves' frequency in the surf. */
@@ -1009,37 +1264,55 @@ export class SurfSolver implements Solver<SurfParams> {
    * Stokes drift (m/s) and the rms orbital velocity at the bed (m/s), as handed to the shallow water.
    */
   forcing(x: number, z: number): { force: [number, number]; stokes: [number, number]; orbital: number } {
-    const f = this.words(this.forces),
-      at = FORCING_WORDS * this.cellOf(x, z);
+    const at = FORCING_WORDS * this.cellOf(x, z),
+      f = this.words(this.forces);
     return { force: [f[at]!, f[at + 1]!], stokes: [f[at + 2]!, f[at + 3]!], orbital: f[at + 4]! };
   }
 
   /** The short waves' rms height at (x, z), m (their significant height is about sqrt 2 times it). */
   waveHeight(x: number, z: number): number {
-    return (regionWords(this.host.memory, this.published) as Float32Array)[3 * this.cellOf(x, z)]!;
+    const index = this.cellOf(x, z);
+    return this.waveSummary(this.words(this.energy), index)[0];
   }
 
   /** The direction the short waves travel toward at (x, z), radians from +x toward +z. */
   waveDirection(x: number, z: number): number {
-    return (regionWords(this.host.memory, this.published) as Float32Array)[3 * this.cellOf(x, z) + 1]!;
+    const index = this.cellOf(x, z);
+    return this.waveSummary(this.words(this.energy), index)[1];
+  }
+
+  private waveSummary(energy: Float64Array, index: number): [height: number, direction: number] {
+    let ew = 0,
+      cx = 0,
+      cz = 0;
+    for (let bin = 0; bin < this.nd; bin++) {
+      const e = energy[index * this.nd + bin]! * this.dtheta;
+      ew += e;
+      cx += e * this.directionX[bin]!;
+      cz += e * this.directionZ[bin]!;
+    }
+    this.summary[0] = finiteSurf(Math.fround(Math.sqrt((8 * ew) / (this.rho * this.g))));
+    this.summary[1] = finiteSurf(Math.fround(ew > 0 ? angleOf(cz, cx) : 0));
+    return this.summary;
   }
 
   /** The roller's energy at (x, z), J/m^2. */
   rollerEnergy(x: number, z: number): number {
-    return this.words(this.roller)[this.cellOf(x, z)]!;
+    const index = this.cellOf(x, z);
+    return this.words(this.roller)[index]!;
   }
 
   /** The waves' Stokes drift at (x, z), m/s along x and z. */
   stokesDrift(x: number, z: number): [number, number] {
-    const f = this.words(this.forces),
-      k = this.cellOf(x, z);
+    const k = this.cellOf(x, z),
+      f = this.words(this.forces);
     return [f[FORCING_WORDS * k + 2]!, f[FORCING_WORDS * k + 3]!];
   }
 
   /** The undertow at (x, z): the water's depth-mean Eulerian velocity, its flow less the Stokes drift, m/s along x and z. */
   undertow(x: number, z: number): [number, number] {
-    const s = this.water.sample(x, z),
-      [ux, uz] = this.stokesDrift(x, z);
+    const [ux, uz] = this.stokesDrift(x, z),
+      s = this.readWater(x, z);
     return [s.velocity[0] - ux, s.velocity[1] - uz];
   }
 
@@ -1048,6 +1321,7 @@ export class SurfSolver implements Solver<SurfParams> {
    * or, without it, the highest of all lines.
    */
   runUp(at?: readonly [number, number]): number {
+    this.checkInitialized();
     const arg = at,
       high = this.words(this.shorelines);
     if (!arg) {
@@ -1062,7 +1336,10 @@ export class SurfSolver implements Solver<SurfParams> {
 
   /** Whether (x, z) has been wet within the last `window` seconds (default 600): the wet sand, with the water itself. */
   wetSand(x: number, z: number, window = 600): boolean {
-    const wetted = this.words(this.wetted)[this.cellOf(x, z)]!,
+    if (!(window >= 0 && Number.isFinite(window)))
+      throw surfError('unsupported', 'The wet-sand window needs finite nonnegative seconds; pass a valid duration.');
+    const index = this.cellOf(x, z),
+      wetted = this.words(this.wetted)[index]!,
       now = this.words(this.clock)[0]!;
     return Number.isFinite(wetted) && now - wetted <= window;
   }
