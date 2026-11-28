@@ -27,6 +27,7 @@
     "lineEnding": "auto"
   },
   "javascript": {
+    "globals": ["Float16Array"],
     "jsxRuntime": "reactClassic",
     "formatter": {
       "quoteStyle": "single",
@@ -75,10 +76,6 @@
     {
       "includes": ["examples/package-benchmarks/vfx-island.mjs"],
       "javascript": { "globals": ["sandbox", "vfxPass", "vfxSamples"] }
-    },
-    {
-      "includes": ["packages/post/test/curvature-browser.mjs", "packages/sciviz/tests/pick-gpu-browser.mjs"],
-      "javascript": { "globals": ["Float16Array"] }
     },
     {
       "includes": ["scripts/diagnose-ssgi-angle.mjs"],

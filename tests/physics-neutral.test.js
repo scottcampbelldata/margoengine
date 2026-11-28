@@ -14,6 +14,10 @@ const text = (file) => readFileSync(file, 'utf8');
 const NAMED = [
   // The guard that the root entry never pulls it in.
   ['packages/react/tests/subpaths.test.js', /rapier/i],
+  // The ragdoll's balance A/B runs its scene on the kernel and on the Rapier test oracle (packages/physics/tests/oracle.js,
+  // a devDependency, never shipped) side by side, and the rig helper takes either solver's class for it.
+  ['packages/ragdoll/scripts/balance-ab.mjs', /rapier/i],
+  ['packages/ragdoll/tests/rig.js', /the Rapier oracle for an A\/B/],
 ];
 
 test('no package outside physics names Rapier', () => {

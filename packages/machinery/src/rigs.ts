@@ -1114,7 +1114,7 @@ export interface DifferentialRig extends MechanismRig<DifferentialRigPose> {
 
 /**
  * An open bevel-gear differential: the carrier is the input, the side gears and a spider pinion are a multibody tree on it whose
- * meshes are couplings of their joint coordinates (Rapier's multibody DOF couplings), and the road turns the left side through a
+ * meshes are couplings of their joint coordinates (a multibody's coordinate couplings), and the road turns the left side through a
  * gear at `1 + split` times the carrier, so the right side and the spider are what the gears make of it. The check is against
  * {@link differentialPose} for the lead the road has given.
  */

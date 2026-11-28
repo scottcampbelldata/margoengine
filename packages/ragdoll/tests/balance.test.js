@@ -77,7 +77,7 @@ rtest(
   async () => {
     const limp = await standing({ balance: false });
     limp.rig.frames(180);
-    // Rapier's ankles rolled over under the standing weight and the hips sank to 0.74 of their height. A straight pose needs
+    // On the earlier solver the ankles rolled over under the standing weight and the hips sank to 0.74 of their height. A straight pose needs
     // about no ankle torque, a rod on a spherical or a cone motor sags by the closed form m g L / 2k, and the kernel's motors hold
     // the pose (docs/limits.md, Ragdoll balance): the character stands on its motors and what it still lacks is the balance
     // that catches a push.

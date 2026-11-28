@@ -544,12 +544,12 @@ The standard floor every physics engine with multibodies ships, built here on th
 
 ## Summary
 
-Counted from the rows on 2026-11-26 by `node scripts/check-rapier-parity.mjs`, one count a row by the first word of its Status cell. `tests/rapier-parity-summary.test.js` fails when this table and the rows disagree, so update both in the same push. BUILDING and PLANNED are no longer used: a row is DONE, PARTIAL, MISSING or N/A.
+Counted from the rows on 2026-11-28 by `node scripts/check-rapier-parity.mjs`, one count a row by the first word of its Status cell. `tests/rapier-parity-summary.test.js` fails when this table and the rows disagree, so update both in the same push. BUILDING and PLANNED are no longer used: a row is DONE, PARTIAL, MISSING or N/A.
 
 | Part | Rows | DONE | PARTIAL | BUILDING | PLANNED | MISSING | N/A |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1, Rapier parity | 254 | 238 | 8 | 0 | 0 | 2 | 6 |
-| 2, beyond Rapier | 84 | 45 | 21 | 0 | 0 | 18 | 0 |
+| 2, beyond Rapier | 84 | 49 | 19 | 0 | 0 | 16 | 0 |
 
 Margo already does more than Rapier in 15 rows (M-01 to M-15). The 2D rows have a finer page-by-page audit in [rapier-parity-2d.md](rapier-parity-2d.md), and the 3D collision and query rows a table of their own in [physics-collision-parity.md](physics-collision-parity.md).
 

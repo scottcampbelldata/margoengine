@@ -3,7 +3,7 @@
 // own 9.81 or 9.80665, so a world with the Moon's gravity changes the waves, the spray, the floods and the hail as it
 // changes the bodies.
 //
-// The default is 9.81 m/s^2 down the y axis: the physics kernel's and Rapier's default, which the replay goldens and the
+// The default is 9.81 m/s^2 down the y axis: the physics kernel's default, which the replay goldens and the
 // tests of every solver already hold. Standard gravity is 9.80665 m/s^2 (3rd CGPM, 1901, declaration on the unit of mass
 // and the definition of weight); the two differ by 0.03 percent, under what any shot can show, and one value matters more
 // than which one.

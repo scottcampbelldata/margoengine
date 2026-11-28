@@ -874,7 +874,7 @@ rtest('contacts with blocks raise Physics collision events naming voxels.body an
   assert.deepEqual(
     events.splice(0),
     ['contactend ball 1,0,0 mesh', 'contactend box 0,0,0 mesh', 'contactstart box 0,0,0 voxels'],
-    'and back: the removed ball ends its contact (Rapier fires an end event when a body goes), and a dropped mesh piece ends its contacts too',
+    'and back: the removed ball ends its contact (an end event fires when a body goes), and a dropped mesh piece ends its contacts too',
   );
   world.setBlock(8, 0, 8, 0);
   world.setBlock(9, 0, 8, 0);
