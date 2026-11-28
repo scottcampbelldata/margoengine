@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21990921,
+  "total": 21995681,
   "history": [
     {
       "date": "2026-10-24",
@@ -15797,6 +15797,12 @@
       "commit": "sea-03-native-wave-pairs",
       "reason": "SEA-03 @margoengine/physics/rogue 7386 to 12255 B gzip, ceiling 7642 to 12623 B. The optional sea owns its finite spectrum validation, phase preparation and deterministic native pair evaluation. A separate evaluator entry would duplicate the coefficient and envelope ownership. The native modules and helpers load only when used. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "d6c27347a7",
+      "grew": 3,
+      "reason": "Objects meet the ground (Above the Treeline look notes). @margoengine/scatter 29,682 -> 30,747 B gzip (+1,065 B): the base and skyOcclusion options, their vertex and fragment edits, and the shared ambient helper that fixes KB-SCATTER-SKYAO1; a separate entry would need a hook into the private pipeline builder. @margoengine/biomes/objects 6,419 -> 7,084 B gzip (+665 B): species sink and alignToGround (KB-BIOMES-SINK1), per-part foot and canopy looks and the footprints fed to the ground. @margoengine/terrain/ground-contact is new, 3,308 B gzip, loaded by BiomeView with import()."
     }
   ],
   "items": {
@@ -15897,7 +15903,7 @@
     "@margoengine/biomes/koppen": 1231,
     "@margoengine/biomes/landscape": 870,
     "@margoengine/biomes/multinoise": 3748,
-    "@margoengine/biomes/objects": 6469,
+    "@margoengine/biomes/objects": 7340,
     "@margoengine/biomes/placement": 13635,
     "@margoengine/biomes/presets": 3392,
     "@margoengine/biomes/region": 4672,
@@ -16668,6 +16674,7 @@
     "@margoengine/physics/bubbles": 3289,
     "@margoengine/physics/celestial": 9756,
     "@margoengine/physics/clouds": 11689,
+    "@margoengine/physics/crater": 4862,
     "@margoengine/physics/crush": 25100,
     "@margoengine/physics/debug-view": 1965,
     "@margoengine/physics/decomposition": 11487,
@@ -16958,7 +16965,7 @@
     "@margoengine/save/scene-state": 1267,
     "@margoengine/save/signed": 2837,
     "@margoengine/save/slots": 6151,
-    "@margoengine/scatter": 31345,
+    "@margoengine/scatter": 31670,
     "@margoengine/scatter/attributes": 2319,
     "@margoengine/scatter/foliage": 3502,
     "@margoengine/scatter/grass": 3688,
@@ -17246,6 +17253,7 @@
     "@margoengine/terrain/far": 3798,
     "@margoengine/terrain/ground-change": 16379,
     "@margoengine/terrain/ground-change-settings": 2159,
+    "@margoengine/terrain/ground-contact": 3564,
     "@margoengine/terrain/height-grid": 1641,
     "@margoengine/terrain/holes": 1539,
     "@margoengine/terrain/imagery": 6506,
@@ -17828,7 +17836,6 @@
     "margoengine": 308,
     "margoengine/game": 946,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/physics/crater": 4862
+    "margoengine/web": 577
   }
 }
