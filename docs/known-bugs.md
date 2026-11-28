@@ -1360,7 +1360,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   scale by 16. The bar is unchanged.
 - **Regression:** `tools/shot/test/look-masks-check.mjs` itself (`npm run test:shot`).
 
-### Open 2026-11-28: the blowup's T6 floor (0.0448 b*) is below what its probe frames can resolve (KB-LOOK-TV-TINTRES1, headless look check)
+### Fixed 2026-11-28: the blowup's T6 drifted along the shot: its flame volumes sat on ground the sun's masks counted (KB-LOOK-TV-TINTRES1, headless look check)
 
 - **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-blowup.json --once --seconds 1.1 --out <folder>`
   (RTX A6000, WebGPU, after KB-LOOK-TV-TINTMATCH1): early bounce 82.8 percent and shadowTint 0.40 b* (pass), mid bounce
@@ -1412,6 +1412,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   flames' own look is still held by every other check.
 - **After:** the closed-shutter 4.5 s run with `over`: per-frame spread 0.98 b* (3.55 without), mid shadowTint 1.10 b*
   pooled (bound 0.0416, pass), bounce 93.2 percent (pass).
+  The blowup itself (`--once --seconds 1.6`, 8 subframes, 180 degree shutter, its 15-frame pool): early shadowTint
+  0.70 b* and mid 0.37 b* (bounds 0.0366 and 0.0448, pass), bounce 94.4 and 97.3 percent (pass), b4c0bdc9a1.
 - **Regression:** `packages/headless/tests/look-clean.test.js` ("T6 leaves out ground an effect is drawn over"),
   `packages/taa/test/reactive-mask.test.js` ("taa.reactiveMask is the mask the last resolve read"),
   `packages/taa/test/reactive-browser.mjs` (WebGPU and `MARGO_COMPAT=1`).
