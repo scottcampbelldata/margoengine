@@ -1137,6 +1137,10 @@
       "status": "exempt",
       "reason": "the result of the function form TerrainMaterialOptions.textures(device), called once per device (rule 2)"
     },
+    "terrain:TerrainStreamWindow.textures": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
     "terrain:TerrainTextures.heightmap": {
       "status": "exempt",
       "reason": "never a plain option: Terrain takes the set only from `TerrainOptions.textures(device)`, the function form of rule 2, called once per device and again at each restore, and frees the old set (pinned by packages/terrain/test/borrowed-restore.test.js)"
