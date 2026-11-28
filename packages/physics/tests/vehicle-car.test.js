@@ -121,7 +121,10 @@ test('the debug lines show each suspension ray, contact, tyre push and wheel', (
     // quarter of 1,200 kg, 1,200 N, over the load the wheel carries now. Two steps after the throttle the front wheels carry
     // less than a quarter of the weight and the rear more, so the line is read against each wheel's own load.
     const push = lines.vertices.subarray(at + 18, at + 24);
-    assert.ok(Math.abs(push[0] - push[3]) < 1e-6 && Math.abs(push[1] - push[4]) < 1e-6, `wheel ${i} push points along Z`);
+    assert.ok(
+      Math.abs(push[0] - push[3]) < 1e-6 && Math.abs(push[1] - push[4]) < 1e-6,
+      `wheel ${i} push points along Z`,
+    );
     assert.ok(
       Math.abs((push[5] - push[2]) * wheel.suspensionForce - 1200) < 0.5,
       `wheel ${i} push ${push[5] - push[2]} on a load of ${wheel.suspensionForce} N`,
