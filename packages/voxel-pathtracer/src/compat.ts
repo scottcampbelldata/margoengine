@@ -732,6 +732,8 @@ export class TraceRoute {
             run('surface');
             for (const q of steps) {
               run('sample', q);
+              // A mesh emitter's radiance (compat-staged.ts, EMITTER).
+              if (staged.emits.includes(q)) run('emit', q);
               run('shadow', q);
               run('gather', q);
             }

@@ -19,6 +19,8 @@ import { fakeDevice, fakeEngine, simpleScene } from './support.js';
 import { inlinedCopies } from '../../../scripts/support/wgsl-inline.mjs';
 
 const STAGES = ['start', 'hit', 'vertex', 'surface', 'sample', 'shadow', 'gather', 'post', 'finish'];
+// The programs of a case: tracers with mesh emitters add `emit` (their radiance, KB5451).
+const stagesOf = (name) => (name === 'mesh' || name.startsWith('compose') ? [...STAGES, 'emit'] : STAGES);
 
 // A fake device of the WebGL2 layer: the tracer takes its compatibility route there.
 function harness() {
@@ -98,7 +100,7 @@ for (const [name, attach] of cases)
     try {
       await tracer.ready;
       const staged = h.modules.filter((code) => /@fragment fn (stage|census)\(/.test(code));
-      assert.equal(staged.length, STAGES.length + 1, 'nine stage programs and the census');
+      assert.equal(staged.length, stagesOf(name).length + 1, 'the stage programs and the census');
       for (const code of staged) {
         assert.doesNotThrow(
           () => checkWGSL(code),
@@ -107,7 +109,7 @@ for (const [name, attach] of cases)
         assert.doesNotMatch(code, /z_once/, `${name}: a one-pass loop is left`);
       }
       const labels = h.pipelines.map((p) => p.label);
-      for (const stage of [...STAGES, 'census']) assert.ok(labels.includes(`voxel-pathtracer ${stage}`), stage);
+      for (const stage of [...stagesOf(name), 'census']) assert.ok(labels.includes(`voxel-pathtracer ${stage}`), stage);
       // The census: no colour target; its mark writes stencil bit 1 where a path finished an iteration before, every
       // program of the loop draws only where it is 0 (start, which comes before any mark, and finish draw everywhere),
       // and its count draws where it is 0 under an occlusion query, resolved and read back through a MAP_READ buffer
@@ -121,7 +123,7 @@ for (const [name, attach] of cases)
       assert.equal(count.fragment, undefined);
       assert.deepEqual(count.depthStencil.stencilFront, { compare: 'equal' });
       assert.equal(count.depthStencil.stencilWriteMask, 0);
-      for (const stage of STAGES) {
+      for (const stage of stagesOf(name)) {
         const p = h.pipelines.find((x) => x.label === `voxel-pathtracer ${stage}`);
         if (stage === 'start' || stage === 'finish') assert.equal(p.depthStencil, undefined, stage);
         else assert.deepEqual(p.depthStencil?.stencilFront, { compare: 'equal' }, stage);
@@ -279,7 +281,7 @@ for (const [name, attach] of cases)
     try {
       await tracer.ready;
       const staged = h.modules.filter((code) => /@fragment fn stage\(/.test(code));
-      assert.equal(staged.length, STAGES.length);
+      assert.equal(staged.length, stagesOf(name).length);
       let walks = 0;
       for (const code of staged) {
         const fns = functions(code);
@@ -443,6 +445,69 @@ test('mesh PBR evaluates its shading normal and material in programs of their ow
   }
 });
 
+// KB5451: a mesh emitter's radiance (with mesh PBR, pbrEmitterRadiance: 11,200 of the sample program's inlined
+// statements, and 83 s of Direct3D's compile at its first draw) is evaluated in a program of its own, emit, between
+// sample and shadow, for the light kinds that can sample a mesh emitter only; sample keeps the picked face and point.
+test('mesh emitters evaluate their radiance in a program of its own between sample and shadow (KB5451)', async () => {
+  await moduleHooks([{ source: new URL('../src/', import.meta.url).href }]);
+  const { stagedTrace } = await import('../src/compat-staged.ts');
+  const h = harness(),
+    tracer = await meshPBRCase[1](h.engine);
+  try {
+    await tracer.ready;
+    const code = (stage) => h.pipelines.find((x) => x.label === `voxel-pathtracer ${stage}`)?.fragment.module.code,
+      calls = (stage, fn) => inlinedCopies(code(stage), 'stage').copies.get(fn) ?? 0;
+    assert.equal(calls('emit', 'meshEmitterRadiance'), 1);
+    assert.equal(calls('emit', 'pbrEmitterRadiance'), 1);
+    assert.equal(calls('emit', 'rand'), 0, 'emit draws no random number');
+    // One texel tap per texture fetch in every program (TEXEL): emit held 20 pbrPixel copies for its 4 fetches.
+    for (const stage of ['hit', 'shading', 'material', 'sample', 'emit', 'shadow', 'gather'])
+      assert.equal(calls(stage, 'pbrPixel'), calls(stage, 'pbrTexture'), stage);
+    assert.equal(calls('emit', 'pbrTexture'), 4);
+    assert.equal(calls('sample', 'meshEmitterRadiance'), 0, 'sample leaves the radiance to emit');
+    assert.equal(calls('sample', 'pbrEmitterRadiance'), 0);
+    // The record goes through the light kind's radiance words: no state word is added for it.
+    assert.match(
+      code('sample'),
+      /let bary=vec2f\(root\*\(1\.0-v\),root\*v\);result\.radiance=vec3f\(bitcast<f32>\(r\|0x40000000u\),root,v\);/,
+    );
+    assert.match(
+      code('emit'),
+      /if\(q==5u\)\{if\(z_shadow\)\{let z_r=radiance;radiance=z_meshEmitted\(o,bitcast<u32>\(z_r\.x\)&0x3fffffffu,z_r\.y,z_r\.z\)\.radiance;\}\}/,
+    );
+    assert.doesNotMatch(code('emit'), /struct ZS \{[^}]*z_e/);
+    assert.doesNotThrow(() => checkWGSL(code('emit')));
+    const trace = h.modules.find((c) => c.includes('fn radiance(') && c.includes('fn trace('));
+    assert.deepEqual(stagedTrace(trace).emits, [5], 'kind 5 alone samples mesh emitters');
+  } finally {
+    tracer.dispose();
+  }
+  // The state stays within the layer's 16 texture units with every feature and mesh PBR (the emitter's whole Hit kept
+  // in the state, 35 words, took 12 pages: 17 units with the 5 sums finish reads, and the layer refused the program).
+  const all = harness(),
+    every = await ComposedVoxelPathTracer.create(all.engine, {
+      scene: { ...meshScene(), pbrMaterials: [{ id: 1 }] },
+      features: [meshPBR(), resampledEmitters(), coloredMedia(), causticGuiding(), spectralTransport()],
+    });
+  try {
+    await every.ready;
+    const trace = all.modules.find((c) => c.includes('fn radiance(') && c.includes('fn trace('));
+    assert.ok(stagedTrace(trace).pages + 5 <= 16, `${stagedTrace(trace).pages} pages`);
+  } finally {
+    every.dispose();
+  }
+  const plain = harness(),
+    base = await VoxelPathTracer.attach(plain.engine, { scene: simpleScene() });
+  try {
+    await base.ready;
+    assert.ok(!plain.pipelines.some((p) => p.label === 'voxel-pathtracer emit'));
+    const trace = plain.modules.find((c) => c.includes('fn radiance(') && c.includes('fn trace('));
+    assert.deepEqual(stagedTrace(trace).emits, []);
+  } finally {
+    base.dispose();
+  }
+});
+
 // meshClosest walked a lone mesh's triangles from one meshBlas call site and each instance's from another, so every
 // program with a triangle traversal held two copies of the triangle walk (6 triangle edge tests, 12 edge products in
 // the hit and shadow programs, and gather with every feature). A lone mesh is now one pass of the instance loop with
@@ -572,7 +637,7 @@ for (const [name, attach] of cases)
     try {
       await tracer.ready;
       const staged = h.modules.filter((code) => /@fragment fn stage\(/.test(code));
-      assert.equal(staged.length, STAGES.length);
+      assert.equal(staged.length, stagesOf(name).length);
       for (const code of staged) {
         const fns = functions(code);
         assert.ok(walkSites(fns, 'stage') <= 1, `${name}: ${walkSites(fns, 'stage')} traversal calls in one program`);

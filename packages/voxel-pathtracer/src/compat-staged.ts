@@ -28,6 +28,7 @@ export type Stage =
   | 'material'
   | 'surface'
   | 'sample'
+  | 'emit'
   | 'shadow'
   | 'gather'
   | 'post'
@@ -36,7 +37,8 @@ export type Stage =
 export interface StagedTrace {
   /**
    * Each program's WGSL (a fill-triangle vertex entry `fill` and a fragment entry `stage`). `shading` and `material`
-   * only for a shader with mesh PBR materials (see SURFACE_CALLS); every other stage always.
+   * only for a shader with mesh PBR materials (see SURFACE_CALLS), `emit` only for a shader with mesh emitters (see
+   * EMITTER); every other stage always.
    */
   readonly modules: Readonly<Partial<Record<Stage, string>>>;
   /** Pages of path state (LAYERS layers of 4 words each). */
@@ -52,6 +54,8 @@ export interface StagedTrace {
    * the kind a shader repeats (`const KIND_REPEAT=vec2u(kind,passes);`, the resampled proposals), that many times.
    */
   readonly steps: readonly number[];
+  /** The light kinds whose passes draw `emit` (those that can reach sampleMeshEmitter); none without it. */
+  readonly emits: readonly number[];
   /**
    * The census program: a fragment per path that passes (is not discarded) once the path finished before iteration
    * `k - 1` began, so both copies of every page hold its final state. compat.ts draws it with stencil writes to mark
@@ -140,6 +144,58 @@ const SURFACE_CALLS = {
       'if(h.inst!=TRIANGLE){lp=xpoint(localX(h.inst),p);}let z_keep=pbrLayer;' +
       'z_pm=pbrMaterial(h,lp,material(h.value));z_pl=pbrLayer;pbrLayer=z_keep;}',
   },
+} as const;
+// A mesh emitter's radiance, evaluated in a program of its own (`emit`, between `sample` and `shadow` of the light kind
+// that samples mesh emitters) and not inside sampleMeshEmitter (KB5451). Inlined into `sample` with mesh PBR it was
+// 11,200 of the program's statements, and Direct3D's compiler took 83 s for it at its first draw. sampleMeshEmitter
+// draws its three random numbers first (the face, then the point on it); everything after them depends on those, the
+// shading point `o` and private words alone. So on this route it returns, in place of the radiance, the face's record
+// and its two draws (the record offset with bit 30 set, so the word is a normal f32 that every move keeps: the scene
+// buffer holds under 2^30 words), and `emit` runs the same code after the draws on the same values,
+// `z_meshEmitted`, for the radiance. The record goes through the light kind's own `radiance` words, which `sample`
+// copies it into and never reads again, so the path state keeps its size: 4 words more took mesh PBR's state from 10
+// to 11 pages, and every program's state load and store with it (a cold first image 20 to 40 s slower). The radiance
+// reaches the light sum only in `gather`, under the shadow ray; the checks below hold the rest.
+const EMITTER = {
+  fn: 'fn sampleMeshEmitter(o:vec3f)->LightPoint {',
+  pick: 'let r=records+lo*24u;let root=sqrt(rand());let v=rand();let bary=vec2f(root*(1.0-v),root*v);',
+  kept: 'result.radiance=vec3f(bitcast<f32>(r|0x40000000u),root,v);',
+  call: 'result.radiance=meshEmitterRadiance(h,result.p,wo);',
+  after:
+    'fn z_meshEmitted(o:vec3f,r:u32,root:f32,v:f32)->LightPoint {var result:LightPoint;' +
+    'let bary=vec2f(root*(1.0-v),root*v);',
+  use: 'ls=sampleMeshEmitter(o);',
+  copy: 'radiance=ls.radiance;',
+  run: 'if(z_shadow){let z_r=radiance;radiance=z_meshEmitted(o,bitcast<u32>(z_r.x)&0x3fffffffu,z_r.y,z_r.z).radiance;}',
+} as const;
+// Mesh PBR's texel fetch in one tap loop on this route (KB5451): pbrTexture wrote its nearest tap and its four
+// bilinear taps as five calls of pbrPixel, each with its two pbrAddress wraps and its sRGB decode, and Direct3D's
+// compiler inlined all five into every pbrTexture copy (emit holds four: 20 pbrPixel and 40 pbrAddress copies). The
+// loop runs the same taps in the same order, decodes each as before and mixes them in the same expressions, so every
+// value is the same; its bound comes from the texture's record, so the compiler keeps one copy of the tap.
+const TEXEL = {
+  from:
+    'let p=wrapped*vec2f(f32(scene[t]),f32(scene[t+1u]));var value:vec4f;' +
+    'if(scene[t+6u]==0u){value=pbrPixel(t,vec2i(floor(p)));}' +
+    'else{let x=p-0.5;let a=vec2i(floor(x));let k=fract(x);' +
+    'var c0=pbrPixel(t,a);var c1=pbrPixel(t,a+vec2i(1,0));' +
+    'var c2=pbrPixel(t,a+vec2i(0,1));var c3=pbrPixel(t,a+vec2i(1,1));' +
+    'if(srgb){' +
+    'c0=vec4f(select(c0.rgb/12.92,pow((c0.rgb+0.055)/1.055,vec3f(2.4)),c0.rgb>vec3f(0.04045)),c0.a);' +
+    'c1=vec4f(select(c1.rgb/12.92,pow((c1.rgb+0.055)/1.055,vec3f(2.4)),c1.rgb>vec3f(0.04045)),c1.a);' +
+    'c2=vec4f(select(c2.rgb/12.92,pow((c2.rgb+0.055)/1.055,vec3f(2.4)),c2.rgb>vec3f(0.04045)),c2.a);' +
+    'c3=vec4f(select(c3.rgb/12.92,pow((c3.rgb+0.055)/1.055,vec3f(2.4)),c3.rgb>vec3f(0.04045)),c3.a);' +
+    '}return mix(mix(c0,c1,k.x),mix(c2,c3,k.x),k.y);}' +
+    'if(srgb){value=vec4f(select(value.rgb/12.92,pow((value.rgb+0.055)/1.055,vec3f(2.4)),value.rgb>vec3f(0.04045)),value.a);}' +
+    'return value;',
+  // Nearest: one tap at floor(p) (x is p); bilinear: taps a, a+(1,0), a+(0,1), a+(1,1) at floor(p-0.5).
+  to:
+    'let p=wrapped*vec2f(f32(scene[t]),f32(scene[t+1u]));let linear=scene[t+6u]!=0u;' +
+    'let x=select(p,p-0.5,linear);let a=vec2i(floor(x));let k=fract(x);var lo:vec4f;var r0:vec4f;var r1:vec4f;' +
+    'for(var i=0u;i<select(1u,4u,linear);i++){var c=pbrPixel(t,a+vec2i(i32(i&1u),i32(i>>1u)));' +
+    'if(srgb){c=vec4f(select(c.rgb/12.92,pow((c.rgb+0.055)/1.055,vec3f(2.4)),c.rgb>vec3f(0.04045)),c.a);}' +
+    'if((i&1u)==0u){lo=c;}else if(i==1u){r0=mix(lo,c,k.x);}else{r1=mix(lo,c,k.x);}}' +
+    'if(!linear){return lo;}return mix(r0,r1,k.y);',
 } as const;
 const SHADOW_IF = 'if(any(e.f>vec3f(0.0))&&(air||!far)){';
 const SHADOW = 'var v=shadow(o,wi,dist);';
@@ -435,6 +491,23 @@ function kindHolds(cond: string, q: number): boolean | undefined {
   }
   return any;
 }
+// Whether kind q runs the statement of `text` that holds `marker` once it gets that far: true, false (the ifs around it
+// rule q out by kind comparisons), or undefined (they depend on more than q).
+function reaches(text: string, marker: string, q: number): boolean | undefined {
+  const s = statements(text).find((t) => t.includes(marker));
+  if (s === undefined) return false;
+  const b = branches(s);
+  if (!b) return true;
+  for (const x of b) {
+    if (x.cond?.includes(marker)) return undefined;
+    const holds = x.cond === undefined ? true : kindHolds(x.cond, q);
+    if (x.body.includes(marker))
+      return holds === false ? false : holds === undefined ? undefined : reaches(x.body, marker, q);
+    if (holds === true) return false;
+    if (holds === undefined) return undefined;
+  }
+  return false;
+}
 // Calls in `text` other than type constructors.
 const calls = (text: string) => /\b(?!(?:vec[234][fiu]?|f32|u32|i32|bool)\b)\w+\s*\(/.test(text);
 
@@ -541,7 +614,40 @@ function idleKinds(code: string, light: string, kinds: number): FrameTest[][][] 
 
 export function stagedTrace(source: string): StagedTrace {
   // Comments out (they name loops and calls the cuts look for).
-  const code = source.replace(/\/\/[^\n]*/g, '');
+  let code = source.replace(/\/\/[^\n]*/g, '');
+  // Mesh PBR's texel fetch: one tap loop (TEXEL), matched without its whitespace.
+  const ti = code.indexOf(TEXEL.from.slice(0, 40));
+  if (code.includes('fn pbrTexture(')) {
+    const end = ti < 0 ? -1 : code.indexOf('return value;', ti) + 'return value;'.length;
+    if (end < 0 || code.slice(ti, end).replace(/\s+/g, '') !== TEXEL.from.replace(/\s+/g, ''))
+      throw stale('pbrTexture');
+    code = code.slice(0, ti) + TEXEL.to + code.slice(end);
+  }
+  // Mesh emitters: their radiance in the `emit` program (EMITTER).
+  const emitter = code.includes(EMITTER.fn);
+  if (emitter) {
+    const fi = unique(code, EMITTER.fn),
+      fClose = matching(code, fi + EMITTER.fn.length - 1),
+      fBody = code.slice(fi + EMITTER.fn.length, fClose);
+    if (fBody.split(EMITTER.call).length !== 2 || fBody.split(EMITTER.pick).length !== 2) throw stale(EMITTER.call);
+    unique(code, EMITTER.use);
+    const [draws, rest] = fBody.split(EMITTER.pick);
+    // Every return after the draws leaves the radiance as set there, or the radiance call's own.
+    if (/result\.radiance/.test(rest.replace(EMITTER.call, ''))) throw stale(EMITTER.call);
+    // The code after the draws reads none of the draws' own locals but r, root and bary.
+    if (/\b(header|records|lo|hi|pick|v)\b/.test(rest)) throw stale(EMITTER.pick);
+    code =
+      code.slice(0, fi) +
+      EMITTER.fn +
+      draws +
+      EMITTER.pick +
+      EMITTER.kept +
+      rest.replace(EMITTER.call, '') +
+      '}\n' +
+      EMITTER.after +
+      rest +
+      code.slice(fClose);
+  }
   const ri = unique(code, RADIANCE),
     rOpen = ri + RADIANCE.length - 1,
     rClose = matching(code, rOpen),
@@ -581,6 +687,15 @@ export function stagedTrace(source: string): StagedTrace {
         for (const p of changes.get(m[1]) ?? [])
           if (m[1] !== name && !changes.get(name)!.has(p)) changes.get(name)!.add(p), (grew = true);
   }
+  /** The private words function `name` reads, itself or through the functions it calls. */
+  const reads = (name: string, seen = new Set<string>()): Set<string> => {
+    const text = bodies.get(name) ?? '',
+      out = new Set(privates.filter((p) => new RegExp(`\\b${p.name}\\b`).test(text)).map((p) => p.name));
+    seen.add(name);
+    for (const m of text.matchAll(/\b(\w+)\s*\(/g))
+      if (bodies.has(m[1]) && !seen.has(m[1])) for (const p of reads(m[1], seen)) out.add(p);
+    return out;
+  };
   /** The private words `text` may change. */
   const touched = (text: string) => {
     const out = new Set(privates.filter((p) => assigns(text, p.name)).map((p) => p.name));
@@ -644,6 +759,26 @@ export function stagedTrace(source: string): StagedTrace {
     off = unique(tail, SUN_OFF, vi) + SUN_OFF.length,
     lightKnown = new Map(known),
     sample = hoist(walkPtr(light.slice(0, si)), lightKnown, T);
+  // emit changes no private word; `sample` after the call changes none emit reads; `sample` copies the record into
+  // `radiance` once and reads neither again; and the light kinds that draw emit run the call wherever they get past it.
+  const emits: number[] = [];
+  if (emitter) {
+    const text = sample.text,
+      at = text.indexOf(EMITTER.use),
+      copied = text.indexOf(EMITTER.copy, at),
+      changed = [...touched(EMITTER.run)],
+      later = [...touched(text.slice(at + EMITTER.use.length))].filter((n) => reads('z_meshEmitted').has(n));
+    if (text.split(EMITTER.use).length !== 2 || text.split('ls.radiance').length !== 2 || copied < 0)
+      throw stale(EMITTER.copy);
+    // A read of the light kind's radiance (not another value's `.radiance`, not a store) after the copy.
+    if (/(?<![\w.])radiance\b(?!\s*=[^=])/.test(text.slice(copied + EMITTER.copy.length))) throw stale(EMITTER.copy);
+    if (changed.length || later.length) throw stale(`emit: ${[...changed, ...later].join(', ')} change in between`);
+    for (let q = 0; q < kinds; q++) {
+      const r = reaches(light, EMITTER.use, q);
+      if (r === undefined) throw stale(`light kind ${q}: ${EMITTER.use}`);
+      if (r) emits.push(q);
+    }
+  }
   // A prologue that changes private state runs in every light program: no kind's passes may be left out then.
   const idle = touched(dPrologue).size ? Array.from({ length: kinds }, () => []) : idleKinds(code, light, kinds);
   sample.decls.push({ name: 'v', type: T.fns.get('shadow') ?? 'f32' });
@@ -728,6 +863,7 @@ export function stagedTrace(source: string): StagedTrace {
     surface: `if(!z_skip){${unloop(vertexB)}}`,
     post: `if(z_post){${once(post.replaceAll('break;', '{z_fin=true;break;}'))}z_post=false;}`,
     sample: `z_lskip=true;z_shadow=false;${once(`${sample.text}z_lskip=false;z_shadow=${SHADOW_IF.slice(3, -2)};`)}`,
+    ...(emitter ? { emit: `if(${emits.map((q) => `q==${q}u`).join('||') || 'false'}){${EMITTER.run}}` } : {}),
     shadow: `if(z_shadow){${shadowText}}`,
     gather: once(`if(z_shadow){${gatherText}`),
   };
@@ -735,11 +871,22 @@ export function stagedTrace(source: string): StagedTrace {
 
   // Pages: control words (every program writes them), then the fields grouped by the programs that write them, those
   // of the programs that run most often (five times an iteration) first, so each program rewrites few pages.
-  const STAGES = ['shadow', 'sample', 'gather', 'hit', 'post', 'vertex', 'shading', 'material', 'surface'] as const,
+  const STAGES = [
+      'shadow',
+      'sample',
+      'emit',
+      'gather',
+      'hit',
+      'post',
+      'vertex',
+      'shading',
+      'material',
+      'surface',
+    ] as const,
     fields = [...control, ...path, ...scratch],
     // The name a field has in a program's text.
     local = (d: Decl, s: string) =>
-      ['sample', 'shadow', 'gather'].includes(s)
+      ['sample', 'emit', 'shadow', 'gather'].includes(s)
         ? scratch.includes(d)
           ? d.name.slice(2)
           : d.name === 'walk'
@@ -906,6 +1053,7 @@ ${unpackPath}${nonFields.map((d) => ` var ${d.name}:${d.type};\n`).join('')} ${S
     surface: pathStage(code_.surface),
     post: pathStage(code_.post),
     sample: lightStage(code_.sample, ''),
+    ...(emitter ? { emit: lightStage(code_.emit, '&&!S.z_lskip') } : {}),
     shadow: lightStage(code_.shadow, '&&!S.z_lskip'),
     gather: lightStage(code_.gather, '&&!S.z_lskip'),
     finish,
@@ -933,5 +1081,5 @@ struct ZCensus {k:u32,p0:u32,p1:u32,p2:u32}
     steps = [...Array(kinds).keys()].flatMap((q) =>
       Array<number>(repeat && Number(repeat[1]) === q ? Number(repeat[2]) : 1).fill(q),
     );
-  return { modules, pages, writes, words: total, census, kinds, steps, idle };
+  return { modules, pages, writes, words: total, census, kinds, steps, idle, emits };
 }

@@ -13719,14 +13719,43 @@ Release exception: Firefox WGSL to HLSL keeps name dx (browser defect).
   all, the layer's `getBufferSubData` reads hashed too); only the order the layer's reads finish in differs. Entry
   sizes stay under their ceilings (the staged route is in the lazy compat chunk). Regression:
   `packages/voxel-pathtracer/tests/compat-staged.test.js` "mesh PBR evaluates its shading normal and material in
-  programs of their own before surface (KB5451)". Still open: 120 s. The cold first-draw waits left are `sample`
-  (mesh emitter radiance, 83 s), `hit` (45 s) and `shadow` (28 s); `sample`'s `pbrEmitterRadiance` (11,200 inlined
-  statements) is the next candidate for the same treatment.
+  programs of their own before surface (KB5451)". The cold first-draw waits left were `sample` (mesh emitter
+  radiance, 83 s), `post` (labelled `hit` before; 45 s) and `shadow` (28 s).
+- **Fix (2026-11-28, emit and the texel loop):** the staged route evaluates a mesh emitter's radiance in a program
+  of its own, `emit`, drawn between `sample` and `shadow` for the light kind that samples mesh emitters only (kind 5;
+  `StagedTrace.emits`). sampleMeshEmitter draws its three random numbers first and everything after them depends on
+  those draws, the shading point and private words alone, so on this route it returns the face's record offset (bit
+  30 set, so the word stays a normal f32) and its two draws through the light kind's own `radiance` words, and `emit`
+  runs the same code after the draws (`z_meshEmitted`) for the radiance. The stager refuses a shader where `sample`
+  reads that radiance again, changes a private word the emitter code reads, or reaches the call by more than the
+  light kind. A first version kept the record in 4 new state words: mesh PBR's state went from 280 words (10 pages)
+  to 11 pages and every program's state load and store grew with it, slower cold; a whole Hit (35 words) took 12
+  pages, 17 texture units with finish's 5 sums, and the layer refused it. `pbrTexture` on this route also fetches
+  its nearest tap and its four bilinear taps in one loop bounded by the texture's filter word, the same taps in the
+  same order, decoded and mixed in the same expressions: Direct3D's compiler had inlined five `pbrPixel` copies
+  (ten `pbrAddress`) into every texture fetch. WebGPU's shader is not touched. Paired offline fxc over all ten
+  (now eleven) staged programs, 2 rounds, per-program minimum: 89.6 s to 68.0 s (sample 29.7 s to 4.1 s plus emit
+  8.1 s, shadow 17.7 to 15.9 s, post 20.1 to 17.9 s). Cold first image of
+  `MARGO_COMPAT=1 node packages/voxel-pathtracer/tests/mesh-pbr-lobes-browser.mjs` (Edge, ANGLE Direct3D 11, fresh
+  profile, old and new alternating, the workstation quiet): old 94 and 91 s, new 80 and 77 s, under the 120 s bar.
+  Same output: the four mesh GPU tests and the resampled, guiding, media, spectral, mesh and compose
+  (`--backend=compat`) checks give the same sets of readback hashes before and after on WebGPU and the layer (1,576).
+  The lazy compat chunk grows from 13,503 to 14,856 B gzip; the root entry by 1 B (the chunk's name). Regressions:
+  `packages/voxel-pathtracer/tests/compat-staged.test.js` "mesh emitters evaluate their radiance in a program of
+  its own between sample and shadow (KB5451)" and `packages/voxel-pathtracer/tests/mesh-pbr.test.js` "the WebGL2
+  route's texel loop gives pbrTexture's values bit for bit (KB5451)" (CPU WGSL interpreter, nearest and bilinear,
+  sRGB and not). Still open: the busy-machine first image (167 to 205 s while other lanes ran); the largest cold
+  programs left are `post` and `shadow` (about 16 to 18 s each offline).
 - **Sources (the split):** S. Laine, T. Karras, T. Aila, "Megakernels Considered Harmful: Wavefront Path Tracing on
   GPUs", HPG 2013, https://research.nvidia.com/publication/2013-07_megakernels-considered-harmful-wavefront-path-tracing-gpus
   (a path's work cut into small kernels that pass the path state through memory, which keeps each kernel small for
   the compiler and the register file); D. van Antwerpen, "Improving SIMD Efficiency for Parallel Monte Carlo Light
-  Transport on the GPU", HPG 2011, https://doi.org/10.1145/2018323.2018330 (stream compaction between path stages).
+  Transport on the GPU", HPG 2011, https://doi.org/10.1145/2018323.2018330 (stream compaction between path stages);
+  P. S. Heckbert, "Fundamentals of Texture Mapping and Image Warping", MS thesis, UC Berkeley, 1989,
+  https://www2.eecs.berkeley.edu/Pubs/TechRpts/1989/CSD-89-516.pdf (bilinear reconstruction as two linear
+  interpolations of four taps, the order the loop keeps); R. W. Scheifler, "An Analysis of Inline Substitution for a
+  Structured Programming Language", CACM 20(9), 1977, https://doi.org/10.1145/359810.359830 (code growth from
+  inlining every call site, which the single tap avoids).
 - **Sources:** Microsoft, "Function Declaration Syntax" (HLSL `inline` is the default; one copy of the body per call),
   https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-function-syntax ; Microsoft,
   "for Statement" (`loop` keeps flow control, `unroll` copies the body; without an attribute the compiler unrolls

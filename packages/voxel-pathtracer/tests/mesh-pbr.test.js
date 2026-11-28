@@ -106,7 +106,7 @@ test('PBR rejects malformed channels before committing a replacement', async () 
   }
 });
 
-async function probeScene(s, body, size = 16) {
+async function probeScene(s, body, size = 16, extra = '') {
   const h = fakeEngine(),
     codes = [],
     make = h.device.createShaderModule.bind(h.device);
@@ -126,6 +126,7 @@ async function probeScene(s, body, size = 16) {
     runComputeOnCPU({
       source:
         code +
+        extra +
         `
 @group(3) @binding(0) var<storage,read_write> probe:array<vec4f>;
 @compute @workgroup_size(1) fn pbr_probe(){
@@ -494,4 +495,72 @@ test('pbrMaterial gives the same values as one filter call per slot (KB5451)', a
   for (let i = 0; i < 24; i++) assert.ok(Object.is(a[i], a[i + 24]), `value ${i}: ${a[i]} vs ${a[i + 24]}`);
   assert.ok(a.slice(0, 24).every(Number.isFinite));
   assert.ok(a[7] > 0 && a[11] > 0 && a[15] > 0, 'textures reach the material');
+});
+// KB5451: the WebGL2 route fetches mesh PBR texels in one tap loop (src/compat-staged.ts, TEXEL), so Direct3D's
+// compiler keeps one pbrPixel per pbrTexture and not five. The loop gives the same values bit for bit: the route's
+// pbrTexture against the shader's own, nearest and bilinear, decoded as sRGB and not, on the CPU WGSL interpreter.
+test("the WebGL2 route's texel loop gives pbrTexture's values bit for bit (KB5451)", async () => {
+  const route = fakeEngine(),
+    codes = [],
+    make = route.device.createShaderModule.bind(route.device);
+  route.device.adapterInfo = { vendor: 'margo-webgl2', architecture: 'webgl2', device: 'test', description: 'test' };
+  route.device.createShaderModule = (d) => {
+    codes.push(d.code);
+    return make(d);
+  };
+  const t = await ComposedVoxelPathTracer.create(route.engine, {
+    scene: scene(),
+    features: [meshPBR()],
+    denoise: false,
+  });
+  let looped;
+  try {
+    await t.ready;
+    const stage = codes.find((c) => c.includes('@fragment fn stage(') && c.includes('fn pbrTexture('));
+    const start = stage.indexOf('fn pbrTexture(');
+    let depth = 0,
+      end = stage.indexOf('{', start);
+    for (; end < stage.length; end++) {
+      if (stage[end] === '{') depth++;
+      else if (stage[end] === '}' && --depth === 0) break;
+    }
+    looped = stage.slice(start, end + 1).replace('fn pbrTexture(', 'fn pbrTextureLooped(');
+    assert.match(looped, /for\(var i=0u;i<select\(1u,4u,linear\);i\+\+\)/);
+    assert.equal(looped.match(/pbrPixel\(/g).length, 1, 'one tap');
+  } finally {
+    t.dispose();
+  }
+  const s = scene(),
+    tex = (filter, k) => ({
+      width: 3,
+      height: 2,
+      filter,
+      data: new Uint8Array(Array.from({ length: 24 }, (_, i) => (61 * i + 29 * k + 7) % 256)),
+    });
+  Object.assign(s.pbrMaterials[0], {
+    baseColorTexture: tex('linear', 0),
+    metallicRoughnessTexture: tex('nearest', 1),
+    emissiveTexture: tex('nearest', 2),
+    clearcoatTexture: tex('linear', 3),
+  });
+  const slots = [0, 1, 3, 4],
+    uv = [
+      [0.2, 0.3],
+      [0.05, 0.9],
+      [0.61, 0.17],
+    ],
+    calls = [];
+  for (const [x, y] of uv)
+    for (const slot of slots)
+      for (const srgb of [true, false]) calls.push(`h.bary=vec2f(${x},${y});`, `pbrTexture$(h,r,${slot}u,${srgb})`);
+  let body = ' let r=pbrRecord(h);\n',
+    n = 0;
+  for (let i = 0; i < calls.length; i += 2, n++)
+    body += ` ${calls[i]}probe[${n}]=${calls[i + 1].replace('$', '')};probe[${calls.length / 2 + n}]=${calls[i + 1].replace('$', 'Looped')};\n`;
+  const values = await probeScene(s, body, calls.length * 4, looped);
+  const half = (calls.length / 2) * 4;
+  for (let i = 0; i < half; i++)
+    assert.ok(Object.is(values[i], values[i + half]), `value ${i}: ${values[i]} vs ${values[i + half]}`);
+  assert.ok(values.slice(0, half).every(Number.isFinite));
+  assert.ok(new Set(values.slice(0, half)).size > 8, 'the textures reach the probe');
 });
