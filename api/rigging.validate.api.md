@@ -30,7 +30,7 @@ export interface ClipReport extends PoseReport {
     readonly summary: readonly ClipIssueSummary[];
 }
 
-export const POSE_HELP = "https://margoengine.com/llms/packages/rigging.md#pose-checks";
+export const POSE_HELP = "https://margoengine.com/llms/packages/rigging.md#pose-checks-margoengineriggingvalidate";
 
 export interface PoseCheckOptions {
     readonly tier?: Tier | 'both';

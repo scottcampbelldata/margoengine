@@ -174,7 +174,7 @@ export interface ProportionCheckOptions {
 }
 
 /** The README section that explains each issue code. */
-export const POSE_HELP = 'https://margoengine.com/llms/packages/rigging.md#pose-checks';
+export const POSE_HELP = 'https://margoengine.com/llms/packages/rigging.md#pose-checks-margoengineriggingvalidate';
 
 type V3 = [number, number, number];
 
