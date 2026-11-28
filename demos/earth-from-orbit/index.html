@@ -7,8 +7,8 @@
   <meta name="description" content="Move through a day in UTC and watch sunlight cross the real geography of Earth.">
   <title>Earth From Orbit | Margo Engine</title>
   <link rel="icon" href="data:,">
-  <script type="module" crossorigin src="./assets/index-DjMDteOA.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-Dxet5vz5.css">
+  <script type="module" crossorigin src="./assets/index-xtM74xZv.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/style-BqwRLN5b.css">
 </head>
 <body>
   <main>
@@ -17,13 +17,10 @@
       <h1>Earth From Orbit</h1>
       <p>Follow the line between daylight and the cities coming on below.</p>
     </header>
-    <section class="exhibit" aria-label="Earth in sunlight">
+    <section class="exhibit" id="exhibit" aria-label="Earth in sunlight">
       <figure>
         <canvas id="scene" aria-label="Earth from orbit with daylight, city lights and the Milky Way. Drag or press the left and right arrow keys to orbit." tabindex="0"></canvas>
         <p class="guide">Drag to orbit</p>
-        <div id="solar-bearing" class="solar-bearing" hidden aria-hidden="true">
-          <span id="solar-arrow">↑</span> Sunward
-        </div>
         <p id="loading" role="status">Opening the orbital view…</p>
         <p id="error" role="alert" hidden></p>
         <figcaption><span>North up</span><output id="view-origin">28° S · 66° W</output></figcaption>

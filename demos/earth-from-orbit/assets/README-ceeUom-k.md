@@ -1,0 +1,25 @@
+# Earth From Orbit
+
+Scrub one day in UTC to move the Sun across real Earth imagery. Pick another UTC date to see how the subsolar point and the shape of the day–night boundary change with the seasons. Drag the canvas horizontally to orbit along 28° S. The canvas also supports Left, Right and Home. The Sunward arrow shows the projected direction toward the Sun in the viewing plane. The latitude and longitude show where it is directly overhead.
+
+## Model
+
+The Earth is held in an Earth-fixed frame with north at +Y and Greenwich on +X. World −Z is east. Margo’s astronomy package evaluates the apparent geocentric solar right ascension and declination for the selected UTC instant. Subsolar latitude is declination, and east-positive longitude is right ascension minus Greenwich apparent sidereal time, wrapped into [−180°, 180°). The receiver-to-Sun unit direction lights the actual globe, its cloud layer and its atmosphere. The day–night transition is a rendered illumination response. The UTC input spans 1900–2100 and minute precision. The package estimates Earth orientation and uses UTC as a practical substitute for UT1. This is an educational sky model. [USNO approximate solar coordinates](https://aa.usno.navy.mil/faq/sun_approx), [USNO apparent sidereal time](https://aa.usno.navy.mil/faq/GAST).
+
+Visible stars come from the Yale Bright Star Catalogue. Margo uses an Earth-pole frame to place the star catalogue and the Milky Way at the same instant used by the Earth itself. The orbital view along the southern belt looks through the supported north-facing sky layer. Margo builds the diffuse Milky Way procedurally from a galactic photometry model. Its displayed brightness, the atmosphere, and the post-processing are composed for a visible orbital exhibit. Surface colors, night-light geography, clouds and ocean reflectivity come from static composites. The pinned Margo sky package can show a small abrupt change in dust-rift shading at galactic longitude +75°. To see it, keep the default camera at 28° S, 66° W, set 2026-10-12 at 10:00 UTC, and look in the upper left of the desktop frame beside the shadowed limb.
+
+Both renderer paths and viewport sizes use the same camera orientation, surface materials, catalogue, galaxy, post settings, and final 2,048 × 1,024 maps. A complete 1,024 × 512 map set opens first. The larger maps replace the first set atomically. The app requires the Margo WebGPU path or the full WebGL2 compatibility tier with HDR support. The page presents the Margo error message if the runtime refuses the scene.
+
+## Sources and credits
+
+- **Day imagery** — NASA Earth Observatory, *Blue Marble: Next Generation, Base Map*, July 2004 composite. This copy comes from the public Margo Earth example, reoriented and encoded as WebP for this demo. [NASA Earth Observatory base map](https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-map/), [NASA imagery usage](https://www.nasa.gov/nasa-brand-center/images-and-media/).
+- **Night lights, clouds and ocean mask** — Solar System Scope (INOVE), *Solar System Scope Textures*, Earth maps. CC BY 4.0. Existing engine maps were reoriented and repacked as WebP. The cloud luma became a single channel. The engine’s two-channel shine derivative retains the red ocean mask and packs roughness into green. [Texture collection](https://www.solarsystemscope.com/textures/), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+- **Star positions and colors** — Dorrit Hoffleit and W. H. Warren Jr., *The Bright Star Catalogue, 5th Revised Ed. (Preliminary Version)*, Astronomical Data Center, 1991. This exhibit’s small extraction keeps required fields for objects of visual magnitude 5.6 and brighter. Catalogue V/50 accessed via the Centre de Données astronomiques de Strasbourg (CDS). [CDS catalogue V/50](https://cdsarc.cds.unistra.fr/viz-bin/cat/V/50).
+- **Milky Way model context** — Axel Mellinger, *A Color All-Sky Panorama Image of the Milky Way*, PASP 121, 2009. This is a reference for the renderer’s galactic photometry and for visual review. The exhibit carries no imported panorama. [Survey paper](https://arxiv.org/abs/0908.4360).
+- **Rendering** — Public Margo Engine main, checkout pinned at `0efd9cff8230507a32deb49907ecd499d46925f5`. Uses `creative/planet`, `sky/astro`, `sky/sun`, `sky/milky-way`, `post/bloom`, `post/stack`, `tonemap`, and the engine quality and renderer bootstrap. [Margo Engine source](https://github.com/scottcampbelldata/margoengine/tree/0efd9cff8230507a32deb49907ecd499d46925f5).
+
+## Local source
+
+Use the showcase’s Vite entry, which resolves the packages through the verified checkout. The `margo-demo-status` alias resolves directly to the same checkout’s `examples/demo-status.ts`. On Windows the Vite resolver canonicalizes engine paths to forward slashes, preserving shared runtime objects used by the sky entries. Use `?backend=webgl2` to check the compatibility tier explicitly.
+
+Assets are generated from existing credited assets in that checkout. With Pillow installed, run `python source/prepare_assets.py <path-to-verified-margo-checkout>` from this directory.
