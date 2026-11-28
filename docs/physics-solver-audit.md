@@ -3126,3 +3126,16 @@ What holds:
   load-sensitive peak and a friction-ellipse rescale for combined slip, and a brush model. The catalog row now names
   Pacejka's 2012 Magic Formula (MF 6.x) with combined-slip weighting functions, load and inflation-pressure
   sensitivity, camber, aligning moment and relaxation length.
+
+## Four-point checkpoints for audit table rows
+
+### ICE-04 Pack ice and floes
+
+#### ICE-04 four-point pass
+
+- Point 5 (50e4e322ce). `packages/physics/tests/coupling/pack-ice.test.js` checks fix-linked errors, cross-bank port reads through memory growth, retention of accepted snapshots and work after a late invalid source, and the signed live cell after restore. Repairing the rejected input repeats the same accepted bytes.
+- Point 6 (50e4e322ce). `packages/physics/tests/coupling/pack-ice-workers.test.js` checks ordered pair contacts and live rigid impulses at 1, 2 and 4 participants against the same signed replay. A nonfinite result in the last worker range preserves accepted poses and work. `packages/physics/tests/pack-ice-workers.browser.mjs` starts three real helpers and records 6,256 f64x2 floe drift rows in 16 substeps, plus 29,141 ordered contact candidates for 391 floes.
+- Point 7 (50e4e322ce). `packages/water/test/pack-ice-film.browser.mjs` renders the real 71-floe pack and rigid launch. The matched vessel-contact control shows a 0.753 m/s loss of speed and an approximately 2.599 kN·s opposing impulse, balanced with ice momentum. The pack retains its volume while redistributing 65.02 L to rafts and 74.71 L to ridges. Both backends repeat the complete accepted snapshots and full RGBA for their own draws.
+- Point 8 (50e4e322ce). `packages/physics/scripts/ice04-pack-resistance-measured.mjs` scores the change in two tow-force pairs from Xue et al. Table 3, held out from the model and its material parameters. Going from 60 to 80 percent ice gives modeled versus measured increases of 0.542 versus 0.774 N and 1.590 versus 1.231 N. Both are inside the published repeat envelopes with hull-to-floe friction. Using measured floe-to-floe friction globally takes the higher-speed condition outside its repeat-only envelope. [Evidence and limits](limits.md#ice-04-shared-native-drift-and-independent-tow-resistance)
+
+Bonded fracture, polygons, wave interaction, ICE-05 thermodynamics, separate contact friction, absolute tow resistance and original shots remain open. The row stays REOPENED at four points.
