@@ -20457,6 +20457,23 @@ midpoint of the diagonal whose mean height is nearer the cubic height at the cen
 the projections read the interpolated surface normal while the structure normal only shades (terrain
 test/grid.test.js, test/teeth.browser.mjs, test/rock-projection.test.js).
 
+## A knife-edge ridge sagging between lattice points on the clipmap terrain (2026-11-28, Above the Treeline round 11)
+
+Problem: a clipmap ring's corner snaps to its own spacing, so the finer ring inside it sits up to one finer cell off
+its lattice. The ring moved its vertices by that offset times a weight falling linearly from 1 at its inner edge to 0
+at its outer edge, which left most of its vertices a fraction of a cell off the heightmap's lattice, where the bilinear
+height cuts sharp features: a knife-edge ridge sagged by up to a third of its height (KB-TERRAIN-RINGSAG1).
+
+Sources read (papers only, no code):
+- F. Losasso and H. Hoppe, "Geometry clipmaps: terrain rendering using nested regular grids", ACM SIGGRAPH 2004,
+  https://doi.org/10.1145/1186562.1015799 (nested rings whose vertices stay on each level's own lattice; the offset to
+  the finer level is taken up at the inner edge, by an L-shaped fill strip there).
+- M. Strugar, "Continuous Distance-Dependent Level of Detail for Rendering Heightmaps", JGT 14(4), 2009,
+  https://doi.org/10.1080/2151237X.2009.10129287 (the morph to the coarser lattice at the outer edge).
+
+Margo's own: the inner edge's vertices move by the whole offset (so they meet the finer ring's morphed outer edge) and
+every other vertex stays on its lattice; the first cell row takes up the offset (terrain test/teeth.browser.mjs).
+
 ## G04 sciviz flow views: stream tracing, tube colours and the wing part (2026-11-28)
 
 `@margoengine/sciviz/tubes` `traceStreamPath` and `streamTubeColors`, `@margoengine/geometry/parts` `wingGeometry` and

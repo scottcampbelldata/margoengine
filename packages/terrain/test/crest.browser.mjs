@@ -11,7 +11,7 @@
 // crests): with bump 1 each frame keeps within 4 dark specks of bump off, drawn by rules and by painted weights (0 and 0
 // on an RTX A6000); the formula without the cap draws over 10 more in each path, so both paths see the slivers. Since
 // the clipmap cells follow the crests (KB-TERRAIN-CRESTTEETH1) shot 05's camera alone shows the painted-weights path
-// only 8 (85 by rules; 21 and 14 before), so the east camera adds crests that path sees edge-on (925 and 59).
+// only 8 (85 by rules; 21 and 14 before), so the east camera adds crests that path sees edge-on (804 and 55).
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';

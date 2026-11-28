@@ -9,6 +9,11 @@ import { ggxD, smithGCorrelated } from '../../shared/light-terms.js';
 // piecewise linear interpolation", IMA J. Numer. Anal. 10(1)); a fixed diagonal draws a crest that runs along the other
 // one as a row of triangular teeth (KB-TERRAIN-CRESTTEETH1, Above the Treeline look round 10). The centre is shared by
 // its own cell's triangles only, so no choice opens a crack; it follows the cell's corners through the morph.
+// A ring's inner edge meets the finer ring's outer edge, whose corner sits up to one finer cell (`Frame.offset`) away:
+// the inner edge's vertices move by that whole offset and every other vertex stays on the ring's lattice. Spreading the
+// offset over the ring (it fell linearly to 0 at the outer edge) put the ring's vertices a fraction of a cell off the
+// heightmap's lattice, where the bilinear height cuts every sharp feature: a knife-edge ridge sagged by up to a third
+// of its height between the lattice points, most near the ring's inner edge (KB-TERRAIN-RINGSAG1, test/teeth.browser.mjs).
 export const terrainVertex = /* wgsl */ `
 struct Frame {camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,grid:vec4f,offset:vec4f,map:vec4f,heights:vec4f,ambient:vec4f}
 struct Layer {heightSlope:vec4f,params:vec4f}
@@ -32,7 +37,7 @@ fn terrainCubic(position:vec2f)->f32 {
 }
 fn terrainMorph(g:vec2f)->vec3f {
   let edge=max(abs(g.x),abs(g.y));let morph=clamp((edge-frame.grid.w*0.5+2)/2,0.0,1.0);
-  return vec3f(mix(g,round(g*0.5)*2,morph),clamp((frame.grid.w*0.5-edge)/(frame.grid.w*0.25),0.0,1.0));
+  return vec3f(mix(g,round(g*0.5)*2,morph),select(0.0,1.0,edge<=frame.grid.w*0.25));
 }
 fn terrainMorphXZ(m:vec3f)->vec2f {return frame.grid.xy+m.xy*frame.grid.z+frame.offset.xy*m.z;}
 struct Output {@builtin(position) @invariant clip:vec4f,@location(0) position:vec3f,@location(1) normal:vec3f,@location(2) color:vec3f,@location(3) material:vec4f}

@@ -763,6 +763,15 @@ grid; the centre is internal to its cell, so no crack). A knife-edge ridge seen 
 projections now read the surface normal instead of the structure's (KB-TERRAIN-ROCKSMEAR1,
 `packages/terrain/test/rock-projection.test.js`; rock-structure.browser.mjs passes on WebGPU and the WebGL2 layer).
 
+Above the Treeline look round 11 (2026-11-28): each clipmap ring spread its offset to the finer ring (up to one finer
+cell) linearly over the ring, so its vertices sat a fraction of a cell off the heightmap's lattice and the bilinear
+height cut every sharp feature there; a knife-edge ridge seen side-on sagged into a V up to 4 m deep, deepest at the
+ring's inner edge (KB-TERRAIN-RINGSAG1). Only the inner edge's vertices move now, by the whole offset, so every other
+vertex stays on the lattice: the ridge's silhouette rows are 344 to 344 over the middle half of the frame against 365 to
+412 with the spread patched back (`packages/terrain/test/teeth.browser.mjs`, WebGPU and the WebGL2 layer; seams,
+clipmap-anchor, origin, far, edge, displace, holes, query and crest browser checks pass). Still by design: a feature
+narrower than two cells of a coarse ring is undersampled there (that ring's vertices point-sample the heightmap).
+
 ### Section 5 evidence: suspended sediment in the flood (water/flood FG-13, 2026-11-24)
 
 GPU maths change in `packages/water/src/flood-shaders.ts` (`floodRecord`), both backends from one WGSL source, only when
