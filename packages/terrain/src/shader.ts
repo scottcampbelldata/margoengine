@@ -105,6 +105,10 @@ export const originShader = (code: string): string =>
         .replace('@location(3) material:vec4f}', '@location(3) material:vec4f,@location(12) eye:vec3f}')
         .replace(terrainClip, originClip)
         .replace(
+          'fn terrainRockP(p:vec3f)->vec3f {return p;}',
+          'fn terrainRockP(p:vec3f)->vec3f {return p+vec3f(frame.anchor.x,frame.anchor.z,frame.anchor.y);}',
+        )
+        .replace(
           'fn terrainPatchXZ(p:vec3f)->vec2f {return p.xz;}',
           'fn terrainPatchXZ(p:vec3f)->vec2f {return p.xz+frame.anchor.xy;}',
         )
@@ -192,18 +196,146 @@ fn terrainBump(position:vec3f,normal:vec3f)->vec3f {
   let bumped=abs(det)*normal-g*min(1.0,min(1.0,4.0*abs(det))*abs(det)/max(length(g),1e-20));
   return select(normal,normalize(bumped),dot(bumped,bumped)>0.0);
 }`;
-/** The fragment's shading normal `n` and layer colour `base` (the SSR capture entry starts the same way). */
-export const terrainShading = (surface: boolean): string =>
-  surface
-    ? 'let terrainN=normalize(i.normal);let base=terrainColor(i.position,terrainN);let n=terrainBump(i.position,terrainN);'
-    : 'let n=normalize(i.normal);let base=terrainColor(i.position,n);';
+/**
+ * The fragment's shading normal `n` and layer colour `base` (the SSR capture entry starts the same way). With `rock`
+ * (`TerrainOptions.rock`) the normal first takes the rock structure and the colour its tone.
+ */
+export const terrainShading = (surface: boolean, rock = false): string =>
+  rock
+    ? surface
+      ? 'let terrainN=terrainRock(i.position,normalize(i.normal));let base=terrainColor(i.position,terrainN)*terrainRockShade;let n=terrainBump(i.position,terrainN);'
+      : 'let n=terrainRock(i.position,normalize(i.normal));let base=terrainColor(i.position,n)*terrainRockShade;'
+    : surface
+      ? 'let terrainN=normalize(i.normal);let base=terrainColor(i.position,terrainN);let n=terrainBump(i.position,terrainN);'
+      : 'let n=normalize(i.normal);let base=terrainColor(i.position,n);';
+
+/** `TerrainOptions.rock` resolved: every field set; `debris` -1 for none, `map` the structure texture's binding or -1. */
+export interface RockShaderOptions {
+  readonly slope: readonly [number, number];
+  readonly strata: number;
+  readonly ledges: number;
+  readonly dip: readonly [number, number];
+  readonly facets: number;
+  readonly relief: number;
+  readonly gullies: number;
+  readonly tone: number;
+  readonly debris: number;
+  readonly map: number;
+}
+
+const f32 = (v: number): string => {
+  const s = Math.fround(v).toPrecision(9);
+  return s.includes('.') || s.includes('e') ? s : s + '.0';
+};
+
+/**
+ * `TerrainOptions.rock`: the structure of bare rock at 10 to 100 m, where a heightmap of 4 to 30 m cells draws a steep
+ * face as one smooth plane. All of it fades in with slope between `slope[0]` and `slope[1]` degrees and fades out where
+ * a pixel covers a good share of its feature, so far ground keeps its mean and nothing aliases.
+ * - Ledges: beds `strata` metres thick (planes tilted by `dip`, their heights warped by value noise so they wander and
+ *   break off), each a riser and a bench. The shading normal takes the bench's or the riser's slope analytically: the
+ *   height gradient times A = 0.25 on the top 30 percent of a bed and B = (1 - 0.3 A) / 0.7 below it, so the mean slope
+ *   is the heightmap's (layered terrain of hard and soft beds: Benes and Forsbach 2001, "Layered data representation
+ *   for visual simulation of terrain erosion", SCCG; Peytavie et al. 2009, "Arches: a framework for modeling complex
+ *   terrains", Computer Graphics Forum 28(2)). Benches collect loose stone (`debris`) and each bed its own tone.
+ * - Facets: joint blocks `facets` metres across and 2.4 times as tall (the steep joint set of granite and gneiss makes
+ *   ribs and columns), and buttresses 4.1 times that at 0.7 the strength, the nearest of the points scattered one to a
+ *   cell over the 27 cells around the position
+ *   (Worley 1996, "A cellular texture basis function", SIGGRAPH), each tilting the normal by up to `relief` in its own
+ *   direction, with dark joints where the nearest two points are about equally near (F2 - F1).
+ * - Gullies: with `TerrainTextures.structure`, its R (drainage, 0 to 1) is carved `gullies` metres deep into the
+ *   shading normal by its central differences, darkened as wet, shaded rock, and on gentler ground below the faces its
+ *   floors and its G (debris fans) carry `debris`. `@margoengine/biomes/hydrology` `drainageStructure` makes one from
+ *   multiple-flow routing (Freeman 1991) and rockfall travel (Statham 1976).
+ * The pcg3d hash is Jarzynski and Olano 2020, "Hash Functions for GPU Rendering", JCGT 9(3). With `floatingOrigin`
+ * every feature reads terrain-relative positions. Without the option the shader is unchanged.
+ */
+export const rockFunctions = (o: RockShaderOptions): string => {
+  const a = 0.25,
+    tau = 0.3,
+    b = (1 - tau * a) / (1 - tau),
+    map = o.map >= 0;
+  return /* wgsl */ `
+${map ? `@group(0) @binding(${o.map}) var terrainStructure:texture_2d<f32>;` : ''}
+var<private> terrainRockShade:f32=1.0;var<private> terrainRockLoose:f32=0.0;
+fn terrainRockP(p:vec3f)->vec3f {return p;}
+fn terrainRockHash(c:vec3i)->vec3f {
+  var v=bitcast<vec3u>(c)*1664525u+1013904223u;
+  v.x+=v.y*v.z;v.y+=v.z*v.x;v.z+=v.x*v.y;v^=v>>vec3u(16u);v.x+=v.y*v.z;v.y+=v.z*v.x;v.z+=v.x*v.y;
+  return vec3f(v>>vec3u(8u))/16777216.0;
+}
+fn terrainRockNoise(p:vec2f,seed:i32)->f32 {
+  let i=floor(p);let f=p-i;let u=f*f*f*(f*(f*6.0-15.0)+10.0);let c=vec2i(i);
+  return mix(mix(terrainRockHash(vec3i(c,seed)).x,terrainRockHash(vec3i(c+vec2i(1,0),seed)).x,u.x),mix(terrainRockHash(vec3i(c+vec2i(0,1),seed)).x,terrainRockHash(vec3i(c+vec2i(1,1),seed)).x,u.x),u.y);
+}
+fn terrainRockFacets(p:vec3f,normal:vec3f,size:f32,fp:f32,steep:f32,weight:f32,seed:vec3i)->vec3f {
+  let q=p*vec3f(1.0,0.42,1.0)/size;let base=vec3i(floor(q));var d1=1e9;var d2=1e9;var id=vec3i(0);
+  for(var j=0;j<27;j++){
+    let cell=base+vec3i(j%3-1,(j/3)%3-1,j/9-1);let d=distance(q,vec3f(cell)+terrainRockHash(cell+seed));
+    if(d<d1){d2=d1;d1=d;id=cell+seed;}else if(d<d2){d2=d;}
+  }
+  let near=steep*weight*(1.0-smoothstep(0.12,0.4,fp/size));let tilt=terrainRockHash(id+vec3i(17,-31,7))*2.0-1.0;
+  let joint=smoothstep(0.0,max(0.05,2.0*fp/size),d2-d1);
+  terrainRockShade*=mix(1.0,mix(0.82,1.0,joint)*(1.0+${f32(o.tone)}*(terrainRockHash(id).y-0.5)),near);
+  return normalize(normal+${f32(o.relief)}*near*(tilt-normal*dot(tilt,normal)));
+}
+fn terrainRock(position:vec3f,normal:vec3f)->vec3f {
+  terrainRockShade=1.0;terrainRockLoose=0.0;
+  let p=terrainRockP(position);let fp=max(max(length(dpdx(position)),length(dpdy(position))),0.0001);
+  let steep=smoothstep(${f32(o.slope[0])},${f32(o.slope[1])},degrees(acos(clamp(normal.y,0.0,1.0))));
+  var m=normal/max(normal.y,0.05);
+${
+  map
+    ? `  let sd=vec2f(textureDimensions(terrainStructure));let e=frame.map.zw/sd;
+  let uv=clamp((position.xz-frame.map.xy)/frame.map.zw,vec2f(0.5)/sd,vec2f(1)-vec2f(0.5)/sd);
+  let c=textureSampleLevel(terrainStructure,terrainSampler,uv,0);let ex=vec2f(1.0/sd.x,0);let ez=vec2f(0,1.0/sd.y);
+  let gx=(textureSampleLevel(terrainStructure,terrainSampler,uv+ex,0).r-textureSampleLevel(terrainStructure,terrainSampler,uv-ex,0).r)/(2.0*e.x);
+  let gz=(textureSampleLevel(terrainStructure,terrainSampler,uv+ez,0).r-textureSampleLevel(terrainStructure,terrainSampler,uv-ez,0).r)/(2.0*e.y);
+  let depth=${f32(o.gullies)}*mix(0.3,1.0,steep)*(1.0-smoothstep(0.25,0.6,fp/max(e.x,e.y)));
+  m.x+=depth*gx;m.z+=depth*gz;
+  terrainRockShade*=1.0-0.7*${f32(o.tone)}*c.r*mix(0.4,1.0,steep);
+  terrainRockLoose=max(0.85*c.g,0.5*smoothstep(0.7,1.0,c.r)*(1.0-steep));
+`
+    : ''
+}${
+  o.strata > 0
+    ? `  let s=(p.y-dot(vec2f(${f32(o.dip[0])},${f32(o.dip[1])}),p.xz))/${f32(o.strata)}+1.6*(terrainRockNoise(p.xz/${f32(o.strata * 9)},7)-0.5)+0.35*(terrainRockNoise(p.xz/${f32(o.strata * 2.3)},8)-0.5);
+  let ws=fwidth(s);let fade=1.0-smoothstep(0.1,0.3,ws);let bed=floor(s);let f=s-bed;let w=clamp(ws,0.03,0.12);
+  let keep=smoothstep(0.32,0.62,terrainRockNoise(p.xz/${f32(o.strata * 4.5)}+vec2f(bed*17.13,bed*-9.71),9));
+  let bench=smoothstep(${f32(1 - tau)}-w,${f32(1 - tau)}+w,f)*(1.0-smoothstep(1.0-w,1.0,f));
+  let k=${f32(o.ledges)}*steep*fade*keep;let factor=mix(1.0,mix(${f32(b)},${f32(a)},bench),k);
+  m.x*=factor;m.z*=factor;
+  terrainRockLoose=max(terrainRockLoose,bench*k*0.7);
+  terrainRockShade*=1.0+${f32(o.tone)}*0.6*(terrainRockHash(vec3i(i32(bed),3,5)).x-0.5)*steep*(1.0-smoothstep(0.3,1.0,ws));
+`
+    : ''
+}  var n=normalize(m);
+${
+  o.facets > 0
+    ? `  n=terrainRockFacets(p,n,${f32(o.facets * 4.1)},fp,steep,0.7,vec3i(41,7,-13));
+  n=terrainRockFacets(p,n,${f32(o.facets)},fp,steep,1.0,vec3i(0));
+`
+    : ''
+}  return n;
+}${
+    o.debris >= 0
+      ? `
+fn terrainRockDebris(packed:ptr<function,array<vec4f,4>>) {
+  let k=clamp(terrainRockLoose,0.0,1.0);var sum=0.0;
+  for(var layer=0u;layer<u32(frame.heights.z);layer++){sum+=(*packed)[layer/4u][layer%4u];(*packed)[layer/4u][layer%4u]*=1.0-k;}
+  (*packed)[${o.debris >> 2}u][${o.debris & 3}u]+=k*sum;
+}`
+      : ''
+  }`;
+};
 // Triplanar weights abs(n)^8 (Geiss 2007, GPU Gems 3 ch. 1; exponent 8 is Margo's); GGX + Schlick (F0 0.04) + Lambert
 // sun per glTF 2.0 Appendix B (Walter et al. 2007; Schlick 1994); Khronos PBR Neutral, then sRGB (IEC 61966-2-1).
 /** The rule-weighted fragment shader; `surface` adds `TerrainLayer.bump` and `macro`. A function, so a bundle that
  * never draws a terrain keeps no shader text. */
 export const terrainFragment = (
   surface = false,
-): string => /* wgsl */ `${neutralShader}${surface ? surfaceFunctions : ''}
+  rock?: RockShaderOptions,
+): string => /* wgsl */ `${neutralShader}${surface ? surfaceFunctions : ''}${rock ? rockFunctions(rock) : ''}
 fn terrainColor(position:vec3f,normal:vec3f)->vec3f {
   let slope=1-clamp(normal.y,0.0,1.0);let axes=pow(abs(normal),vec3f(8));let projection=axes/max(axes.x+axes.y+axes.z,0.00001);let dx=dpdx(position);let dy=dpdy(position);var color=vec3f(0);var total=0.0;var fallback=vec3f(0);${surface ? 'var relief=0.0;var fallbackRelief=0.0;var repeat=0.0;' : ''}
   for(var layer=0u;layer<u32(frame.heights.z);layer++){
@@ -220,7 +352,7 @@ fn terrainColor(position:vec3f,normal:vec3f)->vec3f {
 }
 @fragment fn fragment(i:Output)->@location(0) vec4f {
   ${terrainOutside}
-  ${terrainShading(surface)}let v=normalize(frame.eye.xyz-i.position);let l=frame.light.xyz;let h=(v+l)/max(length(v+l),0.0001);
+  ${terrainShading(surface, !!rock)}let v=normalize(frame.eye.xyz-i.position);let l=frame.light.xyz;let h=(v+l)/max(length(v+l),0.0001);
   let nl=clamp(dot(n,l),0.0,1.0);let nv=clamp(dot(n,v),0.0001,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);let a=i.material.x*i.material.x;let a2=a*a;
   let d=${ggxD};let g=${smithGCorrelated};let fresnel=vec3f(0.04)+vec3f(0.96)*pow(1-vh,5.0);
   let direct=((1-fresnel)*base/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl;
@@ -250,8 +382,22 @@ fn terrainLayerSample(position:vec3f,projection:vec3f,dx:vec3f,dy:vec3f,layer:u3
  * Weights of 1 and 0 stay as painted. Octaves finer than half a pixel's footprint fade to their mean, and the patched
  * weights hand back to the painted ones as the footprint grows from 0.3 to 0.8 of a cell, so far ground neither
  * aliases nor turns into the strongest layer alone. With `floatingOrigin` the noise reads terrain-relative positions.
+ * `warp` displaces the noise's coordinates by a value-noise field of 2.6 `size` cells, up to 1.1 `warp` `size` each way
+ * (domain distortion: Perlin 1985, "An image synthesizer", SIGGRAPH; Ebert, Musgrave et al. 2003, "Texturing and
+ * Modeling: A Procedural Approach", ch. 16), and adds an octave of 3.3 `size` cells, so patches come in clusters and
+ * strands of several sizes instead of one blob size. `terraces` adds to each layer a sine of the height, `terraces`
+ * metres a cycle with its phase wandering by noise and shifted per layer: patches stretch along the contours, as turf
+ * banks and gravel strips do on a grazed or frost-heaved slope. Only on slopes of about 10 to 35 degrees, in stretches
+ * that come and go (a noise of 14 cycles), and it fades where a cycle covers under about 3 pixels.
  */
-const patchFunctions = (size: number, contrast: number): string => /* wgsl */ `
+/** `TerrainOptions.patches` resolved: every field set (`warp` 0 and `terraces` 0 draw the plain patches). */
+export interface PatchShaderOptions {
+  readonly size: number;
+  readonly contrast: number;
+  readonly warp: number;
+  readonly terraces: number;
+}
+const patchFunctions = ({ size, contrast, warp, terraces }: PatchShaderOptions): string => /* wgsl */ `
 var<private> terrainPatchWeights:array<f32,16>;
 fn terrainPatchXZ(p:vec3f)->vec2f {return p.xz;}
 fn terrainPatchHash(c:vec2f,layer:u32)->f32 {
@@ -265,14 +411,33 @@ fn terrainPatchNoise(p:vec2f,layer:u32)->f32 {
 }
 fn terrainPatch(xz:vec2f,layer:u32,footprint:f32)->f32 {
   var p=xz*${(1 / size).toPrecision(9)};var cell=${size.toPrecision(9)};var amp=0.5;var sum=0.0;var norm=0.0;
-  for(var k=0u;k<3u;k++){let fade=1.0-smoothstep(0.25,0.5,footprint/cell);sum+=amp*mix(0.5,terrainPatchNoise(p,layer*3u+k),fade);norm+=amp;p=p*2.03+vec2f(19.1,7.3);cell/=2.03;amp*=0.5;}
+  for(var k=0u;k<3u;k++){let fade=1.0-smoothstep(0.25,0.5,footprint/cell);sum+=amp*mix(0.5,terrainPatchNoise(p,layer*3u+k),fade);norm+=amp;p=p*2.03+vec2f(19.1,7.3);cell/=2.03;amp*=0.5;}${
+  warp > 0
+    ? `
+  let broad=1.0-smoothstep(0.25,0.5,footprint/${(size * 3.3).toPrecision(9)});sum+=0.75*mix(0.5,terrainPatchNoise(xz*${(1 / (size * 3.3)).toPrecision(9)}+vec2f(3.7,8.1),layer*3u+48u),broad);norm+=0.75;`
+    : ''
+}
   return sum/norm;
 }
-fn terrainPatchBlend(packed:ptr<function,array<vec4f,4>>,xz:vec2f,footprint:f32) {
+fn terrainPatchBlend(packed:ptr<function,array<vec4f,4>>,position:vec2f,height:f32,up:f32,footprint:f32) {
+  var xz=position;${
+  warp > 0
+    ? `
+  let wp=position*${(1 / (size * 2.6)).toPrecision(9)};
+  xz+=${(warp * size * 2.2).toPrecision(9)}*(vec2f(terrainPatchNoise(wp,61u),terrainPatchNoise(wp+vec2f(5.2,1.3),62u))-0.5);`
+    : ''
+}${
+  terraces > 0
+    ? `
+  let phase=height*${(1 / terraces).toPrecision(9)}+1.3*terrainPatchNoise(position*${(1 / (terraces * 7)).toPrecision(9)},63u);
+  let tilt=degrees(acos(clamp(up,0.0,1.0)));
+  let bands=${(0.22 * contrast).toPrecision(9)}*(1.0-smoothstep(0.12,0.35,fwidth(phase)))*smoothstep(8.0,14.0,tilt)*(1.0-smoothstep(30.0,38.0,tilt))*smoothstep(0.42,0.68,terrainPatchNoise(position*${(1 / (terraces * 14)).toPrecision(9)},64u));`
+    : ''
+}
   var top=-1.0;var plain=0.0;
   for(var layer=0u;layer<u32(frame.heights.z);layer++){
     let w=(*packed)[layer/4u][layer%4u];terrainPatchWeights[layer]=-1.0;if(w<=0.0){continue;}
-    let t=w+${contrast.toPrecision(9)}*terrainPatch(xz,layer,footprint);terrainPatchWeights[layer]=t;top=max(top,t);plain+=w;
+    let t=w+${contrast.toPrecision(9)}*terrainPatch(xz,layer,footprint)${terraces > 0 ? '+bands*sin(6.2831853*phase+f32(layer)*2.1)' : ''};terrainPatchWeights[layer]=t;top=max(top,t);plain+=w;
   }
   let line=top-${(0.05 * contrast).toPrecision(9)};var sum=0.0;
   for(var layer=0u;layer<u32(frame.heights.z);layer++){let b=max(terrainPatchWeights[layer]-line,0.0);terrainPatchWeights[layer]=b;sum+=b;}
@@ -295,20 +460,21 @@ export const weightedFragment = (
   count: number,
   surface = false,
   tint = false,
-  patches?: { readonly size: number; readonly contrast: number },
+  patches?: PatchShaderOptions,
+  rock?: RockShaderOptions,
 ): string => {
-  const rules = terrainFragment(surface),
+  const rules = terrainFragment(surface, rock),
     ruleColor = rules.slice(rules.indexOf('fn terrainColor('), rules.indexOf('@fragment fn fragment(')),
     n = Math.min(4, Math.max(1, Math.floor(count))),
     ids = Array.from({ length: n }, (_, i) => i);
   const code = /* wgsl */ `
 ${ids.map((i) => `@group(0) @binding(${6 + i}) var terrainWeights${i}:texture_2d<f32>;`).join('\n')}
-${layerSample}${patches ? patchFunctions(patches.size, patches.contrast) : ''}
+${layerSample}${patches ? patchFunctions(patches) : ''}
 fn terrainColor(position:vec3f,normal:vec3f)->vec3f {
   let axes=pow(abs(normal),vec3f(8));let projection=axes/max(axes.x+axes.y+axes.z,0.00001);let dx=dpdx(position);let dy=dpdy(position);
   let d=vec2f(textureDimensions(terrainWeights0));let uv=clamp((position.xz-frame.map.xy)/frame.map.zw,vec2f(0.5)/d,vec2f(1)-vec2f(0.5)/d);
   var packed=array<vec4f,4>(${[0, 1, 2, 3].map((i) => (i < n ? `textureSampleLevel(terrainWeights${i},terrainSampler,uv,0)` : 'vec4f(0)')).join(',')});
-  ${patches ? 'terrainPatchBlend(&packed,terrainPatchXZ(position),max(length(dx),length(dy)));' : ''}var color=vec3f(0);var total=0.0;${surface ? 'var relief=0.0;var repeat=0.0;' : ''}
+  ${rock && rock.debris >= 0 ? 'terrainRockDebris(&packed);' : ''}${patches ? 'terrainPatchBlend(&packed,terrainPatchXZ(position),position.y,normal.y,max(length(dx),length(dy)));' : ''}var color=vec3f(0);var total=0.0;${surface ? 'var relief=0.0;var repeat=0.0;' : ''}
   for(var layer=0u;layer<u32(frame.heights.z);layer++){
     ${patches ? 'let weight=terrainPatchWeights[layer];' : 'let weight=packed[layer/4u][layer%4u];'}if(weight<=0.0){continue;}
     ${surface ? 'let surface=terrainSurface(terrainLayerSample(position,projection,dx,dy,layer),position,projection,dx,dy,layer);color+=surface.rgb*weight;relief+=surface.w*weight;repeat+=layerRules[layer].params.x*weight;total+=weight;' : 'color+=terrainLayerSample(position,projection,dx,dy,layer)*weight;total+=weight;'}

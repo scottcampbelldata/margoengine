@@ -63,15 +63,32 @@ interface TerrainOptions {
     readonly captureSurfaceHeight?: boolean;
     roughness?: number;
     floatingOrigin?: TerrainOrigin;
-    patches?: {
-        readonly size?: number;
-        readonly contrast?: number;
-    };
+    patches?: TerrainPatches;
+    rock?: TerrainRock;
 }
 
 interface TerrainOrigin {
     readonly origin: ArrayLike<number>;
     onRebase(listener: (shift: ArrayLike<number>, origin: ArrayLike<number>) => void): () => void;
+}
+
+interface TerrainPatches {
+    readonly size?: number;
+    readonly contrast?: number;
+    readonly warp?: number;
+    readonly terraces?: number;
+}
+
+interface TerrainRock {
+    readonly slope?: readonly [number, number];
+    readonly strata?: number;
+    readonly ledges?: number;
+    readonly dip?: readonly [number, number];
+    readonly facets?: number;
+    readonly relief?: number;
+    readonly gullies?: number;
+    readonly tone?: number;
+    readonly debris?: number;
 }
 
 interface TerrainSource {
@@ -133,6 +150,7 @@ interface TerrainTextures {
     weights?: readonly GPUTexture[];
     tint?: GPUTexture;
     holes?: GPUTexture;
+    structure?: GPUTexture;
     source?: TerrainSource;
 }
 

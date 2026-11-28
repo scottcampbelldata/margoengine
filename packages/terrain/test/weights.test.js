@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { Terrain } from '../dist/index.js';
 
-function rig(weights, count = 5, tint, tinted = () => false, extra = {}) {
+function rig(weights, count = 5, tint, tinted = () => false, extra = {}, more) {
   const gpu = mockGPU(),
     engine = {
       gpu: gpu.device,
@@ -35,6 +35,7 @@ function rig(weights, count = 5, tint, tinted = () => false, extra = {}) {
         layers: texture('rgba8unorm', count),
         ...(weights ? { weights: weights(texture) } : {}),
         ...(tint ? { tint: tint(texture) } : {}),
+        ...(more ? more(texture) : {}),
       };
       return made;
     },
@@ -203,7 +204,8 @@ test('patches compiles the patch blend into the weighted shader only when asked,
     r = rig(two, 5, undefined, undefined, { patches: { size: 20, contrast: 0.5 } }),
     code = modules(r.frame()).find((c) => c.includes('@fragment'));
   assert.doesNotMatch(plain, /terrainPatch/);
-  assert.match(code, /terrainPatchBlend\(&packed,terrainPatchXZ\(position\),max\(length\(dx\),length\(dy\)\)\);/);
+  assert.match(code, /terrainPatchBlend\(&packed,terrainPatchXZ\(position\),position\.y,normal\.y,max\(length\(dx\),length\(dy\)\)\);/);
+  assert.doesNotMatch(code, /terrainPatchNoise\(wp|let phase=/);
   assert.match(code, /let weight=terrainPatchWeights\[layer\];/);
   assert.match(code, /var p=xz\*0\.0500000000;var cell=20\.0000000;/);
   assert.match(code, /let t=w\+0\.500000000\*terrainPatch\(/);
@@ -214,4 +216,57 @@ test('patches compiles the patch blend into the weighted shader only when asked,
   assert.match(defaults, /let t=w\+0\.600000000\*/);
   for (const patches of [null, { size: 0.1 }, { size: Number.NaN }, { contrast: 0 }, { contrast: 1.5 }])
     assert.throws(() => rig(two, 5, undefined, undefined, { patches }), RangeError, JSON.stringify(patches));
+});
+
+// Above the Treeline look round 4: patches of one blob size read as camouflage. `warp` displaces the patch noise and adds
+// a broad octave; `terraces` stretches patches along the contours. Neither is in the shader unless asked for.
+test('patches warp and terraces compile only when set, and are validated', () => {
+  const two = (texture) => [texture('rgba8unorm'), texture('rgba8unorm')],
+    code = modules(rig(two, 5, undefined, undefined, { patches: { size: 20, warp: 0.5, terraces: 4 } }).frame()).find(
+      (c) => c.includes('@fragment'),
+    );
+  assert.match(code, /xz\+=22\.0000000\*\(vec2f\(terrainPatchNoise\(wp,61u\)/);
+  assert.match(code, /let phase=height\*0\.250000000\+/);
+  assert.match(code, /\+bands\*sin\(6\.2831853\*phase\+f32\(layer\)\*2\.1\)/);
+  for (const patches of [{ warp: -0.1 }, { warp: 2 }, { terraces: 0.2 }, { terraces: 5000 }, { warp: Number.NaN }])
+    assert.throws(() => rig(two, 5, undefined, undefined, { patches }), RangeError, JSON.stringify(patches));
+});
+
+// Above the Treeline look round 4: steep faces drew as one smooth grey plane. `rock` adds ledges, facets and, with a
+// structure texture, gullies and debris (GPU proof: rock-structure.browser.mjs); without the option nothing of it.
+test('rock compiles its structure only when asked, binds the structure texture before a source, and is validated', () => {
+  const two = (texture) => [texture('rgba8unorm'), texture('rgba8unorm')],
+    plain = modules(rig(two).frame()).find((c) => c.includes('@fragment'));
+  assert.doesNotMatch(plain, /terrainRock/);
+  const r = rig(two, 5, undefined, undefined, { rock: { debris: 2, strata: 8 } }, (texture) => ({
+      structure: texture('rgba8unorm'),
+    })),
+    code = modules(r.frame()).find((c) => c.includes('@fragment')),
+    layout = r.log.find((e) => e[0] === 'layout')[2];
+  assert.match(code, /@group\(0\) @binding\(8\) var terrainStructure:texture_2d<f32>;/);
+  assert.equal(layout.entries.length, 9);
+  assert.match(code, /let terrainN=terrainRock\(i\.position,normalize\(i\.normal\)\);|let n=terrainRock\(i\.position/);
+  assert.match(code, /\*terrainRockShade;/);
+  assert.match(code, /terrainRockDebris\(&packed\);/);
+  assert.match(code, /\(\*packed\)\[0u\]\[2u\]\+=k\*sum;/);
+  assert.match(code, /\/8\.00000000\+1\.6\*/);
+  // No structure texture: no gullies, and no debris layer without one named.
+  const bare = modules(rig(two, 5, undefined, undefined, { rock: {} }).frame()).find((c) => c.includes('@fragment'));
+  assert.doesNotMatch(bare, /terrainStructure|terrainRockDebris/);
+  assert.match(bare, /terrainRockFacets\(p,n,73\.8000031,/);
+  for (const rock of [
+    null,
+    { slope: [40, 30] },
+    { slope: [10, 95] },
+    { strata: 0.2 },
+    { facets: 900 },
+    { ledges: 2 },
+    { relief: -1 },
+    { tone: Number.NaN },
+    { gullies: 200 },
+    { dip: [5, 0] },
+    { debris: 5 },
+    { debris: 1.5 },
+  ])
+    assert.throws(() => rig(two, 5, undefined, undefined, { rock }), RangeError, JSON.stringify(rock));
 });

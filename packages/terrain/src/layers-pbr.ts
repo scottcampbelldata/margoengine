@@ -168,6 +168,8 @@ export class TerrainMaterials implements EnginePlugin, TerrainLighting {
     if (cached) return cached;
     const head = '@fragment fn fragment(i:Output)->@location(0) vec4f {',
       plain = 'let n=normalize(i.normal);let base=terrainColor(i.position,n);',
+      // TerrainOptions.rock without relief: the rock normal and tone stand where the plain normal does.
+      plainRock = 'let n=terrainRock(i.position,normalize(i.normal));let base=terrainColor(i.position,n)*terrainRockShade;',
       bumped = 'let n=terrainBump(i.position,terrainN);',
       rules = 'let weight=smoothstep(',
       painted = 'let weight=packed[layer/4u][layer%4u];if(weight<=0.0){continue;}',
@@ -175,7 +177,7 @@ export class TerrainMaterials implements EnginePlugin, TerrainLighting {
     const parts = [head, ambient, 'total+=weight;'];
     if (
       parts.some((p) => source.split(p).length !== 2) ||
-      source.includes(plain) === source.includes(bumped) ||
+      (source.includes(plain) || source.includes(plainRock)) === source.includes(bumped) ||
       source.includes(rules) === source.includes(painted)
     )
       throw new MargoError(
@@ -194,6 +196,10 @@ export class TerrainMaterials implements EnginePlugin, TerrainLighting {
         .replace(
           plain,
           `let terrainN0=normalize(i.normal);let base=terrainColor(i.position,terrainN0);let n=terrainPbrNormal(terrainN0);${resolve}`,
+        )
+        .replace(
+          plainRock,
+          `let terrainN0=terrainRock(i.position,normalize(i.normal));let base=terrainColor(i.position,terrainN0)*terrainRockShade;let n=terrainPbrNormal(terrainN0);${resolve}`,
         )
         .replace(bumped, `let n=terrainPbrNormal(terrainBump(i.position,terrainN));${resolve}`)
         .replace(rules, 'let weight=terrainPbrHeight(position,projection,dx,dy,layer)*smoothstep(')

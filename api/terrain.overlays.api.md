@@ -152,10 +152,8 @@ interface TerrainOptions {
     readonly captureSurfaceHeight?: boolean;
     roughness?: number;
     floatingOrigin?: TerrainOrigin;
-    patches?: {
-        readonly size?: number;
-        readonly contrast?: number;
-    };
+    patches?: TerrainPatches;
+    rock?: TerrainRock;
 }
 
 interface TerrainOrigin {
@@ -166,6 +164,25 @@ interface TerrainOrigin {
 type TerrainPassContext = Extract<PassContext, {
     backend: 'webgpu';
 }>;
+
+interface TerrainPatches {
+    readonly size?: number;
+    readonly contrast?: number;
+    readonly warp?: number;
+    readonly terraces?: number;
+}
+
+interface TerrainRock {
+    readonly slope?: readonly [number, number];
+    readonly strata?: number;
+    readonly ledges?: number;
+    readonly dip?: readonly [number, number];
+    readonly facets?: number;
+    readonly relief?: number;
+    readonly gullies?: number;
+    readonly tone?: number;
+    readonly debris?: number;
+}
 
 interface TerrainSource {
     entries(binding: number): GPUBindGroupLayoutEntry[];
@@ -180,6 +197,7 @@ interface TerrainTextures {
     weights?: readonly GPUTexture[];
     tint?: GPUTexture;
     holes?: GPUTexture;
+    structure?: GPUTexture;
     source?: TerrainSource;
 }
 

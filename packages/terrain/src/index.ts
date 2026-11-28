@@ -23,6 +23,7 @@ import {
   originShader,
   eyeShader,
   eyeEntry,
+  type RockShaderOptions,
 } from './shader.js';
 import { applyView } from '../../shared/view-rect.js';
 import { unitLight } from '../../shared/unit-light.js';
@@ -44,6 +45,31 @@ export {
   type HeightField,
   type HeightfieldOptions,
 } from './heightfield.js';
+/** Whether `rock` is a valid `TerrainOptions.rock` for a terrain of `layers` layers. */
+function validRock(rock: TerrainRock, layers: number): boolean {
+  if (typeof rock !== 'object' || rock === null) return false;
+  const range = (v: number | undefined, lo: number, hi: number) => v === undefined || (v >= lo && v <= hi);
+  const size = (v: number | undefined) => v === undefined || v === 0 || (v >= 0.5 && v <= 500);
+  const slope = rock.slope ?? [28, 44],
+    dip = rock.dip ?? [0, 0];
+  return (
+    Array.isArray(slope) &&
+    slope.length === 2 &&
+    slope[0] >= 0 &&
+    slope[0] < slope[1] &&
+    slope[1] <= 90 &&
+    Array.isArray(dip) &&
+    dip.length === 2 &&
+    dip.every((v) => v >= -4 && v <= 4) &&
+    size(rock.strata) &&
+    size(rock.facets) &&
+    range(rock.ledges, 0, 1) &&
+    range(rock.relief, 0, 1) &&
+    range(rock.tone, 0, 1) &&
+    range(rock.gullies, 0, 100) &&
+    (rock.debris === undefined || (Number.isInteger(rock.debris) && rock.debris >= 0 && rock.debris < layers))
+  );
+}
 declare const GPUBufferUsage: { UNIFORM: number; VERTEX: number; INDEX: number; STORAGE: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -79,6 +105,13 @@ export interface TerrainTextures {
    * (`@margoengine/terrain/holes`) makes and edits one. Without it the shaders and bindings are unchanged. Default: none.
    */
   holes?: GPUTexture;
+  /**
+   * Optional rock structure over the heightmap's bounds, read with `TerrainOptions.rock`: one `rgba8unorm` 2D texture of
+   * any size, sampled bilinearly. R is drainage, 0 to 1 (gullies and couloirs are carved along it), G loose debris such
+   * as talus fans below rock walls, 0 to 1. `@margoengine/biomes/hydrology` `drainageStructure` makes the values from a
+   * height grid. Without `rock` it is not read. Default: none (rock draws ledges and facets only).
+   */
+  structure?: GPUTexture;
   /** More data the terrain's shaders read, such as a stream's far ring (`TerrainStreamOptions.far`). Default: none. */
   source?: TerrainSource;
 }
@@ -206,7 +239,58 @@ export interface TerrainOptions {
    * @example
    * Terrain.attach(engine, { ...options, patches: { size: 18, contrast: 0.7 } });
    */
-  patches?: { readonly size?: number; readonly contrast?: number };
+  patches?: TerrainPatches;
+  /**
+   * Structure for bare rock at 10 to 100 m, where the heightmap draws a steep face as one smooth plane: ledges along
+   * beds, jointed facets that catch and lose the light, and (with `TerrainTextures.structure`) gullies carved along the
+   * drainage with debris fans below. Shading only: the normal and the colour's tone change, the heights do not. Every
+   * part fades in between `slope` degrees and fades out where a pixel covers a good share of it. Default: none (the
+   * shader is unchanged).
+   * @example
+   * Terrain.attach(engine, { ...options, rock: { strata: 8, facets: 20 } });
+   */
+  rock?: TerrainRock;
+}
+/** `TerrainOptions.patches`. */
+export interface TerrainPatches {
+  /** Patch cell in metres, 0.5 to 10,000. Default 14. */
+  readonly size?: number;
+  /** How far each layer's noise lifts it over the others, above 0 to 1. Default 0.6. */
+  readonly contrast?: number;
+  /**
+   * 0 to 1: displaces the patch noise by a broader noise and adds an octave of 3.3 cells, so patches come in clusters
+   * and strands of several sizes rather than one blob size. Default 0.
+   */
+  readonly warp?: number;
+  /**
+   * Metres of height per contour band, 0 (none) or 0.5 to 1,000: patches stretch along the contours (turf banks, gravel
+   * strips). Default 0.
+   */
+  readonly terraces?: number;
+}
+/** `TerrainOptions.rock`. Every field has a default. */
+export interface TerrainRock {
+  /** Slope in degrees where the structure fades in, [start, full], 0 <= start < full <= 90. Default [28, 44]. */
+  readonly slope?: readonly [number, number];
+  /** Bed thickness in metres for ledges, 0 (none) or 0.5 to 500. Default 9. */
+  readonly strata?: number;
+  /** How far beds step into benches and risers, 0 to 1. Default 0.6. */
+  readonly ledges?: number;
+  /** Tilt of the beds: metres of rise per metre along x and z, each -4 to 4. Default [0, 0] (level beds). */
+  readonly dip?: readonly [number, number];
+  /** Joint block size in metres, 0 (none) or 0.5 to 500. Default 18. */
+  readonly facets?: number;
+  /** How far a block's face tilts from the slope, 0 to 1. Default 0.45. */
+  readonly relief?: number;
+  /** Gully depth in metres along `TerrainTextures.structure`'s drainage, 0 to 100. Default 6. */
+  readonly gullies?: number;
+  /** Tone variation between beds and blocks and in gullies, 0 to 1. Default 0.35. */
+  readonly tone?: number;
+  /**
+   * The layer (index) that benches, gully floors below the faces and `structure` debris fans take, with
+   * `TerrainTextures.weights`. Default: none.
+   */
+  readonly debris?: number;
 }
 /** What `setCapture` takes: `@margoengine/post` SSR's material capture hook (its `SSRCapture`), declared here so terrain
  * does not import post. */
@@ -358,7 +442,14 @@ export class Terrain implements EnginePlugin {
         (typeof o.patches !== 'object' ||
           o.patches === null ||
           !((o.patches.size ?? 14) >= 0.5 && (o.patches.size ?? 14) <= 10000) ||
-          !((o.patches.contrast ?? 0.6) > 0 && (o.patches.contrast ?? 0.6) <= 1))) ||
+          !((o.patches.contrast ?? 0.6) > 0 && (o.patches.contrast ?? 0.6) <= 1) ||
+          !((o.patches.warp ?? 0) >= 0 && (o.patches.warp ?? 0) <= 1) ||
+          !(
+            o.patches.terraces === undefined ||
+            o.patches.terraces === 0 ||
+            (o.patches.terraces >= 0.5 && o.patches.terraces <= 1000)
+          ))) ||
+      (o.rock !== undefined && !validRock(o.rock, o.layers?.length ?? 0)) ||
       !Number.isFinite(Math.fround(o.cellSize ?? 1)) ||
       (o.cellSize ?? 1) <= 0 ||
       !Number.isFinite(Math.fround(o.heightScale ?? 100)) ||
@@ -368,7 +459,7 @@ export class Terrain implements EnginePlugin {
       o.layers.length > 16
     )
       throw new RangeError(
-        'Invalid terrain options; check textures, resolution (multiple of 4, 8..256), levels (1..12), roughness (0..1), patches (size 0.5..10000 m, contrast above 0 to 1), cellSize above 0, finite heightScale and heightOffset, and 4 to 16 layers.',
+        'Invalid terrain options; check textures, resolution (multiple of 4, 8..256), levels (1..12), roughness (0..1), patches (size 0.5..10000 m, contrast above 0 to 1, warp 0..1, terraces 0 or 0.5..1000 m), rock (slope 0 <= start < full <= 90, strata and facets 0 or 0.5..500 m, ledges, relief and tone 0..1, dip -4..4, gullies 0..100 m, debris a layer index), cellSize above 0, finite heightScale and heightOffset, and 4 to 16 layers.',
       );
     finiteVector(o.origin ?? [0, 0], 2, 'Terrain origin');
     if (o.clipmapAnchor !== undefined && o.clipmapAnchor !== 'camera')
@@ -441,7 +532,8 @@ export class Terrain implements EnginePlugin {
     const t = this.textures;
     const weights = t.weights,
       tint = t.tint,
-      holes = t.holes;
+      holes = t.holes,
+      structure = t.structure;
     if (
       tint !== undefined &&
       (!weights || !['rgba8unorm', 'rgba8unorm-srgb'].includes(tint?.format) || tint.depthOrArrayLayers !== 1)
@@ -464,6 +556,7 @@ export class Terrain implements EnginePlugin {
       ...(weights ?? []),
       ...(tint ? [tint] : []),
       ...(holes ? [holes] : []),
+      ...(structure ? [structure] : []),
     ])
       if (texture.dimension !== '2d' || !(texture.usage & GPUTextureUsage.TEXTURE_BINDING) || texture.sampleCount !== 1)
         throw new TypeError('Terrain textures must be sampled 2D textures');
@@ -475,7 +568,8 @@ export class Terrain implements EnginePlugin {
       !['r32float', 'rgba16float', 'rgba8unorm'].includes(t.heightmap.format) ||
       (t.normalmap && !['rgba8unorm', 'rgba16float'].includes(t.normalmap.format)) ||
       (weights && weights.some((w) => w.format !== 'rgba8unorm' || w.depthOrArrayLayers !== 1)) ||
-      (holes && (!['r8unorm', 'rgba8unorm'].includes(holes.format) || holes.depthOrArrayLayers !== 1))
+      (holes && (!['r8unorm', 'rgba8unorm'].includes(holes.format) || holes.depthOrArrayLayers !== 1)) ||
+      (structure && (structure.format !== 'rgba8unorm' || structure.depthOrArrayLayers !== 1))
     )
       throw new TypeError(
         'Invalid terrain texture format or layer count; use a layers array texture with one layer per terrain layer and a supported heightmap format.',
@@ -522,7 +616,12 @@ export class Terrain implements EnginePlugin {
         { binding: 3, visibility: fragment, texture: { viewDimension: '2d-array' } },
         { binding: 4, visibility: fragment, sampler: { type: 'filtering' } },
         { binding: 5, visibility: fragment, buffer: { type: 'read-only-storage' } },
-        ...[...(weights ?? []), ...(tint ? [tint] : []), ...(t.holes ? [t.holes] : [])].map((_, i) => ({
+        ...[
+          ...(weights ?? []),
+          ...(tint ? [tint] : []),
+          ...(t.holes ? [t.holes] : []),
+          ...(structure ? [structure] : []),
+        ].map((_, i) => ({
           binding: 6 + i,
           visibility: fragment,
           texture: {},
@@ -538,6 +637,7 @@ export class Terrain implements EnginePlugin {
       ...(weights ? weights.map((w) => w.createView()) : []),
       ...(tint ? [tint.createView()] : []),
       ...(t.holes ? [t.holes.createView()] : []),
+      ...(structure ? [structure.createView()] : []),
       ...(t.source?.resources() ?? []),
     ];
     const group = (buffer: GPUBuffer) =>
@@ -805,10 +905,16 @@ export class Terrain implements EnginePlugin {
             surface,
             !!this.textures.tint,
             this.options.patches
-              ? { size: this.options.patches.size ?? 14, contrast: this.options.patches.contrast ?? 0.6 }
+              ? {
+                  size: this.options.patches.size ?? 14,
+                  contrast: this.options.patches.contrast ?? 0.6,
+                  warp: this.options.patches.warp ?? 0,
+                  terraces: this.options.patches.terraces ?? 0,
+                }
               : undefined,
+            this.rockShader(),
           )
-        : terrainFragment(surface));
+        : terrainFragment(surface, this.rockShader()));
     return this.clip(this.options.floatingOrigin ? originShader(code) : code);
   }
   /**
@@ -818,14 +924,36 @@ export class Terrain implements EnginePlugin {
   private clip(code: string): string {
     const t = this.textures;
     if (t?.holes)
-      code = `@group(0) @binding(${this.sourceBinding() - 1}) var terrainHoles:texture_2d<f32>;
+      code = `@group(0) @binding(${this.holesBinding()}) var terrainHoles:texture_2d<f32>;
 ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
     return t?.source ? t.source.shader(code, this.sourceBinding()) : code;
   }
-  /** The first group-0 binding after the weights, tint and holes: where a `source` binds. */
+  /** The group-0 binding of `TerrainTextures.holes`: after the weights and tint. */
+  private holesBinding(): number {
+    const t = this.textures!;
+    return 6 + (t.weights?.length ?? 0) + (t.tint ? 1 : 0);
+  }
+  /** The first group-0 binding after the weights, tint, holes and structure: where a `source` binds. */
   private sourceBinding(): number {
     const t = this.textures!;
-    return 6 + (t.weights?.length ?? 0) + (t.tint ? 1 : 0) + (t.holes ? 1 : 0);
+    return this.holesBinding() + (t.holes ? 1 : 0) + (t.structure ? 1 : 0);
+  }
+  /** `TerrainOptions.rock` resolved for the shader (the structure texture binds before any source), or undefined. */
+  private rockShader(): RockShaderOptions | undefined {
+    const r = this.options.rock;
+    if (!r) return undefined;
+    return {
+      slope: r.slope ?? [28, 44],
+      strata: r.strata ?? 9,
+      ledges: r.ledges ?? 0.6,
+      dip: r.dip ?? [0, 0],
+      facets: r.facets ?? 18,
+      relief: r.relief ?? 0.45,
+      gullies: r.gullies ?? 6,
+      tone: r.tone ?? 0.35,
+      debris: this.textures?.weights && r.debris !== undefined ? r.debris : -1,
+      map: this.textures?.structure ? this.sourceBinding() - 1 : -1,
+    };
   }
   /** Whether any layer sets `bump` or `macro`; without, the shader and rules are what they were before both. */
   private surface(): boolean {
@@ -938,7 +1066,7 @@ ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
       code =
         declarations +
         lit.replace(head, 'fn margoShade(i:Output)->vec4f {') +
-        `\n@fragment fn capture(i:Output)->MargoSSR {${this.options.floatingOrigin ? eyeEntry : ''}${source ? source.shader(edge, this.sourceBinding()) : edge}${terrainShading(this.surface())}let v=normalize(frame.eye.xyz-i.position);${declarations.includes('var<private> margoPosition:') ? 'margoPosition=i.position;' : ''}return margoSSR(n,v,base,i.material.y,i.material.x);}\n`;
+        `\n@fragment fn capture(i:Output)->MargoSSR {${this.options.floatingOrigin ? eyeEntry : ''}${source ? source.shader(edge, this.sourceBinding()) : edge}${terrainShading(this.surface(), !!this.options.rock)}let v=normalize(frame.eye.xyz-i.position);${declarations.includes('var<private> margoPosition:') ? 'margoPosition=i.position;' : ''}return margoSSR(n,v,base,i.material.y,i.material.x);}\n`;
       if (this.captureCode.size >= 16) this.captureCode.clear();
       this.captureCode.set(cacheKey, code);
     }
@@ -1197,6 +1325,7 @@ ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
             ...(this.textures.weights ?? []),
             this.textures.tint,
             this.textures.holes,
+            this.textures.structure,
           ]
         : [],
     ))

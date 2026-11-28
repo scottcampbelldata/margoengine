@@ -20075,3 +20075,58 @@ Ivan E. Sutherland and Gary W. Hodgman (1974), *Reentrant polygon clipping*, des
 John K. Salmon, Mark A. Moraes, Ron O. Dror and David E. Shaw (2011), *Parallel Random Numbers: As Easy as 1, 2, 3*, define the Philox4x32 transform in Section 4.3. George E. P. Box and Mervin E. Muller (1958), *A Note on the Generation of Random Normal Deviates*, give the independent Cartesian normal construction from two unit uniforms. The optional Rust stage uses the same key, parcel slot, tick words, pinned transforms and output order as the TypeScript entry. Its SIMD lanes act on independent parcel counters. Only the kernel that synthesizes those samples moves to Rust. The source, flow, bed, settling, oil and ledgers retain their original order. [Salmon et al.](https://doi.org/10.1145/2063384.2063405) · [Box and Muller](https://doi.org/10.1214/aoms/1177706645)
 
 Ahmad Mohamadiyeh, Jeffrey Peakall, Michael Fairweather, Martyn Barnes and Timothy N. Hunter (2026), *Impinging jet erosion of granular sediments*, supply independently measured nozzle discharge, bed properties and two ultrasonic final crater profiles. Numerical inputs use the source setup and measured materials. Neither crater profile sets an input parameter. The comparison integrates the below-baseline profile revolved about the nozzle axis, carries the published vertical readout resolution through the integration and reports the 10 mm to 5 mm model spacing difference separately. Leo C. van Rijn (1984), *Sediment Transport, Part II: Suspended Load Transport*, remains the source of the bed pickup and reference level used by the solver. [Jet scour experiment](https://doi.org/10.1002/aic.70336) · [Experimental data](https://doi.org/10.5518/1730) · [Van Rijn](https://doi.org/10.1061/(ASCE)0733-9429(1984)110:11(1613))
+
+## Rock structure, drainage and far fir crowns: terrain rock, biomes drainageStructure, procedural fir-sprays (2026-11-28)
+
+Above the Treeline look round 4: steep faces, the summit dome and far mountains read as smooth grey felt, patches as
+camouflage, and far firs as grey sticks. Sources read for it (papers only, no companion code):
+
+- F. K. Musgrave, C. E. Kolb and R. S. Mace, "The synthesis and rendering of eroded fractal terrains", SIGGRAPH 1989,
+  https://doi.org/10.1145/74333.74337 (thermal weathering to an angle of repose: why talus lies at 30 to 40 degrees
+  below walls).
+- O. Stava, B. Benes, M. Brisbin and J. Krivanek, "Interactive terrain modeling using hydraulic erosion", SCA 2008,
+  https://doi.org/10.2312/SCA/SCA08/201-210 (water carving gullies where flow gathers).
+- G. Cordonnier, J. Braun, M.-P. Cani, B. Benes, E. Galin, A. Peytavie and E. Guerin, "Large scale terrain generation
+  from tectonic uplift and fluvial erosion", Computer Graphics Forum 35(2), 2016, https://doi.org/10.1111/cgf.12820
+  (stream power: incision grows with drainage area times slope, so drainage area is the map of where gullies are).
+- G. Cordonnier, M.-P. Cani, B. Benes, J. Braun and E. Galin, "Sculpting mountains: interactive terrain modeling based on
+  subsurface geology", IEEE TVCG 24(5), 2018, https://doi.org/10.1109/TVCG.2017.2689022 (rock layers and joints shaping
+  faces into ledges and blocks).
+- E. Galin, E. Guerin, A. Peytavie, G. Cordonnier, M.-P. Cani, B. Benes and J. Gain, "A review of digital terrain
+  modeling", Computer Graphics Forum 38(2), 2019, https://doi.org/10.1111/cgf.13657 (survey; amplification of a coarse
+  heightmap by procedural detail at the scales it cannot hold).
+- H. Schott, A. Paris, L. Fournier, E. Guerin and E. Galin, "Large-scale terrain authoring through interactive erosion
+  simulation", ACM TOG 42(5), 2023, https://doi.org/10.1145/3592787 (drainage area as the driver of eroded structure).
+- B. Benes and R. Forsbach, "Layered data representation for visual simulation of terrain erosion", SCCG 2001,
+  and A. Peytavie, E. Galin, J. Grosjean and S. Merillou, "Arches: a framework
+  for modeling complex terrains", Computer Graphics Forum 28(2), 2009
+  (beds of hard and soft rock stepping a face into risers and benches).
+- S. Worley, "A cellular texture basis function", SIGGRAPH 1996, https://doi.org/10.1145/237170.237267 (F1 and F2 - F1
+  of jittered cell points: blocks and their joints).
+- T. G. Freeman, "Calculating catchment area with divergent flow based on a regular grid", Computers and Geosciences
+  17(3), 1991, https://doi.org/10.1016/0098-3004(91)90048-I (the multiple-flow shares already in hydrology).
+- I. Statham, "A scree slope rockfall model", Earth Surface Processes 1(1), 1976
+  (rockfall from a wall travels down and stops where the slope falls under the angle of repose: talus fans and cones).
+- K. Perlin, "An image synthesizer", SIGGRAPH 1985, https://doi.org/10.1145/325165.325247, and D. Ebert, F. K. Musgrave,
+  D. Peachey, K. Perlin and S. Worley, "Texturing and Modeling: A Procedural Approach", 3rd ed. 2003, ch. 16 (domain
+  distortion of noise: patch warp).
+- M. Jarzynski and M. Olano, "Hash Functions for GPU Rendering", JCGT 9(3), 2020 (pcg3d for every cell value).
+- C. Remolar, M. Chover, O. Belmonte, J. Ribelles and C. Rebollo, "Geometric simplification of foliage", Eurographics
+  2002 short papers, and X. Zhang, F. Blaise and M. Jaeger, "Multiresolution plant models with complex organs", ACM
+  GRAPHITE 2006 (a simplified crown keeps its foliage area by growing the
+  leaves it keeps).
+- Reference photographs looked at for the look (not copied, nothing kept): alpine granite faces, couloirs and talus
+  cones of the Colorado Front Range and Rocky Mountain National Park.
+
+Margo's own in this entry: the analytic bench and riser normal (the face's gradient times 0.25 on the top 30 percent of
+a bed and (1 - 0.075) / 0.7 below, so the mean slope holds); level beds warped by two value noises and broken by a
+third; two facet scales (`facets` and 4.1 times it at 0.7 strength), each block tilting the normal by its own hashed
+direction; the slope fade and the pixel-footprint fades (facets from 0.12 to 0.4 of a block, beds from 0.1 to 0.3 of
+a cycle, gullies from 0.25 to 0.6 of a structure texel); the gully carve as central differences of the drainage texel
+added to the height gradient; the debris push that moves `terrainRockLoose` of every layer's weight to the debris
+layer; the drainage scale (log catchment from 800 to 60,000 square metres), the wall (40 degrees), repose (34
+degrees) and travel (half settles every 90 m) defaults and the 3 x 3 spread of settled debris; the patch warp (2.6 cell
+noise, 1.1 cell reach, a 3.3 cell octave of weight 0.75) and contour terraces (a sine of the height a `terraces` cycle,
+phase wandering by a 7 cycle noise, 2.1 radians per layer); and the fir spray ring growth factors (1.17 x 1.1 and
+2.3 x 1.3) from the near ring's spray area.
+

@@ -355,6 +355,71 @@ Terrain.attach(engine, {
 });
 ```
 
+Patches of one cell size read as camouflage from the air. `warp` (0 to 1, default 0) displaces the patch noise by a
+broader value noise, up to 1.1 `warp` cells each way, and adds an octave of 3.3 cells (domain distortion: Perlin 1985,
+"An image synthesizer"; Ebert, Musgrave et al. 2003, "Texturing and Modeling", ch. 16), so patches come in clusters and
+strands of several sizes. `terraces` (metres of height a cycle, 0 or 0.5 to 1,000, default 0) adds to each layer a sine
+of the height with a wandering phase, shifted per layer, so patches stretch along the contours as turf banks and gravel
+strips do, on slopes of about 10 to 35 degrees and in stretches that come and go; it fades where a cycle covers under
+about 3 pixels. Both default to off, and then the shader is the one
+above: `patches: { size: 23, contrast: 0.6, warp: 0.65, terraces: 3.5 }` is what the Above the Treeline film draws.
+
+## Rock structure: `rock` and `TerrainTextures.structure`
+
+A heightmap of 4 to 30 m cells draws a steep face as one smooth plane, which reads as grey felt from 100 m to 5 km.
+`rock` adds the structure of bare rock at 10 to 100 m to the shading (the normal and the colour's tone; the heights do
+not change):
+
+- ledges: beds `strata` metres thick (default 9; 0 for none), tilted by `dip` (rise per metre along x and z, default
+  [0, 0]) and wandering by noise, each a riser and a bench; the normal takes the bench's or the riser's slope
+  analytically, a quarter of the face's on the top 30 percent of a bed and the rest on the riser, so the mean slope is
+  the heightmap's (`ledges` 0 to 1, default 0.6). Ledges break off and come back along a bed;
+- facets: jointed blocks `facets` metres across and 2.4 times as tall (default 18; 0 for none), ribs and columns as a
+  steep joint set cuts them, and buttresses 4.1 times that, each tilting the
+  normal by up to `relief` (0 to 1, default 0.45), with dark joints between them (Worley cells, one point anywhere in
+  each cell, the nearest two of the 27 cells around);
+- gullies, with `TerrainTextures.structure` (one `rgba8unorm` texture over the bounds): its R, drainage 0 to 1, is
+  carved `gullies` metres deep (default 6) and darkened as wet, shaded rock, and its G is loose debris such as talus
+  fans. `@margoengine/biomes/hydrology` `drainageStructure` makes both from a height grid;
+- `debris`, with `weights`: the layer index that benches, gully floors below the faces and the debris fans take.
+
+All of it fades in between `slope` degrees (default [28, 44]) and fades out where a pixel covers a good share of a
+feature, so far ground keeps its mean. Seen at 50 degrees from 160 m, a plane of one grey layer goes from a tone spread
+of 0.5 to 26 (8-bit standard deviation); from 2.5 km it is even again within 0.2 of its mean; a 10 degree slope draws
+exactly as without; a drainage line changes the face by 0.89 on average and full debris turns every pixel to the debris
+layer ([rock-structure.browser.mjs](test/rock-structure.browser.mjs), RTX A6000, the same figures on WebGPU and the
+WebGL2 layer). Without the option the shader is unchanged. Cost: 54 hashes for the two facet scales, two noises for the
+beds and five texel reads for the gullies per pixel. Sources: Benes and Forsbach 2001, "Layered data representation for
+visual simulation of terrain erosion" (SCCG); Peytavie, Galin, Grosjean and Merillou 2009, "Arches: a framework for
+modeling complex terrains" (Computer Graphics Forum 28(2)); Worley 1996, "A cellular texture basis function"
+(SIGGRAPH); Jarzynski and Olano 2020, "Hash Functions for GPU Rendering" (JCGT 9(3)).
+
+```ts
+import { Terrain } from 'margoengine/terrain';
+import { Engine } from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+Terrain.attach(engine, {
+  size: [512, 512],
+  layers: [0, 1, 2, 3].map(() => ({ height: [-1e6, 1e6], slope: [0, 1], scale: 0.25 })),
+  rock: { strata: 8, facets: 20, debris: 1 },
+  textures(device) {
+    const usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST;
+    // A 45 degree face rising along z.
+    const heightmap = device.createTexture({ size: [2, 2], format: 'r32float', usage });
+    device.queue.writeTexture({ texture: heightmap }, new Float32Array([0, 0, 512, 512]), { bytesPerRow: 8 }, [2, 2]);
+    const layers = device.createTexture({ size: [1, 1, 4], format: 'rgba8unorm-srgb', usage });
+    const colours = [120, 115, 105, 255, 140, 125, 100, 255, 0, 0, 0, 255, 0, 0, 0, 255];
+    device.queue.writeTexture({ texture: layers }, new Uint8Array(colours), { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1, 4]);
+    const weight = device.createTexture({ size: [1, 1], format: 'rgba8unorm', usage });
+    device.queue.writeTexture({ texture: weight }, new Uint8Array([255, 0, 0, 0]), { bytesPerRow: 4 }, [1, 1]);
+    // No drainage, a little debris everywhere.
+    const structure = device.createTexture({ size: [1, 1], format: 'rgba8unorm', usage });
+    device.queue.writeTexture({ texture: structure }, new Uint8Array([0, 40, 0, 255]), { bytesPerRow: 4 }, [1, 1]);
+    return { heightmap, layers, weights: [weight, weight], structure };
+  },
+});
+```
+
 ## Sliders for the sand and ground look: `@margoengine/terrain/settings`
 
 `TerrainColors` keeps its look (the colours, the height and slope ranges, the wet darkening and the sand surface's wind,
