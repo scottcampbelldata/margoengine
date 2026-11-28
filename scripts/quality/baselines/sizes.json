@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21588465,
+  "total": 21607817,
   "history": [
     {
       "date": "2026-10-24",
@@ -15263,6 +15263,12 @@
       "commit": "sea-06-threaded-flux",
       "reason": "Physics/tsunami moves from 6641 to 8743 B gzip and its ceiling from 6711 to 9006 B for optional worker lifecycle, deterministic phase barriers and recorded work. Each Wasm moves from 8220 to 9530 B gzip. The worker asset adds 750 B gzip only when requested. A separate public threaded solver would duplicate the grid binding, native stages and acceptance contract. Core and Stage are unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "d828209f91",
+      "reason": "new package @margoengine/optics: physical optics as plain functions, seven entries (root re-export, refraction, polarization, interference, diffraction, imaging, spectrum), no GPU code",
+      "grew": 7
     }
   ],
   "items": {
@@ -16103,6 +16109,13 @@
     "@margoengine/oit/peel": 3771,
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
+    "@margoengine/optics": 7252,
+    "@margoengine/optics/diffraction": 1475,
+    "@margoengine/optics/imaging": 1875,
+    "@margoengine/optics/interference": 2668,
+    "@margoengine/optics/polarization": 2210,
+    "@margoengine/optics/refraction": 2394,
+    "@margoengine/optics/spectrum": 1478,
     "@margoengine/physics": 945858,
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 104696,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 846977,

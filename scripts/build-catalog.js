@@ -128,7 +128,7 @@ const layers = {
     'voxel-net',
   ],
   'Geometry and spatial': ['machinery', 'bvh', 'geometry', 'mesh-edit', 'scene'],
-  'Data and science': ['compute', 'sciviz'],
+  'Data and science': ['compute', 'sciviz', 'optics'],
   'AI tools': ['mcp'],
   'Frameworks': ['react'],
 };

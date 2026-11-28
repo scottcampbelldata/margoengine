@@ -1,0 +1,72 @@
+{
+  "name": "@margoengine/optics",
+  "version": "1.0.0",
+  "description": "Physical optics as plain functions: refraction and dispersion, polarisation, thin films and multilayers, diffraction, image formation and spectral colour.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "optics",
+    "refraction",
+    "polarization",
+    "interference",
+    "diffraction",
+    "spectrum"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/optics"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./refraction": {
+      "types": "./dist/refraction.d.ts",
+      "import": "./dist/refraction.js"
+    },
+    "./polarization": {
+      "types": "./dist/polarization.d.ts",
+      "import": "./dist/polarization.js"
+    },
+    "./interference": {
+      "types": "./dist/interference.d.ts",
+      "import": "./dist/interference.js"
+    },
+    "./diffraction": {
+      "types": "./dist/diffraction.d.ts",
+      "import": "./dist/diffraction.js"
+    },
+    "./imaging": {
+      "types": "./dist/imaging.d.ts",
+      "import": "./dist/imaging.js"
+    },
+    "./spectrum": {
+      "types": "./dist/spectrum.d.ts",
+      "import": "./dist/spectrum.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js optics",
+    "test": "npm run build && node --test tests/*.test.js",
+    "prepack": "npm run build"
+  }
+}

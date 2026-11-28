@@ -2,7 +2,7 @@
 
 The searchable catalog is this folder's `index.html`. Run `npm run catalog` (below) to open it.
 
-Search all 108 packages by task, package name or public runtime export. Copy installation commands and imports, open each package guide, and try the five standalone HTML examples. The catalog marks exact versions available on npm; packages marked Source can be built from the repository until publication.
+Search all 109 packages by task, package name or public runtime export. Copy installation commands and imports, open each package guide, and try the five standalone HTML examples. The catalog marks exact versions available on npm; packages marked Source can be built from the repository until publication.
 
 The [release notes](../CHANGELOG.md#unreleased) cover standalone USDZ parsing,
 Draco/Meshopt support in glTF PBR and synchronous parsing behavior. The core and the stage together measure
@@ -43,7 +43,7 @@ node --test tests/catalog.test.js
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-108 packages in 12 layers, the same layers as the searchable catalog that `npm run catalog` serves.
+109 packages in 12 layers, the same layers as the searchable catalog that `npm run catalog` serves.
 
 ### Start here (7)
 
@@ -194,12 +194,13 @@ node --test tests/catalog.test.js
 | [`@margoengine/mesh-edit`](../packages/mesh-edit/README.md) | Pure polygon editing with retained corner UVs, explicit topology provenance and conservative cleanup. |
 | [`@margoengine/scene`](../packages/scene/README.md) | Scene graph conveniences for core meshes: children, traverse, userData, lookAt and world position, rotation and scale, as functions or as mesh members. |
 
-### Data and science (2)
+### Data and science (3)
 
 | Package | What it is |
 | --- | --- |
 | [`@margoengine/compute`](../packages/compute/README.md) | GPU compute without the WebGPU boilerplate, NumPy style: N-d arrays with views and broadcasting, fused expressions, reductions and statistics, scan, sort, selection, histograms, matmul, FFT, convolution, random numbers, streaming, neural networks, graph algorithms, and WGSL kernels bound by name. |
 | [`@margoengine/sciviz`](../packages/sciviz/README.md) | Scientific visualisation for Margo Engine: volume rendering with transfer functions, slices and GPU isosurfaces, million-point scatter plots, surface and line plots with axes, ticks, labels and colour bars, and perceptual colour maps. |
+| [`@margoengine/optics`](../packages/optics/README.md) | Physical optics as plain functions: refraction and dispersion, polarisation, thin films and multilayers, diffraction, image formation and spectral colour. |
 
 ### AI tools (1)
 

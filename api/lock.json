@@ -59,6 +59,7 @@
     "@margoengine/navmesh",
     "@margoengine/netcode",
     "@margoengine/oit",
+    "@margoengine/optics",
     "@margoengine/physics",
     "@margoengine/physics2d",
     "@margoengine/pixel",

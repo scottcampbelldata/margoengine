@@ -68,6 +68,7 @@
     "@margoengine/cameras": "camera rigs as maths with no GPU or DOM",
     "@margoengine/cinematic": "cinematic sequencing with no GPU or DOM",
     "@margoengine/kinematics-constraints": "kinematics with no GPU or DOM",
+    "@margoengine/optics": "physical optics as plain functions with no GPU or DOM",
     "@margoengine/robot-planning": "robot models, swept checks, IK and planning with no DOM; only the /gpu entry needs WebGPU",
     "@margoengine/rigging": "rigging with no GPU or DOM",
     "@margoengine/road": "road generation with no GPU or DOM",

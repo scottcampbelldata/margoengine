@@ -42,6 +42,7 @@
     "packages/machinery",
     "packages/kinematics-constraints",
     "packages/robot-planning",
+    "packages/optics",
     "packages/creative",
     "packages/sky",
     "packages/stage",

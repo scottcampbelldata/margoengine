@@ -3307,6 +3307,34 @@
       "types": "./dist/oit/precise.d.ts",
       "import": "./dist/oit/precise.js"
     },
+    "./optics": {
+      "types": "./dist/optics.d.ts",
+      "import": "./dist/optics.js"
+    },
+    "./optics/refraction": {
+      "types": "./dist/optics/refraction.d.ts",
+      "import": "./dist/optics/refraction.js"
+    },
+    "./optics/polarization": {
+      "types": "./dist/optics/polarization.d.ts",
+      "import": "./dist/optics/polarization.js"
+    },
+    "./optics/interference": {
+      "types": "./dist/optics/interference.d.ts",
+      "import": "./dist/optics/interference.js"
+    },
+    "./optics/diffraction": {
+      "types": "./dist/optics/diffraction.d.ts",
+      "import": "./dist/optics/diffraction.js"
+    },
+    "./optics/imaging": {
+      "types": "./dist/optics/imaging.d.ts",
+      "import": "./dist/optics/imaging.js"
+    },
+    "./optics/spectrum": {
+      "types": "./dist/optics/spectrum.d.ts",
+      "import": "./dist/optics/spectrum.js"
+    },
     "./physics": {
       "types": "./dist/physics.d.ts",
       "import": "./dist/physics.js"
@@ -6933,6 +6961,7 @@
     "@margoengine/navmesh": "^1.0.0",
     "@margoengine/netcode": "^1.0.0",
     "@margoengine/oit": "^1.0.0",
+    "@margoengine/optics": "^1.0.0",
     "@margoengine/physics": "^1.0.0",
     "@margoengine/physics2d": "^1.0.0",
     "@margoengine/pixel": "^1.0.0",
