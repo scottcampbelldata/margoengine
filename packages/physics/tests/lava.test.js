@@ -5,7 +5,15 @@ import { PhysicsWorld } from '../dist/world.js';
 
 const rate = { num: 60, den: 1 };
 const dt = 1 / 60;
-const defaults = { cells: [7, 3], spacing: 1, bed: 0, conductivity: 0, yieldStrength: 0 };
+const defaults = {
+  cells: [7, 3],
+  spacing: 1,
+  bed: 0,
+  conductivity: 0,
+  emissivity: 0,
+  convection: 0,
+  yieldStrength: 0,
+};
 const near = (a, b, bound) => assert.ok(Math.abs(a - b) <= bound, `${a} vs ${b}; bound ${bound}`);
 
 async function scene(options) {
@@ -99,6 +107,68 @@ test('LavaSolver: basal cooling converts the exact sensible-plus-latent enthalpy
     128 * Number.EPSILON * thickness,
   );
   near(lava.budget.environmentalHeat, power * dt, 100 * Number.EPSILON * power * dt);
+  near(
+    lava.budget.storedEnthalpy + lava.budget.environmentalHeat,
+    lava.budget.initialEnthalpy,
+    8 * Number.EPSILON * lava.budget.initialEnthalpy,
+  );
+});
+
+test('LavaSolver: surface radiation and water film transfer remain active without conduction', async () => {
+  const temperature = 1500;
+  const airTemperature = 320;
+  const waterTemperature = 290;
+  const emissivity = 0.9;
+  const convection = 14;
+  const waterHeatTransfer = 180;
+  const density = 2500;
+  const heatCapacity = 1200;
+  const thickness = 0.8;
+  for (const wet of [false, true]) {
+    const { lava, world } = await scene({
+      cells: [1, 1],
+      bed: wet ? -1 : 0,
+      seaLevel: wet ? 0 : undefined,
+      depth: thickness,
+      temperature,
+      airTemperature,
+      waterTemperature,
+      emissivity,
+      convection,
+      waterHeatTransfer,
+      density,
+      heatCapacity,
+    });
+    world.advance(1);
+    const radiation = emissivity * 5.670374419e-8 * (temperature ** 4 - airTemperature ** 4);
+    const waterPower = wet ? waterHeatTransfer * (temperature - waterTemperature) : 0;
+    const cooling = (radiation + convection * (temperature - airTemperature) + waterPower) * dt;
+    const expected = temperature - cooling / (density * heatCapacity * thickness);
+    const cell = lava.sample(0, 0);
+    near(cell.temperature, expected, 16 * Number.EPSILON * temperature);
+    assert.equal(cell.surfaceTemperature, cell.temperature);
+    near(lava.budget.environmentalHeat, cooling, 32 * Number.EPSILON * cooling);
+    near(lava.budget.waterHeat, waterPower * dt, 32 * Number.EPSILON * cooling);
+    near(
+      lava.budget.storedEnthalpy + cooling,
+      lava.budget.initialEnthalpy,
+      8 * Number.EPSILON * lava.budget.initialEnthalpy,
+    );
+  }
+});
+
+test('LavaSolver: an insulated cold bottom cannot cool the exposed surface below the active air bath', async () => {
+  const airTemperature = 400;
+  const { lava, world } = await scene({
+    cells: [1, 1],
+    depth: 0.8,
+    temperature: 1500,
+    airTemperature,
+    groundTemperature: 200,
+    convection: 1e12,
+  });
+  world.advance(1);
+  near(lava.sample(0, 0).temperature, airTemperature, 16 * Number.EPSILON * airTemperature);
   near(
     lava.budget.storedEnthalpy + lava.budget.environmentalHeat,
     lava.budget.initialEnthalpy,

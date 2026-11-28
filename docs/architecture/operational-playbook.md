@@ -11327,6 +11327,10 @@ frame dragging, a null orbit and exact replay.
 The optional `@margoengine/physics/lava` entry joins the 60 Hz solver graph. A slot-free Rust SIMD module imports world memory and uses solver-owned grid, state and variable work regions, with a private stack in the arena. The mobile layer uses an HLL flux with hydrostatic reconstruction against terrain plus stationary crust. A symmetric stencil transfers enthalpy between occupied cells. Surface skin balance, basal cooling and an implicit Bingham friction update supply the thermal and momentum source terms. Native code subcycles to the transport and diffusion limits. State is published only after the owned candidate passes those checks.
 
 `TerrainBed` supplies a heightfield. ICE-05 returns absorbed heat, liquid and steam through the existing layout-1 fields. SEA-06 consumes the layout-1 displacement rows. The tests cover direct analysis, live bidirectional thermal transfer, a downstream wave, render-frame cadence, snapshot replay and the two browser memory variants. The producer also publishes solid deposit elevation for the next granular terrain consumer.
+The native terminal path evaluates a viscous face law, with a factored depth derivative and donor
+drainage limit. Physics publishes only after checking every solver surface, heat and source receipt.
+Weather draws the accepted column skin and crust directly. Fixed-camera GPU tests compare the
+timed early surface, advanced front, cooled crust and exact replay on both renderers.
 
 ### Native free-surface preview water (FLUID-02)
 

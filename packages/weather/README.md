@@ -546,6 +546,29 @@ The cloud's light is summed over every pair of puffs on the CPU, so 3,500 puffs 
 
 ## Lava flows, fountains and bombs
 
+Use `LavaSurface` to draw a `LavaSolver` grid at the accepted physics time. It draws the wet or
+solidified surface on the same terrain grid, with emission from skin temperature and reflected
+basalt material from crust coverage. WebGPU and WebGL2 share the depth test and scene lighting.
+`glow` defaults to one, and `name` defaults to `lava-surface`.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { LavaSolver } from '@margoengine/physics/lava';
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { LavaSurface } from '@margoengine/weather/lava';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const lava = await LavaSolver.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(lava, {
+  cells: [16, 16],
+  spacing: 0.5,
+  bed: 0,
+  vents: [{ cell: [8, 8], flow: 0.08, start: 0.5, end: 2 }],
+});
+LavaSurface.attach(engine, { source: () => lava.surfaceSource() });
+world.advance(60);
+```
+
 `LavaFlow` from `margoengine/weather/lava` is lava from one vent over film time. The flow runs down your ground by the
 path of steepest descent (Favalli et al. 2005, with a small jitter so it is not locked to a grid; it fills a shallow
 hollow and spills over its rim) as a sheet with a yield strength: its thickness carries the supply and its speed

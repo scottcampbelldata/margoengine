@@ -14,7 +14,7 @@ import {sphereGeometry} from '/packages/geometry/dist/index.js';
 import {Material,createInstancedMesh} from '/packages/materials/dist/index.js';
 import {Clustered} from '/packages/clustered/dist/index.js';
 import {LightGroups} from '/packages/clustered/dist/groups.js';
-import {LavaFlow} from '/packages/weather/dist/lava.js';
+import {LavaFlow,LavaSurface} from '/packages/weather/dist/lava.js';
 if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
 const errors=[];
 const canvas=document.querySelector('#a');
@@ -129,6 +129,63 @@ window.check={samples:sceneSamples,
   out.validation=error?.message??null;out.errors=errors.splice(0);
   return out;
  }
+};
+window.check.runPhysical=async()=>{
+ const [{LavaSolver},{TerrainBed},{PhysicsWorld}]=await Promise.all([
+  import('/packages/physics/dist/lava.js'),
+  import('/packages/physics/dist/earth.js'),
+  import('/packages/physics/dist/world.js'),
+ ]);
+ const cells=[14,22], [nx,nz]=cells, spacing=3, origin=[-21,-168];
+ const terrain={columns:nx,rows:nz,width:nx*spacing,depth:nz*spacing,centre:[0,origin[1]+nz*spacing/2]};
+ const bed=Array.from({length:nx*nz},(_,i)=>ground(
+  origin[0]+(i%nx+0.5)*spacing,origin[1]+(Math.floor(i/nx)+0.5)*spacing,
+ ));
+ const lava=await LavaSolver.load({terrain});
+ const world=new PhysicsWorld({rate:{num:60,den:1}})
+  .add(new TerrainBed(),{...terrain,elevations:ground})
+  .add(lava,{
+   cells,spacing,origin,bed,skinDepth:0.002,
+   vents:[{cell:[7,4],flow:4,start:0.5,end:3,temperature:1450}],
+  });
+ const state=()=>{
+  let active=0,front=-1,maxSkin=0,crusted=0;
+  for(let z=0;z<nz;z++)for(let x=0;x<nx;x++){
+   const q=lava.sample(x,z);
+   if(q.depth<0.001)continue;
+   active++;
+   if(q.depth>0.005)front=Math.max(front,z);
+   maxSkin=Math.max(maxSkin,q.surfaceTemperature);
+   if(q.crustDepth>=0.9*q.depth)crusted++;
+  }
+  return {active,front,maxSkin,crusted,volume:lava.budget.storedVolume,hash:world.hash()};
+ };
+ device.pushErrorScope('validation');
+ const bare=await shot();
+ const renderer=LavaSurface.attach(engine,{source:()=>lava.surfaceSource(),glow:4});
+ let result;
+ try{
+  world.advance(15);
+  const dry=await shot(), dryState=state();
+  world.advance(90);
+  const early=await shot(),earlyState=state(),checkpoint=world.takeSnapshot();
+  world.advance(480);
+  const moving=await shot(),movingState=state();
+  world.advance(7200);
+  const cold=await shot(),coldState=state();
+  world.restoreSnapshot(checkpoint.bytes);
+  const replay=await shot(),replayState=state();
+  result={
+   dryState,earlyState,movingState,coldState,replayState,
+   dryDiff:count(bare,dry),earlyGlow:glowing(early),movingGlow:glowing(moving),
+   motionDiff:count(early,moving),coldGlow:glowing(cold),coldDiff:count(bare,cold),
+   replayPixelsEqual:early.every((value,i)=>Number.isFinite(value)&&value===replay[i]),
+   compat:globalThis.__margoCompat===true,
+  };
+ }finally{renderer.dispose();}
+ const after=await shot();
+ const validation=(await device.popErrorScope())?.message??null;
+ return {...result,disposedDiff:count(bare,after),validation,errors:errors.splice(0)};
 };
 window.ready=true;
 </script></body></html>

@@ -8698,6 +8698,17 @@ Grid records are f64 in layout 1, with X fastest. `lavaField` exposes lava depth
 
 For contact with ice, load with `exchangeIce: true`, map distinct lava cells to the `IceSolver` site's order and area with `ice`, and use a 60 Hz staggered group `.couple(['lava', 'ice-thermodynamics'], 'staggered')` with `new IceSolver({ readHeat: true })`. Heat used by the ice is removed from lava enthalpy. Drainage and steam mass are reported by both sides. The included `LavaBudget` records supplied and stored lava volume, environmental and ice heat, and displaced water.
 
+The default `transport: 'inertial'` evolves discharge with the shallow-layer momentum equations.
+Choose `transport: 'terminal'` for a creeping wide sheet, where the pressure-head slope sets a
+terminal Bingham discharge. Omit initial discharge in this mode. Zero `conductivity` removes internal
+and basal conduction and uses the well-mixed bulk as the exposed surface. Set `emissivity`,
+`convection` and `waterHeatTransfer` to zero for a thermally isolated sheet.
+
+In a rendered scene, attach `LavaSurface` from `@margoengine/weather/lava` with
+`source: () => lava.surfaceSource(renderCell)`. Advance the physics world before the frame.
+Omit `renderCell` when the stage uses the solver's origin cell. The renderer uses the accepted depth,
+skin Kelvin, crust thickness and altitude from the same published grid.
+
 ### Position-based water for interactive pours and splashes
 
 `@margoengine/physics/pbf` advances a free-surface liquid on the physics clock. Its sparse native neighbour search

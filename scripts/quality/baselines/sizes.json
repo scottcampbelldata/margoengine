@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21647672,
+  "total": 21652231,
   "history": [
     {
       "date": "2026-10-24",
@@ -15298,6 +15298,12 @@
       "commit": "e102734004",
       "reason": "HYDRO-07 entry sizes: new @margoengine/physics/hydraulics 7681 B (ceiling 7937 B), and @margoengine/physics/groundwater 3939 to 6235 B (ceiling 4158 to 6491 B) for the confined Darcy and Hele-Shaw solve (solveConfinedFlow, traceStreamlines), kept in the groundwater entry so Darcy flow has one home. Both are plain TypeScript with no Wasm or world; the confined functions are separate exports that a bundler drops when only the aquifer is imported, so a split entry would save little in real bundles.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "earth-10-terminal-and-surface",
+      "reason": "EARTH-10 physics/lava goes from 5891 to 7046 B gzip, cap 6147 to 7302 B, for terminal transport selection, staged publication and the accepted surface binding. Weather lava moves from 11999 to 15291 B, cap 12346 to 15750 B, to draw accepted hot skin and crust in both renderers. Splitting would duplicate the existing Kelvin-to-emission and lighting support. Both lazy native assets move from 4127 to 6049 B. Core and Stage are unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -16180,7 +16186,7 @@
     "@margoengine/physics/ice": 3483,
     "@margoengine/physics/iceberg": 4595,
     "@margoengine/physics/landscape": 4538,
-    "@margoengine/physics/lava": 6147,
+    "@margoengine/physics/lava": 7302,
     "@margoengine/physics/legged": 10415,
     "@margoengine/physics/life": 6901,
     "@margoengine/physics/lightning": 9072,
@@ -17010,7 +17016,7 @@
     "@margoengine/weather/gltf": 5981,
     "@margoengine/weather/hail": 5699,
     "@margoengine/weather/hail-physics": 1312,
-    "@margoengine/weather/lava": 12346,
+    "@margoengine/weather/lava": 15750,
     "@margoengine/weather/lava-settings": 4046,
     "@margoengine/weather/lens": 4125,
     "@margoengine/weather/precipitation": 3923,

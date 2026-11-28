@@ -20,6 +20,7 @@ export interface LavaKernel {
     budget: number,
     dt: number,
     start: number,
+    terminal: number,
   ): number;
   lava_publish(
     state: number,
@@ -35,7 +36,7 @@ export interface LavaKernel {
     z: number,
     budget: number,
     initial: number,
-  ): void;
+  ): number;
 }
 
 export async function loadLavaBuilds(signal?: AbortSignal): Promise<LavaBuilds> {

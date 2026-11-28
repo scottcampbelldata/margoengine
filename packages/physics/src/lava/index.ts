@@ -10,7 +10,7 @@ import {
   ICE_STEAM_FIELD,
 } from '../ice/index.js';
 import { WAKE_SOURCE_LAYOUT, WAKE_SOURCE_WORDS } from '../sea/wake.js';
-import { regionWords } from '../world/memory.js';
+import { DYNAMIC_BASE, MAX_MEMORY_PAGES, regionWords, STACK_BYTES } from '../world/memory.js';
 import type {
   Cell,
   FieldDescriptor,
@@ -72,6 +72,8 @@ export interface LavaOptions {
   readonly cells: Pair;
   /** Cell spacing in metres. */
   readonly spacing: number;
+  /** Inertial shallow-layer transport (default) or a strongly viscous terminal Bingham sheet. */
+  readonly transport?: 'inertial' | 'terminal';
   /** Lower XZ corner in metres. Defaults to [0, 0]. */
   readonly origin?: Pair;
   /** Grid's reference world cell. Defaults to [0, 0, 0]. */
@@ -117,7 +119,7 @@ export interface LavaOptions {
   readonly emissivity?: number;
   /** Air convection coefficient in W/(m² K). Defaults to 20. */
   readonly convection?: number;
-  /** Thermal conductivity in W/(m K). Defaults to 2. Zero insulates the flow. */
+  /** Thermal conductivity in W/(m K). Defaults to 2. Zero removes conduction and exposes the bulk surface. */
   readonly conductivity?: number;
   /** Thermal boundary-layer depth in metres. Defaults to 0.02. */
   readonly skinDepth?: number;
@@ -127,6 +129,22 @@ export interface LavaOptions {
   readonly waterHeatTransfer?: number;
   /** Water temperature in kelvin. Defaults to 283.15 K. */
   readonly waterTemperature?: number;
+}
+
+/** Layout-1 surface data in the renderer's local metres, borrowed for the current draw. */
+export interface LavaSurfaceFrame {
+  /** Arena holding the accepted lava cell records. */
+  readonly memory: WebAssembly.Memory;
+  /** Address, length, layout and element type of the accepted cell region. */
+  readonly region: Readonly<Pick<Region, 'byteOffset' | 'byteLength' | 'type' | 'layout'>>;
+  /** X and Z grid sizes, with X fastest. */
+  readonly cells: Pair;
+  /** Grid spacing in metres. */
+  readonly spacing: number;
+  /** Lower XZ corner in the solver cell. */
+  readonly origin: Pair;
+  /** Metres translating the solver cell into the renderer's cell. */
+  readonly offset: readonly [number, number, number];
 }
 
 /** One lava cell in SI units. */
@@ -171,11 +189,11 @@ interface IceSite {
 interface State {
   readonly host: SolverHost;
   readonly kernel: LavaKernel;
+  readonly terminal: boolean;
   readonly nx: number;
   readonly nz: number;
   readonly count: number;
   readonly origin: Pair;
-  readonly cell: Cell;
   readonly spacing: number;
   readonly cellSize: number;
   readonly sites: readonly IceSite[];
@@ -190,8 +208,13 @@ interface State {
   readonly deposits: Region;
   readonly sources: Region;
   readonly submerged: Region;
+  readonly nextSamples: Region;
+  readonly nextDeposits: Region;
+  readonly nextSources: Region;
+  readonly nextSubmerged: Region;
   readonly icePower: Region;
   readonly heatRequest: Region;
+  readonly nextHeatRequest: Region;
   readonly budget: Region;
   readonly nextBudget: Region;
   readonly regions: readonly Region[];
@@ -199,25 +222,48 @@ interface State {
 
 function scalar(label: string, value: number, lower = -Infinity, upper = Infinity): number {
   if (!Number.isFinite(value) || value < lower || value > upper)
-    throw new RangeError(`Invalid lava ${label}. Use a finite SI value within its documented range.`);
+    throw new MargoError('state', `Invalid lava ${label}. Use a finite SI value within its documented range.`);
   return value;
 }
 
 function positive(label: string, value: number): number {
-  if (scalar(label, value) <= 0) throw new RangeError(`Invalid lava ${label}. Use a positive SI value.`);
+  if (scalar(label, value) <= 0) throw new MargoError('state', `Invalid lava ${label}. Use a positive SI value.`);
   return value;
 }
 
 function integer(label: string, value: number, lower: number, upper = Number.MAX_SAFE_INTEGER): number {
   if (!Number.isSafeInteger(value) || value < lower || value > upper)
-    throw new RangeError(`Invalid lava ${label}. Use an integer within the grid or world-cell range.`);
+    throw new MargoError('state', `Invalid lava ${label}. Use an integer within the grid or world-cell range.`);
   return value;
 }
 
 function mapped(value: Grid, count: number, label: string, lower = -Infinity): Float64Array {
   if (typeof value === 'number') return new Float64Array(count).fill(scalar(label, value, lower));
-  if (value.length !== count) throw new RangeError(`Invalid lava ${label} layout. Use one number per cell, X fastest.`);
+  if (value?.length !== count)
+    throw new MargoError('state', `Invalid lava ${label} layout. Use one number per cell, X fastest.`);
   return Float64Array.from(value, (v) => scalar(label, v, lower));
+}
+
+function axisExtent(label: string, origin: number, count: number, spacing: number): void {
+  const far = scalar(`${label} far edge`, origin + count * spacing);
+  const firstCentre = origin + 0.5 * spacing;
+  const lastCentre = origin + (count - 0.5) * spacing;
+  if (!(firstCentre > origin && lastCentre < far))
+    throw new MargoError(
+      'state',
+      'Lava cell centres exceed coordinate resolution. Use a nearby origin or wider cells.',
+    );
+}
+
+function terrainCount(shape: BedShape): number {
+  try {
+    return bedVertexCount(shape);
+  } catch (cause) {
+    throw Object.assign(
+      new MargoError('state', 'Invalid lava terrain geometry. Use finite TerrainBed extents and cell counts.'),
+      { cause },
+    );
+  }
 }
 
 function cellIndex(nx: number, nz: number, x: number, z: number): number {
@@ -254,9 +300,9 @@ export class LavaSolver implements Solver<LavaOptions> {
     private readonly exchangeIce: boolean,
   ) {
     if (typeof id !== 'string' || !id.trim() || id !== id.trim())
-      throw new RangeError('Invalid lava solver ID. Use a nonempty name without outer whitespace.');
+      throw new MargoError('state', 'Invalid lava solver ID. Use a nonempty name without outer whitespace.');
     if (terrain) {
-      bedVertexCount(terrain);
+      terrainCount(terrain);
       this.terrain = { ...terrain, centre: [terrain.centre[0], terrain.centre[1]] };
     }
     this.lavaField = descriptor(`${id}.state`, 'lavaFlowState', 'SI', 'uniformGrid');
@@ -286,27 +332,48 @@ export class LavaSolver implements Solver<LavaOptions> {
   init(host: SolverHost, options: LavaOptions): void {
     if (this.state)
       throw new MargoError('state', 'LavaSolver is already attached. Load a new solver for a second world.');
+    if (options?.cells?.length !== 2)
+      throw new MargoError('state', 'Invalid lava grid. Use positive whole X and Z cell counts.');
     const nx = integer('X cell count', options.cells[0], 1);
     const nz = integer('Z cell count', options.cells[1], 1);
     const count = integer('cell count', nx * nz, 1);
+    const authoredVents = options.vents ?? [];
+    const contacts = options.ice ?? [];
+    if (!Array.isArray(authoredVents) || !Array.isArray(contacts))
+      throw new MargoError('state', 'Invalid lava vents or ice contacts. Use arrays of cell records.');
+    const fieldWords = LAVA_WORDS + 1 + WAKE_SOURCE_WORDS;
+    const wordsPerCell = 3 * 4 + 2 + 4 + 2 * (fieldWords + 1) + 1 + 2 * fieldWords;
+    const requested = F64 * (wordsPerCell * count + 4 * Math.min(count, Math.max(contacts.length, 1)) + 44);
+    if (requested + DYNAMIC_BASE + STACK_BYTES >= MAX_MEMORY_PAGES * 65536)
+      throw new MargoError('state', 'Lava grid exceeds wasm32 arena capacity. Use fewer cells.');
     const spacing = positive('spacing', options.spacing);
+    const transport = options.transport === undefined ? 'inertial' : options.transport;
+    if (transport !== 'inertial' && transport !== 'terminal')
+      throw new MargoError('state', 'Use inertial or terminal lava transport.');
+    const terminal = transport === 'terminal';
     const volumeArea = positive('cell area', spacing * spacing);
-    const [x, z] = options.origin ?? [0, 0];
-    const origin: Pair = [scalar('X origin', x), scalar('Z origin', z)];
-    scalar('X far edge', x + nx * spacing);
-    scalar('Z far edge', z + nz * spacing);
-    const [cx, cy, cz] = options.originCell ?? [0, 0, 0];
-    const cell: Cell = [cx, cy, cz];
-    for (const v of cell) integer('world cell', v, -2147483648, 2147483647);
+    const lower = options.origin ?? [0, 0];
+    if (lower.length !== 2) throw new MargoError('state', 'Invalid lava origin. Use two local X and Z coordinates.');
+    const origin: Pair = [scalar('X origin', lower[0]), scalar('Z origin', lower[1])];
+    axisExtent('X', origin[0], nx, spacing);
+    axisExtent('Z', origin[1], nz, spacing);
+    if (options.originCell !== undefined) {
+      const cell = options.originCell;
+      if (cell?.length !== 3 || !host.cell.every((value, axis) => value === cell[axis]))
+        throw new MargoError('state', 'Invalid lava origin cell. Use the same cell as world.add.');
+    }
     const cellSize = positive('origin cell size', options.originCellSize ?? 4096);
 
     const density = positive('density', options.density ?? 2600);
+    positive('density times cell area', density * volumeArea);
     const cp = positive('heat capacity', options.heatCapacity ?? 1225);
     const latent = scalar('latent heat', options.latentHeat ?? 350000, 0);
     const solidus = positive('solidus', options.solidus ?? 1253);
     const liquidus = positive('liquidus', options.liquidus ?? 1423);
-    if (liquidus <= solidus) throw new RangeError('Invalid lava phase transition. Set liquidus above solidus.');
+    if (liquidus <= solidus)
+      throw new MargoError('state', 'Invalid lava phase transition. Set liquidus above solidus.');
     positive('effective heat capacity', cp + latent / (liquidus - solidus));
+    positive('liquidus enthalpy', cp * liquidus + latent);
     const viscosity = positive('viscosity', options.viscosity ?? 300);
     const viscosityRise = scalar('viscosity rise', options.viscosityRise ?? 0.04, 0);
     const yieldStrength = scalar('yield strength', options.yieldStrength ?? 0.01, 0);
@@ -319,7 +386,8 @@ export class LavaSolver implements Solver<LavaOptions> {
       viscLog + ln(viscosity) > 700 ||
       (yieldStrength > 0 && (yieldLog > 700 || yieldLog + ln(yieldStrength) > 700))
     )
-      throw new RangeError(
+      throw new MargoError(
+        'state',
         'Lava rheology is outside the finite range. Reduce the temperature sensitivity or reference resistance.',
       );
     const air = positive('air temperature', options.airTemperature ?? 288.15);
@@ -361,17 +429,18 @@ export class LavaSolver implements Solver<LavaOptions> {
     const qz = mapped(options.dischargeZ ?? 0, count, 'Z discharge');
     const ventRows = new Float64Array(4 * count);
     const ventCells = new Set<number>();
-    for (const vent of options.vents ?? []) {
+    for (const vent of authoredVents) {
+      if (vent?.cell?.length !== 2) throw new MargoError('state', 'Invalid lava vent cell. Use an X and Z cell pair.');
       const at = cellIndex(nx, nz, vent.cell[0], vent.cell[1]);
       if (ventCells.has(at))
-        throw new RangeError('Two lava vents share one cell. Use distinct source cells or sum the discharge.');
+        throw new MargoError('state', 'Two lava vents share one cell. Use distinct source cells or sum the discharge.');
       ventCells.add(at);
       const start = scalar('vent start', vent.start ?? 0, 0);
       const end = vent.end === undefined ? Infinity : scalar('vent end', vent.end, start);
       const hot = scalar('vent temperature', vent.temperature ?? liquidus + 20, solidus);
       ventRows.set(
         [
-          positive('vent discharge', vent.flow) / volumeArea,
+          positive('vent discharge per cell area', positive('vent discharge', vent.flow) / volumeArea),
           scalar('vent specific enthalpy', enthalpy(hot, cp, latent, solidus, liquidus), 0),
           start,
           end,
@@ -381,10 +450,15 @@ export class LavaSolver implements Solver<LavaOptions> {
     }
 
     const iceCells = new Set<number>();
-    const sites = (options.ice ?? []).map((site): IceSite => {
+    const sites = contacts.map((site): IceSite => {
+      if (site?.cell?.length !== 2)
+        throw new MargoError('state', 'Invalid lava ice contact cell. Use an X and Z cell pair.');
       const at = cellIndex(nx, nz, site.cell[0], site.cell[1]);
       if (iceCells.has(at))
-        throw new RangeError('Two ice contacts share one lava cell. Use a separate cell for each ICE-05 site.');
+        throw new MargoError(
+          'state',
+          'Two ice contacts share one lava cell. Use a separate cell for each ICE-05 site.',
+        );
       iceCells.add(at);
       return {
         cell: at,
@@ -393,7 +467,8 @@ export class LavaSolver implements Solver<LavaOptions> {
       };
     });
     if (this.exchangeIce !== (sites.length !== 0))
-      throw new RangeError(
+      throw new MargoError(
+        'state',
         'Invalid lava ice coupling. Supply one ice contact per site and enable exchangeIce together.',
       );
 
@@ -411,19 +486,24 @@ export class LavaSolver implements Solver<LavaOptions> {
     const deposits = allocate('lava-deposits', count, BED_LAYOUT);
     const sources = allocate('lava-marine-displacement', WAKE_SOURCE_WORDS * count, WAKE_SOURCE_LAYOUT);
     const submerged = allocate('lava-submerged', count);
+    const nextSamples = allocate('lava-candidate-grid', LAVA_WORDS * count);
+    const nextDeposits = allocate('lava-candidate-deposits', count, BED_LAYOUT);
+    const nextSources = allocate('lava-candidate-displacement', WAKE_SOURCE_WORDS * count, WAKE_SOURCE_LAYOUT);
+    const nextSubmerged = allocate('lava-candidate-submerged', count);
     const icePower = allocate('lava-ice-cooling', count);
     const heatRequest = allocate('lava-ice-heat-flux', Math.max(sites.length, 1), ICE_FIELD_LAYOUT);
+    const nextHeatRequest = allocate('lava-candidate-ice-heat-flux', Math.max(sites.length, 1), ICE_FIELD_LAYOUT);
     const budget = allocate('lava-budget', 12);
     const nextBudget = allocate('lava-next-budget', 12);
 
     const s: State = {
       host,
       kernel,
+      terminal,
       nx,
       nz,
       count,
       origin,
-      cell,
       spacing,
       cellSize,
       sites,
@@ -438,21 +518,31 @@ export class LavaSolver implements Solver<LavaOptions> {
       deposits,
       sources,
       submerged,
+      nextSamples,
+      nextDeposits,
+      nextSources,
+      nextSubmerged,
       icePower,
       heatRequest,
+      nextHeatRequest,
       budget,
       nextBudget,
       regions: [lava, bed, model, vents, samples, deposits, sources, submerged, heatRequest, budget],
     };
-    this.state = s;
     words(s, model).set(params);
-    words(s, bed).set(bedInitial);
+    words(s, nextBed).set(bedInitial);
     words(s, vents).set(ventRows);
-    const columns = words(s, lava);
+    const columns = words(s, working);
     for (let i = 0; i < count; i++) {
       const h = depth[i]!;
       const hot = temperature[i]!;
       const mobile = h > 0 && hot > solidus;
+      if (mobile && (qx[i] !== 0 || qz[i] !== 0)) {
+        if (terminal)
+          throw new MargoError('state', 'Omit initial discharge for terminal flow or use inertial transport.');
+        const meltDepth = positive('initial mobile depth', h * Math.min(1, (hot - solidus) / (liquidus - solidus)));
+        scalar('initial mobile velocity', Math.hypot(qx[i]!, qz[i]!) / meltDepth, 0);
+      }
       columns.set(
         [
           h,
@@ -463,10 +553,12 @@ export class LavaSolver implements Solver<LavaOptions> {
         4 * i,
       );
     }
-    this.publish(s, 1);
-    const b = words(s, budget);
+    this.preparePublication(s, 1, 1 / 60);
+    const b = words(s, nextBudget);
     b[8] = b[6]!;
     b[9] = b[7]!;
+    this.accept(s);
+    this.state = s;
   }
 
   private live(): State {
@@ -481,15 +573,19 @@ export class LavaSolver implements Solver<LavaOptions> {
     if (!this.terrain) return;
     const port = context.inputs.get(BED_FIELD.name);
     if (!port || port.region.layout !== BED_LAYOUT || port.region.type !== 'f32')
-      throw new RangeError('Invalid lava terrain layout. Use the matching TerrainBed geometry.');
+      throw new MargoError('state', 'Invalid lava terrain layout. Use the matching TerrainBed geometry.');
     const values = regionWords(s.host.memory, port.region);
-    if (values.length !== bedVertexCount(this.terrain))
-      throw new RangeError('Invalid lava terrain extent. Use the registered TerrainBed geometry.');
+    if (values.length !== terrainCount(this.terrain))
+      throw new MargoError('state', 'Invalid lava terrain extent. Use the registered TerrainBed geometry.');
     const bed = bedSurface(this.terrain, values, port.cell);
     const point: BedSample = { elevation: 0, normal: [0, 1, 0] };
-    const dx = (s.cell[0] - port.cell[0]) * s.cellSize;
-    const dy = (s.cell[1] - port.cell[1]) * s.cellSize;
-    const dz = (s.cell[2] - port.cell[2]) * s.cellSize;
+    const delta = (axis: number) =>
+      scalar('terrain cell offset', (context.cell[axis]! - port.cell[axis]!) * s.cellSize);
+    const dx = delta(0);
+    const dy = delta(1);
+    const dz = delta(2);
+    axisExtent('shifted terrain X', s.origin[0] + dx, s.nx, s.spacing);
+    axisExtent('shifted terrain Z', s.origin[1] + dz, s.nz, s.spacing);
     for (let z = 0; z < s.nz; z++) {
       for (let x = 0; x < s.nx; x++) {
         bed.sample(s.origin[0] + (x + 0.5) * s.spacing + dx, s.origin[1] + (z + 0.5) * s.spacing + dz, point);
@@ -505,31 +601,36 @@ export class LavaSolver implements Solver<LavaOptions> {
     const input = ICE_FEEDBACK.map((field) => {
       const r = context.inputs.get(field.name)?.region;
       if (!r || r.layout !== ICE_FIELD_LAYOUT || r.type !== 'f64' || r.byteLength !== F64 * s.sites.length)
-        throw new RangeError(`Invalid lava ice feedback ${field.name}. Use one layout-1 f64 per ICE-05 site.`);
+        throw new MargoError('state', `Invalid lava ice feedback ${field.name}. Use one layout-1 f64 per ICE-05 site.`);
       return regionWords(s.host.memory, r);
     });
     const want = words(s, s.heatRequest);
     const b = words(s, s.nextBudget);
     for (const [i, site] of s.sites.entries()) {
       const absorbed = scalar('absorbed ice power', input[0]![i]!, 0);
-      const offered = want[i]! * site.area;
+      const offered = scalar('offered ice power', want[i]! * site.area, 0);
       // Allow only the roundoff of reversing ICE-05's area and time conversion.
       if (absorbed - offered > 16 * Number.EPSILON * Math.max(absorbed, offered))
-        throw new RangeError(
+        throw new MargoError(
+          'state',
           'Ice accepted more heat than lava offered. Use matching contact areas and staggered exchange.',
         );
       power[site.cell] = absorbed;
-      b[10]! += scalar('ice meltwater rate', input[1]![i]!, 0) * dt;
-      b[11]! += scalar('ice steam rate', input[2]![i]!, 0) * dt;
+      b[10] = scalar('accumulated ice meltwater', b[10]! + scalar('ice meltwater rate', input[1]![i]!, 0) * dt, 0);
+      b[11] = scalar('accumulated ice steam', b[11]! + scalar('ice steam rate', input[2]![i]!, 0) * dt, 0);
     }
   }
 
   step(context: StepContext, dt: number): void {
     const s = this.live();
+    const interval = positive('step duration', dt);
+    const start = scalar('step start time', context.tick * interval, 0);
+    if (!(scalar('step end time', start + interval, 0) > start))
+      throw new MargoError('state', 'Lava tick time exceeds numeric resolution. Use a nearer simulation time.');
     words(s, s.working).set(words(s, s.lava));
     words(s, s.nextBudget).set(words(s, s.budget));
     this.prepareBed(s, context);
-    this.receiveIce(s, context, dt);
+    this.receiveIce(s, context, interval);
     const result = s.kernel.lava_step(
       s.working.byteOffset,
       s.trial.byteOffset,
@@ -540,57 +641,86 @@ export class LavaSolver implements Solver<LavaOptions> {
       s.nz,
       s.icePower.byteOffset,
       s.nextBudget.byteOffset,
-      dt,
-      context.tick * dt,
+      interval,
+      start,
+      s.terminal ? 1 : 0,
     );
+    if (result === 3)
+      throw new MargoError(
+        'state',
+        'Lava tick exceeds 4096 explicit microsteps. Use a coarser grid or reduce forcing.',
+      );
     if (result !== 0)
-      throw new RangeError(
+      throw new MargoError(
+        'state',
         'Lava update exceeded its heat or flux bounds. Use finite physical grid, coupling and source scales.',
       );
-    words(s, s.lava).set(words(s, s.working));
-    words(s, s.bed).set(words(s, s.nextBed));
-    words(s, s.budget).set(words(s, s.nextBudget));
-    this.publish(s, 0, dt);
+    this.preparePublication(s, 0, interval);
+    this.accept(s);
   }
 
-  private publish(s: State, initial: number, dt = 1 / 60): void {
-    s.kernel.lava_publish(
-      s.lava.byteOffset,
-      s.bed.byteOffset,
+  private preparePublication(s: State, initial: number, dt: number): void {
+    words(s, s.nextSubmerged).set(words(s, s.submerged));
+    const status = s.kernel.lava_publish(
+      s.working.byteOffset,
+      s.nextBed.byteOffset,
       s.model.byteOffset,
-      s.samples.byteOffset,
-      s.deposits.byteOffset,
-      s.sources.byteOffset,
-      s.submerged.byteOffset,
+      s.nextSamples.byteOffset,
+      s.nextDeposits.byteOffset,
+      s.nextSources.byteOffset,
+      s.nextSubmerged.byteOffset,
       s.nx,
       s.nz,
       s.origin[0],
       s.origin[1],
-      s.budget.byteOffset,
+      s.nextBudget.byteOffset,
       initial,
     );
-    const values = words(s, s.samples);
+    if (status !== 0)
+      throw new MargoError(
+        'state',
+        'Lava publication exceeds finite surface, source or budget range. Use compatible grid, bed and forcing scales.',
+      );
+    const values = words(s, s.nextSamples);
     const props = words(s, s.model);
-    const out = words(s, s.heatRequest);
+    const out = words(s, s.nextHeatRequest);
     for (const [i, site] of s.sites.entries()) {
       const at = site.cell * LAVA_WORDS;
       const potential = (props[15]! / (props[16]! + values[at + 3]!)) * (values[at + 1]! - site.temperature);
       const energy = values[at + 7]! * s.spacing * s.spacing;
       const protectedHeat = values[at]! * props[2]! * props[3]! * site.temperature * s.spacing * s.spacing;
-      out[i] = Math.max(0, Math.min(potential, (energy - protectedHeat) / (dt * site.area)));
+      const limit = (energy - protectedHeat) / (dt * site.area);
+      if (!(Number.isFinite(potential) && Number.isFinite(limit) && Number.isFinite(dt * site.area)))
+        throw new MargoError(
+          'state',
+          'Lava ice heat request exceeds numeric range. Use compatible temperatures, contact area and grid scale.',
+        );
+      out[i] = Math.max(0, Math.min(potential, limit));
     }
+  }
+
+  private accept(s: State): void {
+    words(s, s.lava).set(words(s, s.working));
+    words(s, s.bed).set(words(s, s.nextBed));
+    words(s, s.budget).set(words(s, s.nextBudget));
+    words(s, s.samples).set(words(s, s.nextSamples));
+    words(s, s.deposits).set(words(s, s.nextDeposits));
+    words(s, s.sources).set(words(s, s.nextSources));
+    words(s, s.submerged).set(words(s, s.nextSubmerged));
+    words(s, s.heatRequest).set(words(s, s.nextHeatRequest));
   }
 
   importPorts(_tick: number): void {}
 
   exportPorts(tick: number): readonly Port[] {
     const s = this.live();
+    const cell = s.host.cell;
     const ports = [
-      { field: this.lavaField.name, region: s.samples, tick, cell: s.cell },
-      { field: this.depositField.name, region: s.deposits, tick, cell: s.cell },
-      { field: this.seaSourceField.name, region: s.sources, tick, cell: s.cell },
+      { field: this.lavaField.name, region: s.samples, tick, cell },
+      { field: this.depositField.name, region: s.deposits, tick, cell },
+      { field: this.seaSourceField.name, region: s.sources, tick, cell },
     ];
-    if (this.exchangeIce) ports.push({ field: ICE_HEAT_FIELD.name, region: s.heatRequest, tick, cell: s.cell });
+    if (this.exchangeIce) ports.push({ field: ICE_HEAT_FIELD.name, region: s.heatRequest, tick, cell });
     return ports;
   }
 
@@ -599,6 +729,35 @@ export class LavaSolver implements Solver<LavaOptions> {
   }
   extraState(): readonly Region[] {
     return [];
+  }
+
+  /** Borrow accepted surface records for a renderer. Defaults to the solver's current origin cell. */
+  surfaceSource(renderCell?: Cell): LavaSurfaceFrame {
+    const s = this.live();
+    const source = s.host.cell;
+    const target = renderCell ?? source;
+    if (
+      target.length !== 3 ||
+      !Number.isSafeInteger(target[0]) ||
+      !Number.isSafeInteger(target[1]) ||
+      !Number.isSafeInteger(target[2])
+    )
+      throw new MargoError('state', 'Give the lava renderer three whole origin cell coordinates.');
+    const translation = (axis: number) => {
+      const cells = source[axis]! - target[axis]!;
+      const offset = cells * s.cellSize;
+      if (!Number.isSafeInteger(cells) || !Number.isFinite(Math.fround(offset)))
+        throw new MargoError('state', 'Lava surface translation exceeds render precision. Use a nearer origin cell.');
+      return offset;
+    };
+    return {
+      memory: s.host.memory,
+      region: s.samples,
+      cells: [s.nx, s.nz],
+      spacing: s.spacing,
+      origin: [s.origin[0], s.origin[1]],
+      offset: [translation(0), translation(1), translation(2)],
+    };
   }
 
   /** Read the last published cell. */

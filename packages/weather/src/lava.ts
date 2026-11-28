@@ -54,6 +54,21 @@
 //   P. Shirley, "Simple Analytic Approximations to the CIE XYZ Color Matching Functions", JCGT 2(2), 1-11, 2013,
 //   http://jcgt.org/published/0002/02/01/: the colour and luminance of glowing lava at any temperature (683 lm/W);
 //   IEC 61966-2-1 (sRGB) for the XYZ to linear sRGB matrix.
+import type { EngineKernel } from '@margoengine/core';
+import {
+  engineRuntime,
+  type Engine,
+  type EnginePlugin,
+  type FrameGraph,
+  type PassContext,
+} from '@margoengine/core/extension';
+import { MargoError } from '@margoengine/math/errors';
+import { displayShader } from '../../shared/display.js';
+import { linearHdr } from '../../shared/hdr-format.js';
+import { applyView } from '../../shared/view-rect.js';
+
+declare const GPUBufferUsage: { readonly STORAGE: number; readonly UNIFORM: number; readonly COPY_DST: number };
+
 const G = 9.80665;
 const SIGMA = 5.670374419e-8;
 const H_PLANCK = 6.62607015e-34;
@@ -2392,5 +2407,350 @@ export class LavaFlow {
       if (cd > 0) push(wx / cd, wy / cd, wz / cd, [r, g, b], cd / (o.glow ?? 1) || 0);
     }
     return out.slice(0, max);
+  }
+}
+
+/** One accepted X-fast lava grid in a local rendering cell. No solver dependency is needed to read the frame. */
+export interface LavaGridFrame {
+  /** Arena containing the currently accepted field. */
+  readonly memory: WebAssembly.Memory;
+  /** Layout-1 f64 rows of depth, bulk and skin temperature, crust, discharge, surface altitude and enthalpy. */
+  readonly region: {
+    readonly type: string;
+    readonly layout: number;
+    readonly byteOffset: number;
+    readonly byteLength: number;
+  };
+  /** X and Z cell counts. */
+  readonly cells: readonly [number, number];
+  /** Width of each square cell, in metres. */
+  readonly spacing: number;
+  /** Lower XZ corner in metres, before the optional cell translation. */
+  readonly origin: readonly [number, number];
+  /** Translation into the camera's origin cell, in metres. Defaults to zero. */
+  readonly offset?: readonly [number, number, number];
+}
+
+/** Settings for a view of the accepted, time-stepped lava grid. */
+export interface LavaSurfaceOptions {
+  /** Supplies the latest accepted frame before each draw, or undefined to clear the surface. */
+  readonly source: () => LavaGridFrame | undefined;
+  /** Film appearance multiplier on skin radiance. Default 1. */
+  readonly glow?: number;
+  /** Unique plugin name when drawing several patches in a scene. Default 'weather:lava-surface'. */
+  readonly name?: string;
+}
+
+type LavaPass = Extract<PassContext, { backend: 'webgpu' }>;
+const LAVA_GRID_WORDS = 8;
+const GRID_SHADER = `
+${displayShader}
+struct LavaFrame {
+  camera: mat4x4f,
+  grid: vec4f,
+  cells: vec4u,
+  sun: vec4f,
+  radiance: vec4f,
+  ambient: vec4f,
+}
+struct LavaTile { heightWetCrust: vec4f, glow: vec4f }
+@group(0) @binding(0) var<uniform> lava: LavaFrame;
+@group(0) @binding(1) var<storage, read> tile: array<LavaTile>;
+
+struct SurfaceVertex {
+  @builtin(position) clip: vec4f,
+  @location(0) world: vec3f,
+  @location(1) @interpolate(flat) emission: vec3f,
+  @location(2) @interpolate(flat) crust: f32,
+}
+const corners = array<vec2i, 6>(
+  vec2i(0, 0), vec2i(0, 1), vec2i(1, 0),
+  vec2i(1, 0), vec2i(0, 1), vec2i(1, 1),
+);
+
+fn elevation(cell: vec2i) -> f32 {
+  let at = vec2u(clamp(cell, vec2i(0), vec2i(lava.cells.xy) - vec2i(1)));
+  return tile[at.x + at.y * lava.cells.x].heightWetCrust.x;
+}
+
+@vertex fn vertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) index: u32) -> SurfaceVertex {
+  let state = tile[index].heightWetCrust;
+  if (state.y <= 0.0) {
+    return SurfaceVertex(vec4f(2, 2, 2, 1), vec3f(0), vec3f(0), 0.0);
+  }
+  let cell = vec2i(i32(index % lava.cells.x), i32(index / lava.cells.x));
+  let point = cell + corners[vertexIndex];
+  let xz = lava.grid.xy + vec2f(point) * lava.grid.z;
+  // A shared corner has the same elevation for either neighbouring cell.
+  let height = 0.25 * (elevation(point) + elevation(point - vec2i(1, 0)) +
+                      elevation(point - vec2i(0, 1)) + elevation(point - vec2i(1, 1)));
+  let world = vec3f(xz.x, height, xz.y);
+  return SurfaceVertex(lava.camera * vec4f(world, 1), world, tile[index].glow.rgb, state.z);
+}
+
+@fragment fn fragment(i: SurfaceVertex) -> @location(0) vec4f {
+  let crossed = cross(dpdx(i.world), dpdy(i.world));
+  let upward = crossed * select(-1.0, 1.0, crossed.y >= 0.0);
+  let n = upward / max(length(upward), 1e-15);
+  let sun = lava.sun.xyz / max(length(lava.sun.xyz), 1e-15);
+  let light = lava.ambient.xyz * lava.radiance.w +
+    (max(dot(n, sun), 0.0) * lava.sun.w / 3.14159265) * lava.radiance.rgb;
+  // Visual diffuse reflectance of exposed and crusted basalt; emission comes only from the accepted skin.
+  let basalt = mix(vec3f(0.077, 0.051, 0.038), vec3f(0.047, 0.042, 0.039), i.crust);
+  let colour = basalt * light + i.emission;
+  return vec4f(select(toDisplay(colour), colour, lava.grid.w > 0.5), 1);
+}
+`;
+
+function finiteLavaVector(values: ArrayLike<number> | undefined, count: number): boolean {
+  if (values?.length !== count) return false;
+  for (let i = 0; i < count; i++) {
+    if (typeof values[i] !== 'number' || !Number.isFinite(values[i])) return false;
+  }
+  return true;
+}
+
+/**
+ * Draws the published EARTH-10 surface over terrain, on WebGPU or its WebGL2 compatibility layer.
+ * Advance or restore the physics world before drawing. The shader uses the accepted skin temperature
+ * for thermal emission and the accepted crust depth for diffuse shading. It leaves dry cells to the terrain.
+ */
+export class LavaSurface implements EnginePlugin {
+  readonly name: string;
+  private engine?: Engine;
+  private uniform?: GPUBuffer;
+  private storage?: GPUBuffer;
+  private bind?: GPUBindGroup;
+  private pipeline?: GPURenderPipeline;
+  private pipelineKey = '';
+  private data = new Float32Array(0);
+  private readonly values = new Float32Array(36);
+  private readonly cells = new Uint32Array(this.values.buffer, 20 * Float32Array.BYTES_PER_ELEMENT, 2);
+  private disposed = false;
+
+  constructor(readonly options: LavaSurfaceOptions) {
+    if (typeof options?.source !== 'function')
+      throw new MargoError('state', 'Give LavaSurface a callback that reads the accepted lava grid.');
+    if (
+      options.glow !== undefined &&
+      !(typeof options.glow === 'number' && options.glow >= 0 && Number.isFinite(Math.fround(options.glow)))
+    )
+      throw new MargoError('state', 'Give LavaSurface a finite nonnegative glow multiplier.');
+    const name = options.name ?? 'weather:lava-surface';
+    if (typeof name !== 'string' || !name.trim())
+      throw new MargoError('state', 'Give each LavaSurface a nonempty plugin name.');
+    this.name = name;
+  }
+
+  /** Attaches the surface to the rendering engine. */
+  static attach(engine: EngineKernel, options: LavaSurfaceOptions): LavaSurface {
+    const surface = new LavaSurface(options);
+    engineRuntime(engine).use(surface);
+    return surface;
+  }
+
+  setup(engine: Engine): void {
+    if (this.disposed) throw new MargoError('disposed', 'This LavaSurface was disposed. Attach a new lava surface.');
+    if (!engine.gpu)
+      throw new MargoError(
+        'unsupported',
+        'Attach LavaSurface to WebGPU or an engine using the WebGL2 compatibility layer.',
+      );
+    this.engine = engine;
+    this.uniform = engine.gpu.createBuffer({
+      size: this.values.byteLength,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+  }
+
+  registerPasses(graph: FrameGraph): void {
+    graph.add({
+      name: this.name + ':draw',
+      order: 1.5,
+      execute: (context) => {
+        if (context.backend === 'webgpu' && (context.view?.layers === undefined || context.view.layers & 1))
+          this.draw(context);
+      },
+    });
+  }
+
+  private pack(context: LavaPass, frame: LavaGridFrame): number {
+    const { memory, region, cells, spacing, origin, offset = [0, 0, 0] } = frame;
+    if (
+      !finiteLavaVector(cells, 2) ||
+      !(Number.isSafeInteger(cells[0]) && cells[0] > 0 && Number.isSafeInteger(cells[1]) && cells[1] > 0) ||
+      !finiteLavaVector(origin, 2) ||
+      !finiteLavaVector(offset, 3) ||
+      !(spacing > 0 && Number.isFinite(spacing))
+    )
+      throw new MargoError(
+        'state',
+        'Give LavaSurface positive grid dimensions and spacing, a finite origin and a finite cell translation.',
+      );
+    const [nx, nz] = cells;
+    const count = nx * nz;
+    const words = count * LAVA_GRID_WORDS;
+    const bytes = words * Float32Array.BYTES_PER_ELEMENT;
+    const limits = context.device.limits;
+    if (!Number.isSafeInteger(count) || bytes > Math.min(limits.maxBufferSize, limits.maxStorageBufferBindingSize))
+      throw new MargoError('state', 'The lava grid exceeds render device storage. Divide it into smaller patches.');
+    const f64 = Float64Array.BYTES_PER_ELEMENT;
+    if (
+      !(memory instanceof WebAssembly.Memory) ||
+      region?.type !== 'f64' ||
+      region.layout !== 1 ||
+      !Number.isSafeInteger(region.byteOffset) ||
+      region.byteOffset < 0 ||
+      region.byteOffset % f64 !== 0 ||
+      region.byteLength !== words * f64 ||
+      region.byteLength > memory.buffer.byteLength - region.byteOffset
+    )
+      throw new MargoError('state', 'Read LavaSurface from the live layout-1 f64 lava grid.');
+
+    const x = origin[0] + offset[0];
+    const z = origin[1] + offset[2];
+    const edgeX = x + nx * spacing;
+    const edgeZ = z + nz * spacing;
+    if (
+      ![x, z, edgeX, edgeZ, spacing].every((value) => Number.isFinite(Math.fround(value))) ||
+      Math.fround(x + spacing) === Math.fround(x) ||
+      Math.fround(z + spacing) === Math.fround(z) ||
+      Math.fround(edgeX - spacing) === Math.fround(edgeX) ||
+      Math.fround(edgeZ - spacing) === Math.fround(edgeZ)
+    )
+      throw new MargoError('state', 'The lava grid has no float32 cell resolution. Use a nearer rendering cell.');
+
+    const rows = new Float64Array(memory.buffer, region.byteOffset, words);
+    if (this.data.length !== words) this.data = new Float32Array(words);
+    const data = this.data;
+    const gain = (this.options.glow ?? 1) / SUN_LUMINANCE;
+    let flowing = false;
+    for (let at = 0; at < words; at += LAVA_GRID_WORDS) {
+      const depth = rows[at]!;
+      const skin = rows[at + 2]!;
+      const crust = rows[at + 3]!;
+      const elevation = rows[at + 6]! + offset[1];
+      if (
+        !(
+          depth >= 0 &&
+          Number.isFinite(depth) &&
+          skin > 0 &&
+          Number.isFinite(skin) &&
+          crust >= 0 &&
+          crust <= depth &&
+          Number.isFinite(Math.fround(elevation))
+        )
+      )
+        throw new MargoError(
+          'state',
+          'LavaSurface received invalid cells. Publish finite depths, skin temperatures, crust and elevations.',
+        );
+      data[at] = elevation;
+      data[at + 1] = depth > 0 ? 1 : 0;
+      if (depth === 0) continue;
+      data[at + 2] = crust / depth;
+      const glow = lavaGlow(skin);
+      for (let channel = 0; channel < 3; channel++) {
+        const radiance = glow[channel]! * gain;
+        if (!Number.isFinite(Math.fround(radiance)))
+          throw new MargoError(
+            'state',
+            'The lava skin radiance exceeds its render range. Reduce the glow or skin temperature.',
+          );
+        data[at + 4 + channel] = radiance;
+      }
+      flowing = true;
+    }
+    if (!flowing) return 0;
+    this.values.set([x, z, spacing, +linearHdr(context.format)], 16);
+    this.cells[0] = nx;
+    this.cells[1] = nz;
+    return count;
+  }
+
+  private draw(context: LavaPass): void {
+    const frame = this.options.source();
+    if (!frame || !this.engine || !this.uniform) return;
+    const count = this.pack(context, frame);
+    if (!count) return;
+    const device = context.device;
+    const depth = context.descriptor.depthStencil?.format;
+    if (!depth) throw new MargoError('unsupported', 'Give the lava surface a render target with a depth attachment.');
+
+    const bytes = this.data.byteLength;
+    if (!this.storage || this.storage.size !== bytes) {
+      this.storage?.destroy();
+      this.storage = device.createBuffer({ size: bytes, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+      this.bind = undefined;
+    }
+    const key = context.format + ':' + depth + ':' + context.descriptor.multisample?.count;
+    if (key !== this.pipelineKey) {
+      const module = device.createShaderModule({ code: GRID_SHADER });
+      this.pipeline = device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module, entryPoint: 'vertex' },
+        fragment: { module, entryPoint: 'fragment', targets: [{ format: context.format }] },
+        depthStencil: { format: depth, depthWriteEnabled: true, depthCompare: 'greater' },
+        multisample: context.descriptor.multisample,
+      });
+      this.pipelineKey = key;
+      this.bind = undefined;
+    }
+    this.bind ??= device.createBindGroup({
+      layout: this.pipeline!.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: this.uniform } },
+        { binding: 1, resource: { buffer: this.storage } },
+      ],
+    });
+
+    const light = this.engine.sceneOf(this)?.lighting ?? this.engine.lighting;
+    this.values.set(context.camera.matrix, 0);
+    this.values.set(light.direction, 24);
+    this.values.set(light.radiance, 28);
+    this.values.set(light.ambient, 32);
+    device.queue.writeBuffer(this.uniform, 0, this.values);
+    device.queue.writeBuffer(this.storage, 0, this.data);
+    const pass = context.encoder.beginRenderPass({
+      colorAttachments: [{ view: context.color, loadOp: 'load', storeOp: 'store' }],
+      depthStencilAttachment: {
+        view: context.depth,
+        depthLoadOp: 'load',
+        depthStoreOp: 'store',
+        ...(depth.includes('stencil') ? { stencilReadOnly: true } : {}),
+      },
+    });
+    applyView(pass, context);
+    pass.setPipeline(this.pipeline!);
+    pass.setBindGroup(0, this.bind);
+    pass.draw(6, count);
+    pass.end();
+  }
+
+  private release(): void {
+    this.uniform?.destroy();
+    this.storage?.destroy();
+    this.uniform = this.storage = this.pipeline = this.bind = undefined;
+    this.pipelineKey = '';
+  }
+
+  onDeviceRestored(engine: Engine): void {
+    this.release();
+    this.setup(engine);
+  }
+
+  /** Detaches the surface and releases its graphics buffers. The physics world remains owned by its caller. */
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
+    this.release();
+    this.engine = undefined;
+    this.data = new Float32Array(0);
+  }
+
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
   }
 }

@@ -15658,8 +15658,8 @@
         "gzip": 5574
       },
       "./lava": {
-        "raw": 14007,
-        "gzip": 5891
+        "raw": 17759,
+        "gzip": 7046
       },
       "./dfsph": {
         "raw": 19974,
@@ -18838,8 +18838,8 @@
         "gzip": 3360
       },
       "./lava": {
-        "raw": 30345,
-        "gzip": 11999
+        "raw": 38881,
+        "gzip": 15291
       },
       "./lava-settings": {
         "raw": 8873,
@@ -19187,14 +19187,14 @@
       "brotli": 3875
     },
     "packages/physics/dist/lava-kernel.wasm": {
-      "raw": 9735,
-      "gzip": 4127,
-      "brotli": 3822
+      "raw": 13839,
+      "gzip": 6049,
+      "brotli": 5486
     },
     "packages/physics/dist/lava-kernel-shared.wasm": {
-      "raw": 9735,
-      "gzip": 4127,
-      "brotli": 3804
+      "raw": 13839,
+      "gzip": 6049,
+      "brotli": 5489
     },
     "packages/physics/dist/snowpack-kernel.wasm": {
       "raw": 6455,

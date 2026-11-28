@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   LavaFlow,
+  LavaSurface,
   SUN_LUMINANCE,
   airDensity,
   binghamSpeed,
@@ -16,6 +17,17 @@ import {
   slabCore,
   validateLava,
 } from '../dist/lava.js';
+
+test('accepted lava surface gives coded source, appearance and plugin-name corrections', () => {
+  const source = () => undefined;
+  assert.throws(() => new LavaSurface({}), { code: 'state', message: /Give LavaSurface a callback/ });
+  for (const glow of [-1, Infinity, 1e100, '1'])
+    assert.throws(() => new LavaSurface({ source, glow }), { code: 'state', message: /finite nonnegative glow/ });
+  assert.throws(() => new LavaSurface({ source, name: '  ' }), { code: 'state', message: /nonempty plugin name/ });
+  const surface = new LavaSurface({ source, glow: 0 });
+  assert.equal(surface.name, 'weather:lava-surface');
+  surface.dispose();
+});
 
 const G = 9.80665;
 const slope = (grade) => (x, z) => 1000 - grade * z;

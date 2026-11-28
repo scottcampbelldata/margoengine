@@ -1,0 +1,125 @@
+{
+  "attribution": "Dietterich, H. R., Lev, E., Chen, J., Richardson, J. A., and Cashman, K. V. (2017), Benchmarking computational fluid dynamics models of lava flow simulation for hazard assessment, forecasting, and risk management. Journal of Applied Volcanology 6:9. Additional file 1, transcribed field names and column subsets.",
+  "source": "https://doi.org/10.1186/s13617-017-0061-x",
+  "supplement": "https://static-content.springer.com/esm/art%3A10.1186%2Fs13617-017-0061-x/MediaObjects/13617_2017_61_MOESM1_ESM.xlsx",
+  "supplementSha256": "7bbe52b2018374b629ffc9e91cfe9d379415a9b22cc6bfabda1fcd763dcdd82a",
+  "license": "https://creativecommons.org/licenses/by/4.0/",
+  "recordFields": [
+    "time_s",
+    "down_slope_cm",
+    "cross_slope_cm"
+  ],
+  "A": {
+    "inputRanges": ["BM-A&B parameters!B3:E3", "BM-A&B model setup!B3:C5", "BM-A&B model setup!B9"],
+    "observationRange": "BM-A XY!A3:C19",
+    "inputs": {
+      "slopeDegrees": 15,
+      "flowMlPerS": 1,
+      "viscosityPaS": 78.1,
+      "densityKgPerM3": 1443,
+      "sourceSideCm": 1,
+      "sourceCenterCm": [
+        25.5,
+        50.5
+      ],
+      "extentCm": [
+        101,
+        101
+      ],
+      "supplySeconds": 600
+    },
+    "measuredXY": [
+      [0, 0, 0],
+      [10, 3.916, 1.842],
+      [20, 5.92, 2.688],
+      [30, 7.592, 3.286],
+      [40, 9.173, 3.833],
+      [50, 10.663, 4.182],
+      [60, 12.041, 4.58],
+      [70, 13.439, 4.879],
+      [80, 14.781, 5.227],
+      [90, 16.031, 5.426],
+      [100, 17.317, 5.625],
+      [110, 18.549, 5.775],
+      [120, 19.744, 5.974],
+      [130, 20.939, 6.173],
+      [140, 22.134, 6.422],
+      [150, 23.255, 6.671],
+      [160, 24.469, 6.77]
+    ]
+  },
+  "D": {
+    "inputRanges": ["BM-D parameters!B2:B12", "BM-D model setup!B3:C5", "BM-D model setup!B9", "BM-D model setup!B17"],
+    "observationRange": "BM-D XY!A3:C47",
+    "inputs": {
+      "slopeDegrees": 13.25,
+      "flowMlPerS": 220,
+      "viscosityPaS": 59.2,
+      "densityKgPerM3": 2350,
+      "sourceSideCm": 6,
+      "sourceCenterCm": [
+        4,
+        50
+      ],
+      "extentCm": [
+        120,
+        100
+      ],
+      "supplySeconds": 60,
+      "inletCelsius": 1050,
+      "ambientCelsius": 25,
+      "heatCapacity": 1500,
+      "conductivity": 0.2,
+      "emissivity": 0.95,
+      "convection": 2,
+      "modelBasalConductance": 30
+    },
+    "measuredXY": [
+      [1, 4.042, 5.961],
+      [2.218, 6.539, 7.207],
+      [3.438, 9.117, 8.363],
+      [4.656, 12.008, 9.4355],
+      [5.873, 14.973, 10.591],
+      [7.09, 17.706, 11.6865],
+      [8.306, 20.36, 12.6865],
+      [9.523, 22.857, 13.627],
+      [10.741, 25.824, 14.4175],
+      [11.959, 28.086, 15.405],
+      [13.177, 30.431, 16.0035],
+      [14.394, 32.54, 17.0195],
+      [15.612, 34.88, 17.7095],
+      [16.829, 36.989, 18.562],
+      [18.046, 39.329, 19.342],
+      [19.264, 41.442, 20.1005],
+      [20.481, 44.095, 21.075],
+      [21.699, 47.06, 21.906],
+      [22.917, 50.106, 22.821],
+      [24.134, 53.229, 23.642],
+      [25.351, 56.196, 24.3135],
+      [26.569, 59.241, 25.121],
+      [27.787, 61.737, 25.759],
+      [29.005, 64.316, 26.129],
+      [30.223, 66.657, 26.5775],
+      [31.441, 68.843, 26.967],
+      [32.659, 70.872, 27.5275],
+      [33.876, 73.059, 27.83],
+      [35.093, 75.087, 28.155],
+      [36.311, 76.806, 28.397],
+      [37.529, 78.992, 28.615],
+      [38.746, 80.396, 28.822],
+      [39.963, 82.349, 28.9365],
+      [41.181, 83.831, 29.272],
+      [42.399, 85.396, 29.4185],
+      [43.617, 86.798, 29.525],
+      [44.837, 88.051, 29.5865],
+      [46.054, 89.533, 29.585],
+      [47.27, 90.781, 29.7685],
+      [48.487, 92.032, 29.9335],
+      [49.705, 92.968, 29.969],
+      [50.923, 94.138, 29.965],
+      [52.141, 95.308, 29.9335],
+      [53.36, 96.403, 29.9305],
+      [54.576, 97.497, 30.073]
+    ]
+  }
+}

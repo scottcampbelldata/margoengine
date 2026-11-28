@@ -16,6 +16,9 @@ unsafe impl core::alloc::GlobalAlloc for ArenaOnly {
 #[global_allocator]
 static NO_HEAP: ArenaOnly = ArenaOnly;
 
+const MAX_MICROSTEPS: usize = 4096;
+const BUDGET_WORDS: usize = 12;
+
 #[panic_handler]
 fn abort(_: &core::panic::PanicInfo<'_>) -> ! {
     unreachable()
@@ -28,7 +31,17 @@ fn sqrt(value: f64) -> f64 {
 fn length(x: f64, z: f64) -> f64 {
     let pair = f64x2(x, z);
     let square = f64x2_mul(pair, pair);
-    sqrt(f64x2_extract_lane::<0>(square) + f64x2_extract_lane::<1>(square))
+    let sum = f64x2_extract_lane::<0>(square) + f64x2_extract_lane::<1>(square);
+    if sum > 0.0 && sum.is_finite() {
+        return sqrt(sum);
+    }
+    let scale = x.abs().max(z.abs());
+    if scale == 0.0 {
+        return 0.0;
+    }
+    let scaled_x = x / scale;
+    let scaled_z = z / scale;
+    scale * sqrt(scaled_x * scaled_x + scaled_z * scaled_z)
 }
 
 #[derive(Clone, Copy)]
@@ -73,6 +86,10 @@ impl Model {
             * exp(self.yield_rise * (self.liquidus - temperature.max(self.solidus)).max(0.0))
     }
 
+    fn plastic_viscosity(&self, temperature: f64) -> f64 {
+        self.viscosity * exp(self.viscosity_rise * (self.liquidus - temperature).max(0.0))
+    }
+
     fn capacity(&self) -> f64 {
         self.cp + self.latent / (self.liquidus - self.solidus)
     }
@@ -104,19 +121,39 @@ impl Model {
     }
 
     fn surface(&self, temperature: f64, crust: f64, wet: bool) -> (f64, f64, f64) {
-        let conduction = self.conductivity / (self.skin + crust);
         let film = if wet { self.water_coefficient } else { 0.0 };
         let sigma = self.emissivity * 5.670374419e-8;
+        if sigma == 0.0 && self.convection == 0.0 && film == 0.0 {
+            return (temperature, 0.0, 0.0);
+        }
         let ar = self.air * self.air;
+        let surface_flux = |skin: f64| {
+            let square = skin * skin;
+            let radiation = if sigma > 0.0 {
+                sigma * (square * square - ar * ar)
+            } else {
+                0.0
+            };
+            let air = radiation + self.convection * (skin - self.air);
+            let water = film * (skin - self.water_temperature);
+            (air, water)
+        };
+        if self.conductivity == 0.0 {
+            // With no resolved conduction layer the mixed column exposes its bulk temperature.
+            let (air, water) = surface_flux(temperature);
+            return (temperature, air, water);
+        }
+        let conduction = self.conductivity / (self.skin + crust);
         let lower = temperature.min(self.air).min(self.water_temperature);
         let upper = temperature.max(self.air).max(self.water_temperature);
         let (mut low, mut high) = (lower, upper);
         for _ in 0..40 {
             let skin = 0.5 * (low + high);
-            let sq = skin * skin;
-            let transfer = sigma * (sq * sq - ar * ar)
-                + self.convection * (skin - self.air)
-                + film * (skin - self.water_temperature);
+            let (air, water) = surface_flux(skin);
+            let transfer = air + water;
+            if !transfer.is_finite() {
+                return (f64::NAN, f64::NAN, f64::NAN);
+            }
             if conduction * (temperature - skin) > transfer {
                 low = skin;
             } else {
@@ -124,9 +161,8 @@ impl Model {
             }
         }
         let skin = 0.5 * (low + high);
-        let square = skin * skin;
-        let air = sigma * (square * square - ar * ar) + self.convection * (skin - self.air);
-        (skin, air, film * (skin - self.water_temperature))
+        let (air, water) = surface_flux(skin);
+        (skin, air, water)
     }
 }
 
@@ -256,8 +292,7 @@ fn apply(cell: &mut Lava, flux: Flux, ratio: f64, axis: usize) {
 }
 
 fn resistance(q: f64, h: f64, temperature: f64, model: &Model, dt: f64) -> f64 {
-    let offset = (model.liquidus - temperature).max(0.0);
-    let viscosity = model.viscosity * exp(model.viscosity_rise * offset) / model.density;
+    let viscosity = model.plastic_viscosity(temperature) / model.density;
     let yield_accel = model.yield_strength(temperature) / (model.density * h);
     if yield_accel == 0.0 {
         return q / (1.0 + 3.0 * viscosity * dt / (h * h));
@@ -282,6 +317,51 @@ fn resistance(q: f64, h: f64, temperature: f64, model: &Model, dt: f64) -> f64 {
     (q - dt * h * (0.5 * (low + high))).max(0.0)
 }
 
+/// Wide Bingham sheet with a no-slip base and zero traction at the interface.
+/// The same integrated velocity law is used by the inertial drag, but here it
+/// is the mass flux at a face so it retains the large-viscosity limit.
+fn terminal_face(a: Lava, ba: f64, b: Lava, bb: f64, model: &Model) -> (f64, f64) {
+    let slope = ((ba - bb) + (a.depth - b.depth)) / model.spacing;
+    let acceleration = model.gravity * slope.abs();
+    if model.gravity == 0.0 {
+        return (0.0, 0.0);
+    }
+    let (donor, donor_bed, receiver, receiver_bed, direction) = if slope > 0.0 {
+        (a, ba, b, bb, 1.0)
+    } else {
+        (b, bb, a, ba, -1.0)
+    };
+    let (temperature, liquid) = model.phase(donor.depth, donor.heat);
+    let mobile = donor.depth * liquid;
+    let receiver_liquid = model.phase(receiver.depth, receiver.heat).1;
+    let receiver_floor = receiver_bed + receiver.depth * (1.0 - receiver_liquid);
+    let h = mobile.min(((donor_bed - receiver_floor) + donor.depth).max(0.0));
+    if h == 0.0 {
+        return (0.0, 0.0);
+    }
+    let mut viscosity = model.plastic_viscosity(temperature);
+    if slope == 0.0 {
+        // At equal head the mobility for a perturbation can come from either side.
+        let receiver_temperature = model.phase(receiver.depth, receiver.heat).0;
+        viscosity = viscosity.min(model.plastic_viscosity(receiver_temperature));
+    }
+    let mobility_per_height = (model.density / (3.0 * viscosity)) * h * h;
+    let mobility = mobility_per_height * h;
+    // Differentiate the Newtonian h³ mobility before evaluating shallow films.
+    // Dividing acceleration by a subnormal film would overflow before multiplying.
+    let stiffness = mobility_per_height * (3.0 * acceleration)
+        + mobility * (2.0 * model.gravity / model.spacing);
+    let shear = model.density * h * acceleration;
+    let yield_stress = model.yield_strength(temperature);
+    if shear <= yield_stress {
+        return (0.0, stiffness);
+    }
+    let plug = yield_stress / shear;
+    let yielded = 1.0 - plug;
+    let rate = mobility * acceleration * yielded * yielded * (1.0 + 0.5 * plug);
+    (direction * rate, stiffness)
+}
+
 #[repr(C)]
 struct Source {
     flux: f64,
@@ -298,6 +378,123 @@ struct Grid {
 impl Grid {
     fn count(&self) -> usize {
         self.width * self.rows
+    }
+
+    unsafe fn terminal_step_bound(
+        &self,
+        current: *const Lava,
+        bed: *const f64,
+        model: &Model,
+        remaining: f64,
+    ) -> f64 {
+        let mut step = remaining;
+        for z in 0..self.rows {
+            for x in 0..self.width {
+                let i = x + z * self.width;
+                let value = *current.add(i);
+                let mut outflow = 0.0;
+                let mut derivative = 0.0;
+                for neighbor in [
+                    (x > 0).then(|| i - 1),
+                    (x + 1 < self.width).then(|| i + 1),
+                    (z > 0).then(|| i - self.width),
+                    (z + 1 < self.rows).then(|| i + self.width),
+                ]
+                .into_iter()
+                .flatten()
+                {
+                    let (rate, sensitivity) = terminal_face(
+                        value,
+                        *bed.add(i),
+                        *current.add(neighbor),
+                        *bed.add(neighbor),
+                        model,
+                    );
+                    if !(rate.is_finite() && sensitivity.is_finite()) {
+                        return f64::NAN;
+                    }
+                    outflow += rate.max(0.0);
+                    derivative += sensitivity;
+                }
+                if outflow > 0.0 {
+                    step = step.min(0.4 * model.spacing * (value.depth / outflow));
+                }
+                if derivative > 0.0 {
+                    step = step.min(0.4 * model.spacing / derivative);
+                }
+            }
+        }
+        step
+    }
+
+    unsafe fn conduct_between(
+        current: *const Lava,
+        trial: *mut Lava,
+        i: usize,
+        k: usize,
+        model: &Model,
+        gain: f64,
+    ) {
+        let p = *current.add(i);
+        let q = *current.add(k);
+        if model.conductivity > 0.0 && p.depth > 0.0 && q.depth > 0.0 {
+            let ta = model.phase(p.depth, p.heat).0;
+            let tb = model.phase(q.depth, q.heat).0;
+            let exchange =
+                model.conductivity / model.density * p.depth.min(q.depth) * (ta - tb) * gain
+                    / model.spacing;
+            (*trial.add(i)).heat -= exchange;
+            (*trial.add(k)).heat += exchange;
+        }
+    }
+
+    unsafe fn update_terminal(
+        &self,
+        current: *const Lava,
+        trial: *mut Lava,
+        bed: *const f64,
+        model: &Model,
+        dt: f64,
+    ) {
+        trial.copy_from_nonoverlapping(current, self.count());
+        for i in 0..self.count() {
+            (*trial.add(i)).qx = 0.0;
+            (*trial.add(i)).qz = 0.0;
+        }
+        let gain = dt / model.spacing;
+        for z in 0..self.rows {
+            for x in 0..self.width {
+                let i = x + z * self.width;
+                for (axis, neighbor) in [
+                    (0, (x + 1 < self.width).then(|| i + 1)),
+                    (1, (z + 1 < self.rows).then(|| i + self.width)),
+                ] {
+                    let Some(k) = neighbor else { continue };
+                    let a = *current.add(i);
+                    let b = *current.add(k);
+                    let (rate, _) = terminal_face(a, *bed.add(i), b, *bed.add(k), model);
+                    if rate != 0.0 {
+                        let donor = if rate > 0.0 { a } else { b };
+                        let depth = rate * gain;
+                        let heat = depth * (donor.heat / donor.depth);
+                        let left = &mut *trial.add(i);
+                        let right = &mut *trial.add(k);
+                        left.depth -= depth;
+                        right.depth += depth;
+                        left.heat -= heat;
+                        right.heat += heat;
+                        if axis == 0 {
+                            left.qx += 0.5 * rate;
+                            right.qx += 0.5 * rate;
+                        } else {
+                            left.qz += 0.5 * rate;
+                            right.qz += 0.5 * rate;
+                        }
+                    }
+                    Self::conduct_between(current, trial, i, k, model, gain);
+                }
+            }
+        }
     }
 
     unsafe fn update(
@@ -328,23 +525,7 @@ impl Grid {
                     let (x, y) = face(a, b, model);
                     apply(&mut *trial.add(i), x, -gain, axis);
                     apply(&mut *trial.add(k), y, gain, axis);
-                    // Equal and opposite lateral conduction between filled columns.
-                    if model.conductivity > 0.0
-                        && (*current.add(i)).depth > 0.0
-                        && (*current.add(k)).depth > 0.0
-                    {
-                        let p = *current.add(i);
-                        let q = *current.add(k);
-                        let ta = model.phase(p.depth, p.heat).0;
-                        let tb = model.phase(q.depth, q.heat).0;
-                        let exchange = model.conductivity / model.density
-                            * p.depth.min(q.depth)
-                            * (ta - tb)
-                            * gain
-                            / model.spacing;
-                        (*trial.add(i)).heat -= exchange;
-                        (*trial.add(k)).heat += exchange;
-                    }
+                    Self::conduct_between(current, trial, i, k, model, gain);
                     a = b;
                 }
                 let last = i + (width - 1) * stride;
@@ -356,7 +537,7 @@ impl Grid {
 }
 
 fn cooling(cell: Lava, bed: f64, model: &Model, dt: f64) -> (f64, f64) {
-    if cell.depth == 0.0 || model.conductivity == 0.0 {
+    if cell.depth == 0.0 {
         return (0.0, 0.0);
     }
     let (temperature, fraction) = model.phase(cell.depth, cell.heat);
@@ -365,17 +546,25 @@ fn cooling(cell: Lava, bed: f64, model: &Model, dt: f64) -> (f64, f64) {
     let (_, air, water) = model.surface(temperature, crust, wet);
     let ground = model.conductivity / (model.skin + crust) * (temperature - model.ground);
     let conversion = dt / model.density;
-    let target = model.enthalpy(model.air.min(model.ground).min(if wet {
-        model.water_temperature
-    } else {
-        model.air
-    }));
-    let upper = model.enthalpy(model.air.max(model.ground).max(if wet {
-        model.water_temperature
-    } else {
-        model.air
-    }));
+    let mut low = temperature;
+    let mut high = temperature;
+    for reservoir in [
+        (model.emissivity > 0.0 || model.convection > 0.0).then_some(model.air),
+        (model.conductivity > 0.0).then_some(model.ground),
+        (wet && model.water_coefficient > 0.0).then_some(model.water_temperature),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        low = low.min(reservoir);
+        high = high.max(reservoir);
+    }
+    let target = model.enthalpy(low);
+    let upper = model.enthalpy(high);
     let raw = (air + water + ground) * conversion;
+    if !raw.is_finite() || !target.is_finite() || !upper.is_finite() {
+        return (f64::NAN, f64::NAN);
+    }
     let budget = raw
         .max((cell.heat - cell.depth * upper).min(0.0))
         .min((cell.heat - cell.depth * target).max(0.0));
@@ -400,11 +589,20 @@ unsafe extern "C" fn lava_step(
     budget: *mut f64,
     dt: f64,
     start: f64,
+    terminal: u32,
 ) -> i32 {
     let model = &*model;
     let grid = Grid { width, rows };
     let area = model.spacing * model.spacing;
     let heat_scale = model.density * area;
+    if !(dt > 0.0
+        && dt.is_finite()
+        && start.is_finite()
+        && heat_scale > 0.0
+        && heat_scale.is_finite())
+    {
+        return 1;
+    }
     // The caller maps absorbed ICE-05 power once per published interval to the owning cell.
     for i in 0..grid.count() {
         let volume = &mut *current.add(i);
@@ -425,27 +623,43 @@ unsafe extern "C" fn lava_step(
         *budget.add(3) += draw * heat_scale;
     }
     let mut t = 0.0;
+    let mut steps = 0;
     while t < dt {
-        let mut sub = dt - t;
-        let mut speed: f64 = 0.0;
-        for i in 0..grid.count() {
-            let state = *current.add(i);
-            let mobile = state.depth * model.phase(state.depth, state.heat).1;
-            let vent = &*source.add(i);
-            let extra = if start + t < vent.end && start + dt > vent.start {
-                vent.flux * sub
-            } else {
-                0.0
-            };
-            let spread = if mobile > 0.0 {
-                length(state.qx, state.qz) / mobile
-            } else {
-                0.0
-            };
-            speed = speed.max(spread + sqrt(model.gravity * (mobile + extra)));
+        if steps == MAX_MICROSTEPS {
+            return 3;
         }
-        if speed > 0.0 {
-            sub = sub.min(0.4 * model.spacing / speed);
+        steps += 1;
+        let mut sub = dt - t;
+        if terminal != 0 {
+            sub = grid.terminal_step_bound(current, bed, model, sub);
+        } else {
+            let mut speed: f64 = 0.0;
+            for i in 0..grid.count() {
+                let state = *current.add(i);
+                let mobile = state.depth * model.phase(state.depth, state.heat).1;
+                let vent = &*source.add(i);
+                let extra = if start + t < vent.end && start + dt > vent.start {
+                    vent.flux * sub
+                } else {
+                    0.0
+                };
+                let spread = if mobile > 0.0 {
+                    length(state.qx, state.qz) / mobile
+                } else {
+                    0.0
+                };
+                let local = spread + sqrt(model.gravity * (mobile + extra));
+                if !local.is_finite() {
+                    return 1;
+                }
+                speed = speed.max(local);
+            }
+            if speed > 0.0 {
+                sub = sub.min(0.4 * model.spacing / speed);
+            }
+        }
+        if !sub.is_finite() {
+            return 1;
         }
         if model.conductivity > 0.0 {
             sub = sub.min(0.2 * area * model.density * model.cp / model.conductivity);
@@ -453,7 +667,11 @@ unsafe extern "C" fn lava_step(
         if !sub.is_finite() || t + sub <= t {
             return 1;
         }
-        grid.update(current, trial, bed, model, sub);
+        if terminal != 0 {
+            grid.update_terminal(current, trial, bed, model, sub);
+        } else {
+            grid.update(current, trial, bed, model, sub);
+        }
         for i in 0..grid.count() {
             let state = &mut *trial.add(i);
             let vent = &*source.add(i);
@@ -473,14 +691,29 @@ unsafe extern "C" fn lava_step(
             }
             let old = model.phase(state.depth, state.heat).1;
             let (loss, water) = cooling(*state, *bed.add(i), model, sub);
+            if !(loss.is_finite() && water.is_finite()) {
+                return 1;
+            }
             state.heat -= loss;
             *budget.add(2) += loss * heat_scale;
             *budget.add(4) += water * heat_scale;
             let (temperature, liquid) = model.phase(state.depth, state.heat);
+            if !(state.heat.is_finite()
+                && state.heat >= 0.0
+                && temperature.is_finite()
+                && liquid.is_finite())
+            {
+                return 1;
+            }
             let q = length(state.qx, state.qz);
             let h = state.depth * liquid;
             let scale = if h > 0.0 && q > 0.0 && old > 0.0 {
-                resistance(q, h, temperature, model, sub) / q * (liquid / old).min(1.0)
+                let solidification = (liquid / old).min(1.0);
+                if terminal != 0 {
+                    solidification
+                } else {
+                    resistance(q, h, temperature, model, sub) / q * solidification
+                }
             } else {
                 0.0
             };
@@ -511,7 +744,7 @@ unsafe extern "C" fn lava_publish(
     z0: f64,
     budget: *mut f64,
     initial: i32,
-) {
+) -> i32 {
     let model = &*model;
     let area = model.spacing * model.spacing;
     let mut stored_volume = 0.0;
@@ -530,35 +763,58 @@ unsafe extern "C" fn lava_publish(
             } else {
                 model.air
             };
-            let row = out.add(8 * k);
-            *row = q.depth;
-            *row.add(1) = temperature;
-            *row.add(2) = surface;
-            *row.add(3) = crust;
-            *row.add(4) = q.qx;
-            *row.add(5) = q.qz;
-            *row.add(6) = z + q.depth;
-            *row.add(7) = q.heat * model.density;
-            *deposits.add(k) = z + crust;
-            stored_volume += q.depth * area;
-            stored_energy += q.heat * model.density * area;
+            let energy = q.heat * model.density;
+            let sample = [
+                q.depth,
+                temperature,
+                surface,
+                crust,
+                q.qx,
+                q.qz,
+                z + q.depth,
+                energy,
+            ];
+            let deposit = z + crust;
             let submerged = q.depth.min((model.water_level - z).max(0.0));
             let delta = if initial == 0 {
                 (submerged - *previous.add(k)) * area
             } else {
                 0.0
             };
+            let source = [
+                x0 + (i as f64 + 0.5) * model.spacing,
+                z0 + (j as f64 + 0.5) * model.spacing,
+                1.5 * model.spacing,
+                0.0,
+                delta,
+            ];
+            if q.depth < 0.0
+                || !deposit.is_finite()
+                || !submerged.is_finite()
+                || !sample
+                    .iter()
+                    .chain(source.iter())
+                    .all(|word| word.is_finite())
+            {
+                return 1;
+            }
+            out.add(8 * k)
+                .copy_from_nonoverlapping(sample.as_ptr(), sample.len());
+            *deposits.add(k) = deposit;
             *previous.add(k) = submerged;
-            let source = sources.add(5 * k);
-            *source = x0 + (i as f64 + 0.5) * model.spacing;
-            *source.add(1) = z0 + (j as f64 + 0.5) * model.spacing;
-            *source.add(2) = 1.5 * model.spacing;
-            *source.add(3) = 0.0;
-            *source.add(4) = delta;
+            sources
+                .add(5 * k)
+                .copy_from_nonoverlapping(source.as_ptr(), source.len());
+            stored_volume += q.depth * area;
+            stored_energy += energy * area;
             displaced += delta;
         }
     }
     *budget.add(5) += displaced;
     *budget.add(6) = stored_volume;
     *budget.add(7) = stored_energy;
+    if (0..BUDGET_WORDS).any(|word| !(*budget.add(word)).is_finite()) {
+        return 1;
+    }
+    0
 }

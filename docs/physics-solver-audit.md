@@ -97,6 +97,27 @@ them; the rest is a record of what a stronger solver would need.
   Reproduce with `node packages/physics/scripts/atmo07-return-optical.mjs`.
   [Quick and Krider (2017), Figures 5, 6 and 8](https://doi.org/10.1002/2017JD027363)
 
+### EARTH-10 four-point pass
+
+- Point 5. `lava-extremes.test.js` checks coded corrections for malformed grids, unrepresentable input and ICE receipts,
+  rejects an overflowing aggregate and an unresolved time step without publishing any candidate state, and samples
+  TerrainBed in the live world cell. `lava-terminal.test.js` checks yielded and Newtonian discharge, nonnegative wet/dry
+  columns, enthalpy and volume conservation and exact replay. `lava.test.js` checks radiation and convection with
+  conductivity set to zero.
+- Point 7. Weather's `lava-surface.browser.mjs` draws the accepted dry grid, timed vent, moving front and cooled crust at
+  one camera on WebGPU and WebGL2. It verifies exact seek, no emission from cooled crust, detachment, and the same accepted
+  solver bytes on both paths. The source supports an explicit render cell.
+- Point 8. The package READMEs and `docs/limits.md` record the inertial and terminal tiers, timestep bound, fixed
+  substrate, lumped column enthalpy, static sea level and the remaining crust, tube, crystal and water feedback gaps.
+- Point 2 remains open. The Dietterich et al. benchmark gives viscosity and source flux separately from the held-out
+  front length and width. In BMA the terminal tier lowers the downslope normalised RMS error from 380.34% to 20.93%
+  at 10 mm, but still misses seven of sixteen grid and contour bounds. The transverse error is 36.77%, with three
+  missed bounds. At 5 mm the first two downslope samples and transverse widths pass the stated allowances. In BMD the
+  first second still overpredicts downslope advance by 42.86 mm against a 20.55 mm allowance. Its 12 s prefix misses all
+  ten downslope bounds and has 38.99% normalised RMS error. The full BMD run reached the hard timeout. Reproduce with
+  `node packages/physics/scripts/earth10-lava-measured.mjs A terminal` and the same command with `D terminal 12`.
+  Analytic and conservation cases cover the equations implemented here. [Dietterich et al. (2017), workbook and experiment](https://doi.org/10.1186/s13617-017-0061-x)
+
 ## Film set first: the underwater and boat films
 
 The solvers behind the Edmund Fitzgerald, First Wake, Below the Swell and Below the Blue Line films (problem rows EF,

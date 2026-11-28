@@ -40,6 +40,7 @@ export interface LavaLoadOptions {
 export interface LavaOptions {
     readonly cells: Pair;
     readonly spacing: number;
+    readonly transport?: 'inertial' | 'terminal';
     readonly origin?: Pair;
     readonly originCell?: Cell;
     readonly originCellSize?: number;
@@ -98,8 +99,18 @@ export class LavaSolver implements Solver<LavaOptions> {
     exportPorts(tick: number): readonly Port[];
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
+    surfaceSource(renderCell?: Cell): LavaSurfaceFrame;
     sample(x: number, z: number): LavaSample;
     get budget(): LavaBudget;
+}
+
+export interface LavaSurfaceFrame {
+    readonly memory: WebAssembly.Memory;
+    readonly region: Readonly<Pick<Region, 'byteOffset' | 'byteLength' | 'type' | 'layout'>>;
+    readonly cells: Pair;
+    readonly spacing: number;
+    readonly origin: Pair;
+    readonly offset: readonly [number, number, number];
 }
 
 export interface LavaVent {

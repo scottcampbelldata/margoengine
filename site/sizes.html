@@ -111,8 +111,8 @@
 <tr><th scope="row"><code>terramechanics-kernel-shared.wasm</code></th><td>Rust SIMD soil footprint and conservative redistribution, shared world memory</td><td class="num">40,423</td><td class="num">16,491</td><td class="num">14,345</td><td>Terramechanics.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>granular-flow-kernel.wasm</code></th><td>Rust SIMD depth-averaged conservative granular flow</td><td class="num">9,620</td><td class="num">4,255</td><td class="num">3,875</td><td>GranularFlowSolver.load() from the optional /granular-flow entry</td></tr>
 <tr><th scope="row"><code>granular-flow-kernel-shared.wasm</code></th><td>Rust SIMD depth-averaged conservative granular flow, shared world memory</td><td class="num">9,620</td><td class="num">4,255</td><td class="num">3,875</td><td>GranularFlowSolver.load() with shared world memory support</td></tr>
-<tr><th scope="row"><code>lava-kernel.wasm</code></th><td>Rust SIMD thermo-viscoplastic lava advance and cooling</td><td class="num">9,735</td><td class="num">4,127</td><td class="num">3,822</td><td>LavaSolver.load() from the optional /lava entry</td></tr>
-<tr><th scope="row"><code>lava-kernel-shared.wasm</code></th><td>Rust SIMD thermo-viscoplastic lava advance and cooling, shared world memory</td><td class="num">9,735</td><td class="num">4,127</td><td class="num">3,804</td><td>LavaSolver.load() with shared world memory support</td></tr>
+<tr><th scope="row"><code>lava-kernel.wasm</code></th><td>Rust SIMD thermo-viscoplastic lava advance and cooling</td><td class="num">13,839</td><td class="num">6,049</td><td class="num">5,486</td><td>LavaSolver.load() from the optional /lava entry</td></tr>
+<tr><th scope="row"><code>lava-kernel-shared.wasm</code></th><td>Rust SIMD thermo-viscoplastic lava advance and cooling, shared world memory</td><td class="num">13,839</td><td class="num">6,049</td><td class="num">5,489</td><td>LavaSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>snowpack-kernel.wasm</code></th><td>Rust SIMD layered snowpack</td><td class="num">6,455</td><td class="num">2,811</td><td class="num">2,595</td><td>Snowpack.load() from the optional /snowpack entry</td></tr>
 <tr><th scope="row"><code>snowpack-kernel-shared.wasm</code></th><td>Rust SIMD layered snowpack, shared world memory</td><td class="num">6,455</td><td class="num">2,811</td><td class="num">2,611</td><td>Snowpack.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>glacier-kernel.wasm</code></th><td>Rust SIMD shallow-ice flow and fracture</td><td class="num">15,437</td><td class="num">6,189</td><td class="num">5,527</td><td>GlacierSolver.load() from the optional /glacier entry</td></tr>
@@ -3978,7 +3978,7 @@
 <tr><td><code>./boundary-layer</code></td><td class="num">4,951</td><td class="num">2,410</td></tr>
 <tr><td><code>./precipitation</code></td><td class="num">10,030</td><td class="num">3,852</td></tr>
 <tr><td><code>./surface-energy</code></td><td class="num">7,509</td><td class="num">3,360</td></tr>
-<tr><td><code>./lava</code></td><td class="num">30,345</td><td class="num">11,999</td></tr>
+<tr><td><code>./lava</code></td><td class="num">38,881</td><td class="num">15,291</td></tr>
 <tr><td><code>./lava-settings</code></td><td class="num">8,873</td><td class="num">3,790</td></tr>
 <tr><td><code>./regions</code></td><td class="num">6,982</td><td class="num">2,636</td></tr>
 <tr><td><code>./drive</code></td><td class="num">29,711</td><td class="num">9,463</td></tr>
@@ -4966,7 +4966,7 @@
 <tr><td><code>./underwater</code></td><td class="num">8,709</td><td class="num">3,965</td></tr>
 <tr><td><code>./orbit</code></td><td class="num">8,213</td><td class="num">3,624</td></tr>
 <tr><td><code>./granular-flow</code></td><td class="num">14,611</td><td class="num">5,574</td></tr>
-<tr><td><code>./lava</code></td><td class="num">14,007</td><td class="num">5,891</td></tr>
+<tr><td><code>./lava</code></td><td class="num">17,759</td><td class="num">7,046</td></tr>
 <tr><td><code>./dfsph</code></td><td class="num">19,974</td><td class="num">7,880</td></tr>
 <tr><td><code>./pbf</code></td><td class="num">13,032</td><td class="num">5,577</td></tr>
 <tr><td><code>./breakable</code></td><td class="num">58,334</td><td class="num">19,414</td></tr>
