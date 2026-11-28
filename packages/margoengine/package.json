@@ -2631,6 +2631,10 @@
       "types": "./dist/machinery/kinematics.d.ts",
       "import": "./dist/machinery/kinematics.js"
     },
+    "./machinery/mechanisms": {
+      "types": "./dist/machinery/mechanisms.d.ts",
+      "import": "./dist/machinery/mechanisms.js"
+    },
     "./machinery/surface": {
       "types": "./dist/machinery/surface.d.ts",
       "import": "./dist/machinery/surface.js"

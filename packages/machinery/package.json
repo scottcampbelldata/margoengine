@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/machinery",
   "version": "1.0.0",
-  "description": "Kinematics, sections, metrology, clearance, assemblies, exploded views, feature edges, dimensions, spatial queries, surface transport and telemetry for Margo Engine.",
+  "description": "Kinematics, closed-form mechanism poses, sections, metrology, clearance, assemblies, exploded views, feature edges, dimensions, spatial queries, surface transport and telemetry for Margo Engine.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -41,6 +41,10 @@
     "./kinematics": {
       "types": "./dist/kinematics.d.ts",
       "import": "./dist/kinematics.js"
+    },
+    "./mechanisms": {
+      "types": "./dist/mechanisms.d.ts",
+      "import": "./dist/mechanisms.js"
     },
     "./surface": {
       "types": "./dist/surface.d.ts",

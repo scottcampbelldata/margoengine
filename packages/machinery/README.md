@@ -38,6 +38,7 @@ Import individual systems from these subpaths to keep unrelated code out of dire
 | Subpath | Public system |
 | --- | --- |
 | `/kinematics` | `Kinematics` joints, couplings and constraints |
+| `/mechanisms` | Closed-form poses: Geneva, Scotch yoke, Oldham, Sarrus, toggle, Reuleaux, rose engine, Archimedes screw, gimbal, epicyclic, differential, harmonic drive, integrator, Watt governor, stroboscope |
 | `/surface` | `SurfacePhysics` transport |
 | `/telemetry` | `TelemetryChannel` binary playback |
 | `/section` | `SectionPlanes`, `boxSection` |
@@ -153,6 +154,57 @@ Three more entries draw on top of the scene:
 `packages/machinery/test/*-check.mjs` (`npm run test:gpu` in this package) check edges, dimensions and caps on open shells on a real adapter.
 
 This ESM package includes TypeScript declarations and requires `@margoengine/core` 1.0.0. See the API and supported geometry guide.
+
+### Mechanism poses
+
+`margoengine/machinery/mechanisms` holds the exact pose of fifteen classic mechanisms as pure functions: angles in radians, lengths in metres, plain numbers and arrays back. Each is the closed-form solution of the mechanism's loop-closure equations, so it is what a physics-joint model of the same mechanism tracks (see `tests/machinery-mechanisms-physics.test.js`, where a hinge motor, sliders, a pin in a slot and a gear joint of `@margoengine/physics` follow `genevaPose`, `scotchYokePose`, `oldhamPose` and `epicyclicSpeeds`) and the number a readout shows. No engine is needed.
+
+```ts
+import {
+  genevaPose, scotchYokePose, oldhamPose, epicyclicSpeeds, harmonicDriveRatio,
+  wattGovernorEquilibrium, stroboscopicRate, ballDiskIntegrator,
+} from 'margoengine/machinery/mechanisms';
+
+// A four-slot Geneva wheel 0.32 m from its crank: dwells, then indexes a quarter turn each crank turn.
+const geneva = genevaPose(0.3, { slots: 4, centerDistance: 0.32 });
+console.log(geneva.wheel, geneva.indexing, geneva.velocityRatio);
+
+console.log(scotchYokePose(1, 0.14).slide); // 0.14 cos(1), simple harmonic motion
+console.log(oldhamPose(1, 0.1).output); // 1: the Oldham coupling has constant velocity
+
+// Willis: sun 21, planet 18, ring 57 with the ring held; the carrier turns 21/78 of the sun.
+console.log(epicyclicSpeeds({ sun: 21, planet: 18, ring: 57 }, { sun: 1, ring: 0 }).carrier);
+console.log(harmonicDriveRatio({ flexTeeth: 60, circularTeeth: 62 })); // -1/30
+
+// Maxwell 1868: the balls of a governor at 90 rpm sit where w^2 L cos(a) = g.
+const governor = wattGovernorEquilibrium((90 * 2 * Math.PI) / 60, { arm: 0.29, pickoff: 0.2, link: 0.23 });
+console.log(governor.angle, governor.sleeve);
+
+console.log(stroboscopicRate(120, 14, 6)); // -20 rpm: a six-spoke rotor seems to turn backwards
+const integrator = ballDiskIntegrator({ wheelRadius: 0.046, diskRadius: 0.24 });
+integrator.advance(1, 0, 0.2); // one disk turn while the ball moves out to 0.2 m
+console.log(integrator.outputTurns); // 0.1 / 0.046
+```
+
+| Function | Mechanism and source |
+| --- | --- |
+| `genevaPose`, `genevaCrankRadius` | External Geneva drive, tangential pin entry (Bickford 1972; Uicker, Pennock and Shigley 2017) |
+| `scotchYokePose` | Scotch yoke, exact simple harmonic motion |
+| `oldhamPose` | Oldham coupling, disc centre on a circle of half the offset (Reuleaux 1876) |
+| `sarrusPose` | Sarrus straight-line linkage (Reuleaux 1876) |
+| `togglePressPose` | Symmetric toggle and its mechanical advantage `h / 2x` |
+| `reuleauxPose`, `reuleauxOutline` | Reuleaux triangle turning in a square, touching all four sides (Reuleaux 1876) |
+| `roseEnginePose`, `rosetteModulation` | Rose engine: rosette, rubber and fixed tool |
+| `archimedesScrew`, `archimedesScrewPose` | Inclined Archimedes screw buckets and flow (Rorres 2000) |
+| `gimbalAngles`, `gimbalAxis`, `gimbalPose` | Two-ring gimbal and gimbal lock |
+| `epicyclicSpeeds`, `epicyclicAssembles` | Simple planetary train by Willis's relation (Willis 1841) |
+| `differentialSpeeds`, `differentialPose` | Open bevel-gear differential |
+| `harmonicDriveRatio`, `waveGeneratorRadius`, `flexsplinePoint` | Strain wave gearing (Musser 1959) |
+| `ballDiskIntegrator` | Disk-ball-roller integrator (Thomson 1876) |
+| `wattGovernorEquilibrium` | Conical-pendulum governor (Maxwell 1868) |
+| `stroboscopicRate`, `stroboscopicPose` | Apparent speed under a strobe (Shannon 1949; Edgerton 1932) |
+
+Every input is checked: a bad count or length throws a `RangeError` naming it. `flexsplinePoint` is a drawing aid (where a flexspline point sits as its teeth hand over between the two pitches), not an elastic solution of the flexspline.
 
 ### Attaching from a second scene
 
