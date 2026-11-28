@@ -19139,3 +19139,29 @@ raising the generation): the bulk-synchronous model (L. G. Valiant, "A bridging 
 1990). No item of a pass writes what another item of it reads (a colour's edges share no particle: the graph colouring the
 GPU route already uses), so the result does not depend on the thread count. The worker pattern is the explosive kernel's
 (`src/explosive/thread.ts`).
+
+## Crossing triangles after rounding an exact boolean (2026-11-27, KB-BOOL-F32CROSS1)
+
+Read as published descriptions only (search results, abstracts and library manual pages); no source code or companion
+repository was opened, CGAL's included. The publisher refused the Valque and Lazard page, so only its abstract-level
+summary was read.
+
+- J. D. Hobby, "Practical segment intersection with finite precision output", Computational Geometry 13(4), 1999:
+  snap rounding in the plane.
+- D. Halperin, E. Packer, "Iterated snap rounding", Computational Geometry 23(2), 2002,
+  https://doi.org/10.1016/S0925-7721(01)00064-5: repeat until features are apart.
+- O. Devillers, S. Lazard, W. J. Lenhart, "Rounding meshes in 3D", Discrete and Computational Geometry 64, 2020,
+  https://doi.org/10.1007/s00454-020-00202-2: a 3D rounding with no new intersections, at a worst case far above the
+  input size; not implemented.
+- L. Valque, S. Lazard, "Resolving self-intersections in 3D meshes while preserving floating-point coordinates",
+  Computer Graphics Forum 44(5), 2025, https://doi.org/10.1111/cgf70192: round, find new crossings, repeat.
+- J. R. Shewchuk, "Adaptive precision floating-point arithmetic and fast robust geometric predicates", Discrete and
+  Computational Geometry 18, 1997, https://doi.org/10.1007/PL00009321: filtered exact orientation tests.
+- P. Guigue, O. Devillers, "Fast and robust triangle-triangle overlap test using orientation predicates", Journal of
+  Graphics Tools 8(1), 2003, https://doi.org/10.1080/10867651.2003.10487580.
+- M. Botsch, L. Kobbelt, 2001 (above): splitting a cap's neighbor, now also the repair's step after 64 rounds.
+
+Design: pairs come from a sweep along one axis and are decided with a float64 filter and BigInt. For each crossing
+pair, local edits that keep the mesh closed: join corners within a reach, put a corner into a nearby edge or face,
+split two nearby edges at one point; then the thin-triangle pass, then test again. The reach doubles from 2^-23 to 2^-16
+of the coordinates and the state with the fewest pairs is returned. It is not proven to reach zero.

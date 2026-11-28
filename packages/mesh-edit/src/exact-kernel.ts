@@ -18,6 +18,8 @@ import { type Flattened, withoutFlatTriangles } from './flat-triangles.js';
 import { indexOfLeast } from './least.js';
 import { assertPolygonMesh, dominantAxis, faceGeometryError, newellNormal } from './polygon.js';
 import { convexLoopPieces } from './polygon-split.js';
+import { crossingTriangles } from './self-intersections.js';
+import { withoutCrossings } from './boolean-separate.js';
 import { withoutCutPoints } from './boolean-simplify.js';
 import type { PolygonMesh } from './types.js';
 import type { MeshBatchBooleanResult, MeshBatchFaceSource } from './boolean-batch.js';
@@ -51,6 +53,13 @@ function assertPrecision({ precision }: ExactBooleanOptions): void {
 export interface ExactBooleanResult extends MeshBooleanResult {
   /** Faces of the exact result too thin to exist in the chosen precision, folded away after rounding. */
   collapsedFaces: number;
+  /**
+   * With `precision: 'float32'` only: pairs of the result's triangles that still meet anywhere but in the corners they
+   * share. Rounding can push faces closer than a float step through each other; those places are joined or split,
+   * moving the surface by at most 2^-16 of the coordinates there. This is normally 0; it can stay above 0 where a
+   * part thinner than a float step leaves two sheets in one plane.
+   */
+  selfIntersections?: number;
 }
 
 /** Plane a x + b y + c z + d = 0 in the shared integer scale, with a float copy for the filter. */
@@ -664,7 +673,10 @@ function validityEpsilon(points: readonly MutableVec3[]): number {
   return Math.max(1e-9, (size * Number.EPSILON * 8) / extent);
 }
 
-/** Rounds of folding before a face that still will not fold just merges its shortest edge. */
+/**
+ * Rounds of folding before the faces left are split as triangles, and as many again before one that still will not go
+ * merges its shortest edge whatever its length.
+ */
 const FOLD_ROUNDS = 64;
 
 /** Triangles covering a loop too warped to be one face: each step cuts the fattest ear, so thin ones come last. */
@@ -750,6 +762,14 @@ function repairLoops(
       if (loop.vertices.length > 64 || faceGeometryError(vertices, loop.vertices)) bad.push(i);
     });
     if (!bad.length) return { loops, collapsed };
+    // Two thin faces can hand a corner back and forth, each fold making the other's. Splitting the neighbor of a cap
+    // where its middle corner lies ends that, and moves the surface by the cap's height only.
+    if (round === FOLD_ROUNDS) {
+      const flattened = withoutThin(loops, vertices, 0, tick);
+      loops = flattened.loops;
+      collapsed += flattened.collapsed;
+      continue;
+    }
     const owner = new Map<string, number>(),
       touched = new Set<number>(),
       next: (BooleanLoop | null)[] = [...loops],
@@ -769,7 +789,7 @@ function repairLoops(
         { length, along, height } = chordOf(corners),
         sides = corners.map((p, c) => distance(p, corners[(c + 1) % n])),
         shortest = indexOfLeast(sides);
-      if (sides[shortest] <= snap * length || round >= FOLD_ROUNDS) {
+      if (sides[shortest] <= snap * length || round >= 2 * FOLD_ROUNDS) {
         const x = find(vs[shortest]),
           y = find(vs[(shortest + 1) % n]);
         parent[Math.max(x, y)] = Math.min(x, y);
@@ -836,23 +856,89 @@ function repairLoops(
   }
 }
 
-/**
- * For float32 output: the loops as triangles, fattest ears first, then without any triangle thinner than
- * {@link FLOAT32_GRAIN}, as {@link withoutFlatTriangles} takes out flat ones.
- */
-function forFloat32(
+/** The loops as triangles, fattest ears first. */
+function triangulated(
   loops: readonly BooleanLoop[],
-  vertices: MutableVec3[],
-  tick: () => void,
-): { loops: BooleanLoop[]; collapsed: number } {
+  vertices: readonly MutableVec3[],
+  tick: () => void = () => {},
+): BooleanLoop[] {
   const triangles: BooleanLoop[] = [];
   for (const loop of loops) {
     tick();
     for (const ear of loop.vertices.length > 3 ? fattestEars(loop.vertices.map((v) => vertices[v])) : [[0, 1, 2]])
       triangles.push({ ...loop, vertices: ear.map((c) => loop.vertices[c]), uv: ear.map((c) => loop.uv[c]) });
   }
-  const faces = triangles.map(({ vertices: corners, uv }, i) => ({ id: String(i), vertices: corners, uv })),
-    { mesh, origin, removed = 0 } = withoutFlatTriangles({ vertices, faces }, FLOAT32_GRAIN);
+  return triangles;
+}
+
+/** The pieces of each source face merged back where their union is a valid face; a face in `apart` stays in pieces. */
+function mergeFaces(
+  loops: readonly BooleanLoop[],
+  vertices: MutableVec3[],
+  tick: () => void,
+  apart: ReadonlySet<string> = new Set(),
+): BooleanLoop[] {
+  const groups = new Map<string, BooleanLoop[]>();
+  for (const loop of loops) {
+    const k = `${loop.input}|${loop.face}`,
+      list = groups.get(k);
+    if (list) list.push(loop);
+    else groups.set(k, [loop]);
+  }
+  return [...groups].flatMap(([k, group]) => (apart.has(k) ? group : mergeGroup(group, vertices, tick)));
+}
+
+/**
+ * {@link mergeFaces} that adds no crossing: a face of more than three corners need not lie in one plane after rounding,
+ * so where the triangles it renders as cross more than the `before` pairs did, that source face stays in triangles.
+ */
+function mergeWithoutCrossings(
+  loops: readonly BooleanLoop[],
+  vertices: MutableVec3[],
+  before: number,
+  tick: () => void,
+): BooleanLoop[] {
+  const apart = new Set<string>();
+  for (;;) {
+    const merged = mergeFaces(loops, vertices, tick, apart),
+      triangles: number[][] = [],
+      owner: BooleanLoop[] = [];
+    for (const loop of merged)
+      for (let i = 1; i < loop.vertices.length - 1; i++) {
+        triangles.push([loop.vertices[0], loop.vertices[i], loop.vertices[i + 1]]);
+        owner.push(loop);
+      }
+    const pairs = crossingTriangles(vertices, triangles, undefined, tick);
+    if (pairs.length <= before) return merged;
+    const size = apart.size;
+    for (const pair of pairs)
+      for (const t of pair) if (owner[t].vertices.length > 3) apart.add(`${owner[t].input}|${owner[t].face}`);
+    if (apart.size === size) return merged;
+  }
+}
+
+/**
+ * For float32 output: the loops as triangles, then without any triangle thinner than {@link FLOAT32_GRAIN}, as
+ * {@link withoutFlatTriangles} takes out flat ones.
+ */
+function forFloat32(
+  loops: readonly BooleanLoop[],
+  vertices: MutableVec3[],
+  tick: () => void,
+): { loops: BooleanLoop[]; collapsed: number } {
+  return withoutThin(loops, vertices, FLOAT32_GRAIN, tick);
+}
+
+/** The loops as triangles, without those {@link withoutFlatTriangles} takes out at `grain`. */
+function withoutThin(
+  loops: readonly BooleanLoop[],
+  vertices: MutableVec3[],
+  grain: number,
+  tick: () => void,
+): { loops: BooleanLoop[]; collapsed: number } {
+  const triangles = triangulated(loops, vertices, tick),
+    faces = triangles.map(({ vertices: corners, uv }, i) => ({ id: String(i), vertices: corners, uv })),
+    { mesh, origin, removed = 0 } = withoutFlatTriangles({ vertices, faces }, grain);
   return {
     loops: mesh.faces.map(({ id, vertices: corners, uv }) => ({
       ...triangles[Number(origin?.get(id) ?? id)],
@@ -1207,20 +1293,19 @@ function materializeExact(
   const thinned = single ? forFloat32(start, vertices, tick) : { loops: start, collapsed: 0 },
     { loops: repaired, collapsed: folded } = repairLoops(thinned.loops, vertices, tick),
     collapsed = thinned.collapsed + folded,
-    loops = cancelFins(repaired),
+    // Float32 steps are wide enough for rounded faces to cross; they are taken apart while still triangles.
+    apart = single
+      ? withoutCrossings(triangulated(cancelFins(repaired), vertices), vertices, FLOAT32_GRAIN, cancelFins, tick)
+      : undefined,
+    loops = apart ? apart.loops : cancelFins(repaired),
     nonManifold = closedNonManifoldEdges(loops),
-    groups = new Map<string, BooleanLoop[]>();
-  for (const loop of loops) {
-    const k = `${loop.input}|${loop.face}`,
-      list = groups.get(k);
-    if (list) list.push(loop);
-    else groups.set(k, [loop]);
-  }
-  const merged = [...groups.values()].flatMap((group) => mergeGroup(group, vertices, tick)),
+    merged = apart ? mergeWithoutCrossings(loops, vertices, apart.crossings, tick) : mergeFaces(loops, vertices, tick),
     result = finishBoolean(a, b, merged, vertices, nonManifold, options.createId);
+  if (apart?.crossings)
+    result.diagnostics.push(`${apart.crossings} pairs of triangles still cross after rounding to float32.`);
   if (collapsed)
     result.diagnostics.push(`${collapsed} faces too thin for ${options.precision ?? 'float64'} were folded away.`);
-  return { ...result, collapsedFaces: collapsed };
+  return { ...result, collapsedFaces: collapsed, ...(apart && { selfIntersections: apart.crossings }) };
 }
 
 /** @internal N-ary exact evaluation with a single final materialization. */
@@ -1378,6 +1463,7 @@ export function batchExactKernel(
     faceMap,
     nonManifoldEdges: finished.nonManifoldEdges,
     collapsedFaces: finished.collapsedFaces,
+    ...(finished.selfIntersections !== undefined && { selfIntersections: finished.selfIntersections }),
     diagnostics: finished.diagnostics,
     work,
   };

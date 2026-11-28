@@ -90,6 +90,51 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   has `Symbol.dispose`. Regression: `packages/gltf/test/audit-gltfa.test.js` ("KB-GLTFA A1" to "A8", all fail without
   the fix). The rest of the audit's API table closed the same day (entry above).
 
+### Fixed 2026-11-27: the exact boolean's float32 output could hold crossing triangles (KB-BOOL-F32CROSS1, mesh-edit)
+
+- **Repro:** `booleanMeshesExact` with `precision: 'float32'` of two unit cubes turned apart by 1e-5 radians,
+  `'difference'`: 15 pairs of the result's triangles passed through each other.
+- **Cause:** each corner was rounded on its own and thin triangles removed within 2^-20, with nothing testing whether
+  faces closer than those steps had crossed.
+- **Fix:** every pair is tested exactly (`self-intersections.ts`) and crossing places are joined or split in a loop with
+  a doubling reach (`boolean-separate.ts`); `selfIntersections` reports what is left. Regression:
+  `packages/mesh-edit/tests/boolean-rounding.test.js`.
+
+### Fixed 2026-11-27: repairing thin faces could merge an edge of any length and change the solid (KB-BOOL-REPAIR1, mesh-edit)
+
+- **Repro:** the exact difference of two unit cubes about 1e-8 apart (in the test) returned a solid of volume 0.034
+  instead of about 1.5e-8; a union of two such spheres lost 0.0047 of 3.85. Default float64 output.
+- **Cause:** after 64 rounds of repair, every face still invalid merged its shortest edge, whatever its length (0.39 of
+  a unit here), warped faces that only needed triangles included. Two thin faces handing a corner back and forth are
+  what reached 64 rounds.
+- **Fix:** at round 64 the faces are split as triangles (Botsch and Kobbelt, 2001), which moves the surface by a thin
+  face's height only; the merge remains as a last resort after 64 more rounds. Same regression file.
+
+### Fixed 2026-11-27: a valid needle triangle was rejected as non-planar (KB-MESH-NEEDLE1, mesh-edit)
+
+- **Repro:** `compilePolygonMesh` of one triangle 1 long and 1.3e-8 high threw "must be planar".
+- **Cause:** `polygonGeometryError` compared each corner with the plane within 1e-9 of the face, but the normal of a
+  needle comes from a nearly cancelling cross product, and its rounding tilted the plane by about 2e-8.
+- **Fix:** the tolerance adds the normal's rounding, 8 float steps over the cross product's length. Same regression file.
+
+### Open 2026-11-27: the exact boolean's float64 output can hold triangles crossing at rounding size (KB-BOOL-CROSS64, mesh-edit)
+
+- **Repro:** `booleanMeshesExact` (default precision) of two cubes turned apart by 1e-3 radians and moved 400 units
+  from the origin; a test of all triangle pairs finds some meeting outside their shared corners, at depths mostly under
+  1e-14 of the coordinates and rarely up to about 1e-9 (the validity repair's folds).
+- **Cause:** corners round to float64 one by one, and the repair of invalid faces moves the surface by up to the
+  validity tolerance; neither is followed by a crossing test. `'float32'` output is tested.
+- **Next:** run `withoutCrossings` for float64 too, with the validity tolerance as its grain; in a prototype this left
+  3 of 180 runs, so the repair and the separation have to share one loop.
+
+### Open 2026-11-27: a float32 boolean residue of two coincident sheets can keep crossing pairs (KB-BOOL-F32SHEETS1, mesh-edit)
+
+- **Repro:** the float32 difference of two 8 by 12 spheres turned and moved about 1e-8 apart can report
+  `selfIntersections` 3 (1 of 720 seeded runs).
+- **Cause:** the result is a shell thinner than a float32 step: its two sheets round into one plane with different
+  triangles, and joining features one pair at a time adds pairs as fast as it removes them.
+- **Next:** triangulate coplanar overlapping parts together so the two sheets cancel.
+
 ### Fixed 2026-11-27: scatter motion vectors drew a streamed forest from destroyed buffers (KB-SCATTER-VELTILES1, scatter)
 
 - **Repro:** a `ScatterTiles` scatter with `ScatterVelocity` added to TAA; stream a tile in with `setTile` so a ring

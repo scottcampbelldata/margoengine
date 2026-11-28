@@ -13,6 +13,7 @@ export interface ExactBooleanOptions {
 
 export interface ExactBooleanResult extends MeshBooleanResult {
     collapsedFaces: number;
+    selfIntersections?: number;
 }
 
 export interface MeshBooleanFaceSource {

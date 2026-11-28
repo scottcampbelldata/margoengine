@@ -14,6 +14,7 @@ export interface MeshBatchBooleanResult {
     faceMap: Record<string, string[]>[];
     nonManifoldEdges: number;
     collapsedFaces: number;
+    selfIntersections?: number;
     diagnostics: string[];
     work: {
         exactSpaces: number;

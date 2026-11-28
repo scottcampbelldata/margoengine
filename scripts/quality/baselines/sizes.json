@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21556404,
+  "total": 21566278,
   "history": [
     {
       "date": "2026-10-24",
@@ -15205,6 +15205,12 @@
       "commit": "7d8bf2f39",
       "reason": "Measured cloth bending (SOFT-01, 7d8bf2f39) with the soft cells meeting Hertz landed the same hour (727f5df2f): the soft kernel gains the bending elements (bend.rs: each triangle's curvature tensor from the hinge vectors, nine rows of the exact solve, rows of up to six particles) and the entry the fabric bending presets and the elements' builder. Measured gzip: @margoengine/physics/soft 177,421 B, budget 168429 to 182744 (+3%); its base 59,611, budget 56034 to 61400; its lazy soft body kernel 116,989, budget 111510 to 120499. The bending is a pass of the step every cloth of measured fabric runs, so it lives in the soft kernel every cloth loads; a second blueprint would duplicate the step.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-e-boolean-rounding",
+      "reason": "exact booleans now test float32 output for crossing triangles and remove them (self-intersections.ts, boolean-separate.ts, KB-BOOL-F32CROSS1): boolean-exact 12908 to 15780 B, boolean-batch 13069 to 15979, hull 14655 to 17577, root 30193 to 30205 (needle planarity). Every one holds the exact kernel and booleans are synchronous, so a lazy split would break the API.",
+      "grew": 4
     }
   ],
   "items": {
@@ -15968,12 +15974,12 @@
     "@margoengine/mcp/porting": 3531,
     "@margoengine/mcp/render": 3277,
     "@margoengine/mcp/resources": 2313,
-    "@margoengine/mesh-edit": 30203,
+    "@margoengine/mesh-edit": 31112,
     "@margoengine/mesh-edit/bake": 5070,
-    "@margoengine/mesh-edit/boolean-batch": 13462,
-    "@margoengine/mesh-edit/boolean-exact": 13296,
+    "@margoengine/mesh-edit/boolean-batch": 16459,
+    "@margoengine/mesh-edit/boolean-exact": 16254,
     "@margoengine/mesh-edit/geometry": 15785,
-    "@margoengine/mesh-edit/hull": 15095,
+    "@margoengine/mesh-edit/hull": 18105,
     "@margoengine/mesh-edit/modeling": 37194,
     "@margoengine/mesh-edit/modifiers": 8564,
     "@margoengine/mesh-edit/remesh": 9967,

@@ -91,8 +91,10 @@ export function polygonGeometryError(points: readonly Vec3[]): string | null {
   nx *= unit;
   ny *= unit;
   nz *= unit;
+  // The normal of a needle is only as good as its cross product: its rounding, over its length, tilts the plane.
+  const tilted = epsilon + (8 * Number.EPSILON) / magnitude;
   for (let i = 0; i < count; i++)
-    if (Math.abs(N[i * 3] * nx + N[i * 3 + 1] * ny + N[i * 3 + 2] * nz) > epsilon) return 'must be planar';
+    if (Math.abs(N[i * 3] * nx + N[i * 3 + 1] * ny + N[i * 3 + 2] * nz) > tilted) return 'must be planar';
   // Project by dropping the normal's dominant axis, then test edge crossings and convexity in 2D.
   const absX = Math.abs(nx),
     absY = Math.abs(ny),
