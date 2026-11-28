@@ -3150,3 +3150,14 @@ Bonded fracture, polygons, wave interaction, ICE-05 thermodynamics, separate con
 - Point 8 (316b7367c1). `packages/physics/scripts/ice01-col-de-porte-measured.mjs` checks later snow depth and water equivalent from two independent six-day weather windows. The model's depth RMSE is 0.011 and 0.018 m. On the last warm day it retains 232.89 kg/m² against 189 kg/m² measured. Even the instantaneous residual of 31.70 kg/m² exceeds the 25 kg/m² spatial RMS scale. The 300-to-150 s refinement and one-hour forcing label shift leave the warm miss intact. [Evidence and limits](limits.md#ice-01-snowpack-acceptance-and-independent-field-measurements)
 
 Warm-period water equivalent, storm-by-storm layers, microstructure and weak layers, suspension and vapor mass exchange, and original avalanche shots remain open. The row stays REOPENED at four points.
+
+### ICE-03 Iceberg rigid-body dynamics and calving
+
+#### ICE-03 four-point pass
+
+- Point 5 (a71611f852). `packages/physics/tests/coupling/iceberg.test.js` checks coded fix-linked errors, a foreign calving bank with a late invalid entry, and an overflowing derived meltwater flux. Both retain all accepted output bytes. Corrected input reproduces the same snapshot and all five ports keep the live signed origin through a shift and restore.
+- Point 6 (a71611f852). `packages/physics/tests/coupling/iceberg-workers.test.js` compares 259 and 385 rows with 1, 2 and 4 participants and signed replay. A real GlacierSolver event and vacant rows exercise admission. `packages/physics/tests/iceberg-workers.browser.mjs` starts three actual helpers. The 259-row case records 234 active bodies, 887 adaptive substeps, 2,008 wrench evaluations and 40,160 paired face dot products. Both grids also match the previous scalar Wasm exactly.
+- Point 7 (a71611f852). `packages/water/test/iceberg-film.browser.mjs` draws an accepted cuboid reaching 105.2° of roll at 5 s. Its live signed SeaSource drives a far gauge 11.99 cm above still water. The identical-ice control with wake disconnected stays flat. Independent clipping, zero net source volume and an accepted height read within 2 µm pass. Both renderers repeat full frames and snapshots exactly.
+- Point 8 (a71611f852). `packages/physics/scripts/ice03-capsize-measured.mjs` checks Burton's held-out motion after initialization. Modeled and measured 10° to 90° times are 0.636 and 0.998 s, outside the 0.10 s allowance. Observed maximum roll is 96.07° versus 114.28° modeled. The separate Heller comparison retains the guided tank versus free-body difference, with 0.214 m/s observed and 0.403 m/s modeled marker speed. [Evidence and limits](limits.md#ice-03-accepted-calving-and-independent-capsize-measurements)
+
+Measured timing and wave amplitudes, added inertia and radiation damping, two-way water feedback, grounding, irregular shape and fracture, and original shots remain open. The row stays REOPENED at four points.
