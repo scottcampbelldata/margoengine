@@ -222,6 +222,12 @@ export class PointStyle {
     );
     const filter = options.filter ?? {};
     if (typeof filter !== 'object') throw new TypeError('A point filter is not an object; pass an object of ranges');
+    // A misspelt or other column name would otherwise filter nothing and show every point without a word.
+    for (const name of Object.keys(filter))
+      if (name !== 'ranges' && name !== 'classification' && !(FILTERS as readonly string[]).includes(name))
+        throw new TypeError(
+          `Filter ${name} is not a LAS filter; put other columns under filter.ranges, as {ranges: {${name}: [min, max]}}`,
+        );
     for (const name of FILTERS)
       if (filter[name] !== undefined) c.ranges.push([name, ...checkRange(name, filter[name])]);
     for (const [name, range] of Object.entries(filter.ranges ?? {})) c.ranges.push([name, ...checkRange(name, range)]);

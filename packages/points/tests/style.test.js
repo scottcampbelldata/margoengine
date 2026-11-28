@@ -284,3 +284,9 @@ test('a real USGS lidar tile: ground-only and first-return filters match an inde
   assert.ok(g > 1000 && g < las.count, `ground points ${g} of ${las.count}`);
   assert.ok(f > 0, 'the tile holds multi-return pulses');
 });
+
+test('a filter key that is not a LAS filter throws and names filter.ranges, rather than filtering nothing', () => {
+  assert.throws(() => new PointStyle({ filter: { colorIndex: [0, 1] } }), /colorIndex is not a LAS filter; put other columns under filter\.ranges/);
+  const style = new PointStyle({ filter: { ranges: { colorIndex: [0.5, Infinity] } } });
+  assert.deepEqual([...style.evaluate({ colorIndex: new Float32Array([0.2, 0.5, 3]) }).show], [0, 1, 1]);
+});

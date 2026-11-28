@@ -796,7 +796,7 @@ Rules, from the 3D Tiles styling specification: `show` must give a boolean and `
 choices: a `color` whose conditions all fail keeps the point's own colour (its `${COLOR}`), not white; `pointSize` is
 in the material's units (pixels by default, as in 3D Tiles), clamped by `minPixelSize` and `maxPixelSize`; column names
 match exactly first, then ignoring case, `_`, `-` and spaces. Filters are inclusive `[min, max]` ranges, and
-`classification` lists the classes to show. Styles run on the CPU, once per call: about one pass over the columns per
+`classification` lists the classes to show; a filter key that is neither a LAS filter nor `ranges` or `classification` throws a `TypeError` that points to `ranges`, as other columns go there (`{ranges: {colorIndex: [0.8, 1.4]}}`). Styles run on the CPU, once per call: about one pass over the columns per
 `update`, so restyle on a change, not every frame. `pointSize` does not apply to octree nodes. The same interpreter
 drives `margoengine/tiles/style` for 3D Tiles.
 
