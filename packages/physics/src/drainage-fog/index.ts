@@ -3,6 +3,7 @@ import type { Wind } from '@margoengine/math/fields';
 import { gravityMagnitude } from '@margoengine/math/gravity';
 import { exp } from '@margoengine/math/pinned';
 import { BED_FIELD, BED_LAYOUT } from '../earth/bed.js';
+import type { NativePhasePool } from '../native-phase-pool.js';
 import { canShareMemory, isShared, regionWords, STACK_BYTES } from '../world/memory.js';
 import type {
   Cell,
@@ -21,6 +22,10 @@ const CP = 1005;
 const LV = 2500000;
 const SIZE = 9;
 const LAYOUT = 1;
+const JOB_BYTES = 88;
+const JOB_VALUES_OFFSET = 64;
+const RECEIPT_WORDS = 7;
+const LIQUID_MASS_ABSORPTION = 130;
 const ORIGIN: Cell = [0, 0, 0];
 type GridValue = number | ArrayLike<number>;
 type Side = 'minX' | 'maxX' | 'minZ' | 'maxZ';
@@ -57,7 +62,7 @@ export interface DrainageFogParams {
   readonly windVelocity?: readonly [GridValue, GridValue];
   /** Sample the background wind at the centre of each evolving layer, overriding windVelocity. */
   readonly wind?: Wind;
-  /** Cell size for translating positions into the Wind contract's cell, metres. Defaults to 4096. */
+  /** Cell size for translating positions into the Wind contract's cell, metres. Match the world's cell size. Defaults to 4096. */
   readonly worldCellSize?: number;
   /** Additional surface heat flux into the air in W/m². Defaults to zero. */
   readonly heat?: GridValue;
@@ -65,8 +70,10 @@ export interface DrainageFogParams {
   readonly moisture?: GridValue;
   /** Effective clear-sky temperature in K. Defaults to 263.15. */
   readonly skyTemperature?: GridValue;
-  /** Layer effective longwave emissivity. Defaults to 0.15, or zero for input fluxes only. */
+  /** Dry background emissivity in the liquid-water-path model, or fixed grey emissivity in grey mode. Defaults to 0.15. */
   readonly emissivity?: number;
+  /** Liquid-water path by default, or grey when emissivity is supplied without a mode. Set grey and emissivity 0 for input fluxes only. */
+  readonly longwave?: 'grey' | 'liquid-water-path';
   /** Dimensionless background shear drag. Defaults to 0.008. */
   readonly drag?: number;
   /** Neutral interfacial entrainment coefficient. Defaults to 0.02. */
@@ -100,6 +107,8 @@ export interface DrainageFogLoadOptions {
   readonly moisture?: DrainageFogInput;
   /** Sample the live TerrainBed beneath the same cell-centred grid. Defaults to false. */
   readonly followTerrain?: boolean;
+  /** Native participants, including the caller. Defaults to one. Two and four use shared world memory. */
+  readonly threads?: number;
 }
 
 /** The latest resolved shallow atmospheric column. */
@@ -129,26 +138,41 @@ export interface DrainageFogBudget {
   readonly deposited: number;
 }
 
+/** Production column work performed by the caller or one optional native worker. */
+export interface DrainageFogWorkerWork {
+  readonly resolvedRows: number;
+  readonly sourceRows: number;
+  readonly settledRows: number;
+  readonly publishedRows: number;
+  readonly simdPairs: number;
+}
+
+/** The work associated with the latest accepted fog step. */
+export interface DrainageFogWorkCounts extends DrainageFogWorkerWork {
+  readonly threads: number;
+  readonly workers: readonly DrainageFogWorkerWork[];
+}
+
 interface Kernel extends WebAssembly.Exports {
   readonly __stack_pointer: WebAssembly.Global;
   readonly __data_end: WebAssembly.Global;
-  fog_step(
-    state: number,
-    next: number,
-    local: number,
-    forcing: number,
-    settings: number,
-    departure: number,
-    settling: number,
-    ledger: number,
-    output: number,
-    optical: number,
-    width: number,
-    depth: number,
-    open: number,
-    time: number,
-    tickDt: number,
-  ): void;
+  fog_step(job: number): number;
+  fog_thread_begin(job: number, parts: number): number;
+  fog_thread_phase(job: number, stage: number, part: number, parts: number): number;
+  fog_thread_plan(job: number, parts: number): number;
+  fog_thread_route(job: number): number;
+  fog_thread_fold(job: number): number;
+}
+
+interface Candidates {
+  readonly columns: Region;
+  readonly ledger: Region;
+  readonly output: Region;
+  readonly optical: Region;
+  readonly settings: Region;
+  readonly cellWork: Region;
+  readonly receipts: Region;
+  readonly job: Region;
 }
 
 interface State {
@@ -163,6 +187,8 @@ interface State {
   readonly wind?: Wind;
   readonly worldCellSize: number;
   readonly scale: number;
+  readonly liquidAbsorption: number;
+  readonly work: Candidates;
   readonly airDensity: number;
   readonly columns: Region;
   readonly scratch: Region;
@@ -180,26 +206,66 @@ interface State {
 
 type Bound = Readonly<{ input: Required<DrainageFogInput>; slot: number; label: string }>;
 
+function fogInput(message: string): MargoError {
+  return new MargoError('state', message);
+}
+
+function nativeStatus(status: number): void {
+  if (status === 0) return;
+  if (status === 1)
+    throw fogInput(
+      'Drainage fog produced an unrepresentable column. Reduce fluxes, wind, terrain range or time scale.',
+    );
+  if (status === 2)
+    throw fogInput('Drainage fog cannot advance its stable interval. Reduce secondsPerSecond or use larger cells.');
+  throw new MargoError(
+    'failed',
+    'Drainage fog kernel rejected the private phase layout. Rebuild both Wasm assets with the solver.',
+  );
+}
+
+function finiteCell(cell: Cell, label: string): Cell {
+  if (
+    !cell ||
+    cell.length !== 3 ||
+    !Number.isSafeInteger(cell[0]) ||
+    !Number.isSafeInteger(cell[1]) ||
+    !Number.isSafeInteger(cell[2])
+  )
+    throw fogInput(`${label} needs three signed cell indices. Use the origin cell of the producing solver.`);
+  return cell;
+}
+
 function bound(input: DrainageFogInput, slot: number, unit: string, label: string): Bound {
+  if (!input?.field) throw fogInput(`Missing drainage fog ${label} field. Supply a registry field descriptor.`);
   const { field, word = 0, stride = 1 } = input;
   if (field.unit !== unit || !Number.isSafeInteger(stride) || !Number.isSafeInteger(word) || word < 0 || word >= stride)
-    throw new RangeError(
-      `Invalid drainage fog ${label} binding. Use ${unit} and a valid word within a positive stride.`,
-    );
+    throw fogInput(`Invalid drainage fog ${label} binding. Use ${unit} and a valid word within a positive stride.`);
   return { input: { field: { ...field }, stride, word }, slot, label };
 }
 
 function checked(value: number, label: string, min = -Infinity, max = Infinity): number {
   if (!Number.isFinite(value) || value < min || value > max)
-    throw new RangeError(
+    throw fogInput(
       `Invalid drainage fog ${label}. Pass a finite number from ${min} to ${max} in the documented units.`,
     );
   return value;
 }
 
+function pair<T>(value: readonly [T, T], label: string): readonly [T, T] {
+  if (!(Array.isArray(value) || ArrayBuffer.isView(value)) || value.length !== 2)
+    throw fogInput(`Invalid drainage fog ${label}. Give two values in X, then Z order.`);
+  return value;
+}
+
+function stackTop(host: SolverHost, label: string): number {
+  const region = host.allocate(label, STACK_BYTES + 8, 'u8', LAYOUT);
+  return Math.floor((region.byteOffset + region.byteLength) / 16) * 16;
+}
+
 function gridCell(value: GridValue, index: number, count: number, label: string, min?: number, max?: number): number {
-  if (typeof value !== 'number' && value.length !== count)
-    throw new RangeError(`Invalid drainage fog ${label} shape. Supply a scalar or ${count} x-fast column values.`);
+  if (typeof value !== 'number' && (!value || value.length !== count))
+    throw fogInput(`Invalid drainage fog ${label} shape. Supply a scalar or ${count} x-fast column values.`);
   return checked(typeof value === 'number' ? value : value[index]!, label, min, max);
 }
 
@@ -208,7 +274,7 @@ function mixingRatio(temp: number, pressure: number, humidity: number): number {
   const celsius = temp - FREEZING;
   const partial = 611.2 * exp((17.67 * celsius) / (celsius + 243.5)) * humidity;
   if (partial >= pressure)
-    throw new RangeError(
+    throw fogInput(
       'Drainage fog vapour pressure exceeds its atmosphere. Lower temperature or humidity, or raise total pressure.',
     );
   return (0.622 * partial) / (pressure - partial);
@@ -216,6 +282,52 @@ function mixingRatio(temp: number, pressure: number, humidity: number): number {
 
 function words(s: State, region: Region): Float64Array {
   return regionWords(s.host.memory, region) as Float64Array;
+}
+
+function workerResult(s: State): DrainageFogWorkCounts {
+  const wordsUsed = words(s, s.work.receipts);
+  const workers: DrainageFogWorkerWork[] = [];
+  let resolvedRows = 0;
+  let sourceRows = 0;
+  let settledRows = 0;
+  let publishedRows = 0;
+  let simdPairs = 0;
+  for (let at = 0; at < wordsUsed.length; at += RECEIPT_WORDS) {
+    const worker = {
+      resolvedRows: wordsUsed[at + 2]!,
+      sourceRows: wordsUsed[at + 3]!,
+      settledRows: wordsUsed[at + 4]!,
+      publishedRows: wordsUsed[at + 5]!,
+      simdPairs: wordsUsed[at + 6]!,
+    };
+    if (
+      Object.values(worker).some((n) => !Number.isSafeInteger(n) || n < 0) ||
+      worker.resolvedRows !== worker.sourceRows ||
+      worker.resolvedRows !== worker.settledRows ||
+      worker.simdPairs * 2 > worker.resolvedRows
+    )
+      throw new MargoError('failed', 'Drainage fog worker returned an invalid work count. Rebuild the native assets.');
+    workers.push(worker);
+    resolvedRows += worker.resolvedRows;
+    sourceRows += worker.sourceRows;
+    settledRows += worker.settledRows;
+    publishedRows += worker.publishedRows;
+    simdPairs += worker.simdPairs;
+  }
+  if (publishedRows !== s.count || resolvedRows % s.count !== 0)
+    throw new MargoError('failed', 'Drainage fog worker missed grid columns. Rebuild the native assets.');
+  return { workers, threads: workers.length, resolvedRows, sourceRows, settledRows, publishedRows, simdPairs };
+}
+
+function storedMass(s: State, columns: Float64Array): readonly [number, number] {
+  let air = 0;
+  let water = 0;
+  for (let i = 0; i < s.count; i++) {
+    air += columns[5 * i]!;
+    water += columns[5 * i + 4]!;
+  }
+  const factor = s.spacing[0] * s.spacing[1] * s.airDensity;
+  return [checked(air * factor, 'stored air mass', 0), checked(water * factor, 'stored water mass', 0)];
 }
 
 function field(name: string, quantity: string, unit: string): FieldDescriptor {
@@ -253,6 +365,9 @@ export class DrainageFog implements Solver<DrainageFogParams> {
   private readonly sources: readonly Bound[];
   private readonly windSample = { velocity: [0, 0, 0] as [number, number, number], density: 0, temperature: 0 };
   private state?: State;
+  private pool?: NativePhasePool;
+  private disposed = false;
+  private acceptedWork?: DrainageFogWorkCounts;
 
   private constructor(
     private readonly plain: WebAssembly.Module,
@@ -269,9 +384,13 @@ export class DrainageFog implements Solver<DrainageFogParams> {
     this.columnField = field(`${this.id}:columns`, 'moistAirColumn', 'record');
   }
 
-  /** Loads both Wasm memory variants supported by the current host. */
+  /** Loads the optional fog kernels and up to three native helpers. */
   static async load(options: DrainageFogLoadOptions = {}): Promise<DrainageFog> {
-    const { signal } = options;
+    if (!options || typeof options !== 'object')
+      throw fogInput('Invalid drainage fog options. Pass a load options object or omit it.');
+    const { signal, threads = 1 } = options;
+    if (threads !== 1 && threads !== 2 && threads !== 4)
+      throw fogInput('Invalid drainage fog worker count. Use 1, 2 or 4 native participants.');
     const [plain, shared] = await Promise.all([
       compile(new URL(/* @vite-ignore */ './drainage-fog-kernel.wasm?no-inline', import.meta.url), signal),
       canShareMemory()
@@ -279,7 +398,21 @@ export class DrainageFog implements Solver<DrainageFogParams> {
         : undefined,
     ]);
     signal?.throwIfAborted();
-    return new DrainageFog(plain, shared, options);
+    const solver = new DrainageFog(plain, shared, options);
+    if (threads > 1) {
+      if (!shared)
+        throw new MargoError(
+          'unsupported',
+          'Drainage fog helpers need shared memory. Use a shared-memory host or threads: 1.',
+        );
+      const { createNativePhasePool } = await import('../native-phase-pool.js');
+      solver.pool = await createNativePhasePool(threads, {
+        subject: 'Drainage fog',
+        phaseExport: 'fog_thread_phase',
+        signal,
+      });
+    }
+    return solver;
   }
 
   describe(): SolverDescription {
@@ -290,7 +423,14 @@ export class DrainageFog implements Solver<DrainageFogParams> {
   }
 
   init(host: SolverHost, params: DrainageFogParams): void {
-    if (!params) throw new RangeError('Drainage fog needs a grid. Pass positive width, depth and column spacing.');
+    if (this.disposed) throw new MargoError('disposed', 'Drainage fog is disposed. Load a new solver.');
+    if (this.state && this.pool)
+      throw new MargoError(
+        'attached',
+        'Drainage fog workers are already bound. Load a new threaded solver for the other world.',
+      );
+    if (!params || typeof params !== 'object')
+      throw fogInput('Drainage fog needs a grid. Pass positive width, depth and column spacing.');
     const { width, depth } = params;
     const count = width * depth;
     if (
@@ -300,23 +440,33 @@ export class DrainageFog implements Solver<DrainageFogParams> {
       depth < 1 ||
       count * 8 * SIZE >= 0x100000000
     )
-      throw new RangeError('Invalid drainage fog grid. Choose positive whole counts fitting the world memory.');
-    const [dx, dz] = params.spacing ?? [10, 10];
-    const [x0, z0] = params.origin ?? [0, 0];
+      throw fogInput('Invalid drainage fog grid. Choose positive whole counts fitting the world memory.');
+    const [dx, dz] = pair(params.spacing ?? [10, 10], 'spacing');
+    const [x0, z0] = pair(params.origin ?? [0, 0], 'origin');
     const spacing = [checked(dx, 'X spacing', Number.MIN_VALUE), checked(dz, 'Z spacing', Number.MIN_VALUE)] as const;
     const origin = [checked(x0, 'origin X'), checked(z0, 'origin Z')] as const;
     const gravity = checked(gravityMagnitude(host.gravity), 'gravity', Number.MIN_VALUE);
     const airDensity = checked(params.airDensity ?? 1.225, 'air density', Number.MIN_VALUE);
     const radius = checked(params.radius ?? 8e-6, 'droplet radius', Number.MIN_VALUE);
+    checked(dx * dz * airDensity, 'reference air mass per metre of column depth', Number.MIN_VALUE);
+    checked(x0 + (width - 1) * dx, 'last column X');
+    checked(z0 + (depth - 1) * dz, 'last column Z');
+    const longwave = params.longwave ?? (params.emissivity === undefined ? 'liquid-water-path' : 'grey');
+    if (longwave !== 'grey' && longwave !== 'liquid-water-path')
+      throw fogInput('Unknown longwave model. Use grey or liquid-water-path.');
+    const settling = checked(params.settling ?? 1, 'settling multiplier', 0);
     const setting = [
       gravity,
       airDensity,
       checked(params.drag ?? 0.008, 'surface drag', 0),
       checked(params.entrainment ?? 0.02, 'entrainment', 0),
       checked(params.emissivity ?? 0.15, 'emissivity', 0, 1),
-      (checked(params.settling ?? 1, 'settling multiplier', 0) * (2 * 1000 * gravity * radius * radius)) /
-        (9 * 1.81e-5),
-      3 / (2 * 1000 * radius),
+      checked(
+        settling === 0 ? 0 : (settling * (2 * 1000 * gravity * radius * radius)) / (9 * 1.81e-5),
+        'droplet settling speed',
+        0,
+      ),
+      checked(3 / (2 * 1000 * radius), 'droplet extinction per mass', Number.MIN_VALUE),
       dx,
       dz,
     ];
@@ -331,15 +481,17 @@ export class DrainageFog implements Solver<DrainageFogParams> {
         'unsupported',
         'Shared drainage fog Wasm is unavailable. Use plain world memory on this host.',
       );
-    const stack = host.allocate('fog-stack', STACK_BYTES + 8, 'u8', LAYOUT);
+    const stack = stackTop(host, 'fog-stack');
     const kernel = new WebAssembly.Instance(module, { env: { memory: host.memory } }).exports as Kernel;
     if (
       !(kernel.__stack_pointer instanceof WebAssembly.Global) ||
       !(kernel.__data_end instanceof WebAssembly.Global) ||
-      kernel.__data_end.value !== 0
+      kernel.__data_end.value !== 0 ||
+      typeof kernel.fog_step !== 'function' ||
+      typeof kernel.fog_thread_phase !== 'function'
     )
       throw new MargoError('failed', 'Drainage fog has an invalid Wasm layout. Rebuild the slot-free native variants.');
-    kernel.__stack_pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
+    kernel.__stack_pointer.value = stack;
     const allocate = (label: string, size: number): Region => host.allocate(`fog-${label}`, 8 * size, 'f64', LAYOUT);
     const s: State = {
       host,
@@ -354,6 +506,7 @@ export class DrainageFog implements Solver<DrainageFogParams> {
       airDensity,
       worldCellSize: checked(params.worldCellSize ?? 4096, 'world cell size', 1),
       scale: checked(params.secondsPerSecond ?? 1, 'time scale', Number.MIN_VALUE),
+      liquidAbsorption: longwave === 'liquid-water-path' ? LIQUID_MASS_ABSORPTION : 0,
       columns: allocate('columns', 5 * count),
       scratch: allocate('transport', 5 * count),
       phase: allocate('phase', 4 * count),
@@ -366,12 +519,22 @@ export class DrainageFog implements Solver<DrainageFogParams> {
       output: allocate('diagnostics', SIZE * count),
       optical: host.allocate('fog-optical', 16 * count, 'f32', LAYOUT),
       clock: allocate('clock', 4),
+      work: {
+        columns: allocate('candidate-columns', 5 * count),
+        ledger: allocate('candidate-ledger', 6),
+        output: allocate('candidate-diagnostics', SIZE * count),
+        optical: host.allocate('fog-candidate-optical', 16 * count, 'f32', LAYOUT),
+        settings: allocate('candidate-settings', setting.length + 1),
+        cellWork: allocate('cell-work', 3 * count),
+        receipts: allocate('worker-receipts', RECEIPT_WORDS * (this.pool?.count ?? 1)),
+        job: host.allocate('fog-work-job', JOB_BYTES, 'u8', LAYOUT),
+      },
     };
     words(s, s.settings).set(setting);
     const columns = words(s, s.columns),
       defaults = words(s, s.defaults);
-    const initial = params.initialVelocity ?? [0, 0];
-    const wind = params.windVelocity ?? [0, 0];
+    const initial = pair(params.initialVelocity ?? [0, 0], 'initial velocity');
+    const wind = pair(params.windVelocity ?? [0, 0], 'background wind');
     for (let i = 0; i < count; i++) {
       const value = (grid: GridValue, name: string, min?: number, max?: number) =>
         gridCell(grid, i, count, name, min, max);
@@ -396,19 +559,33 @@ export class DrainageFog implements Solver<DrainageFogParams> {
       const temp = value(params.initialTemperature ?? ambient, 'initial temperature', Number.MIN_VALUE);
       const vapour = mixingRatio(temp, pressure, value(params.initialHumidity ?? humidity, 'initial humidity', 0, 1));
       const liquid = value(params.initialLiquid ?? 0, 'initial liquid', 0);
-      columns.set(
-        [
-          h,
-          h * value(initial[0], 'initial velocity X'),
-          h * value(initial[1], 'initial velocity Z'),
-          h * (CP * (temp - FREEZING) + LV * vapour),
-          h * (vapour + liquid),
-        ],
-        5 * i,
-      );
+      const values = [
+        h,
+        h * value(initial[0], 'initial velocity X'),
+        h * value(initial[1], 'initial velocity Z'),
+        h * (CP * (temp - FREEZING) + LV * vapour),
+        h * (vapour + liquid),
+      ];
+      if (!values.every(Number.isFinite))
+        throw fogInput('Initial fog column exceeds numeric range. Reduce its height, water, temperature or velocity.');
+      columns.set(values, 5 * i);
     }
+    if (this.pool) {
+      const pool = this.pool;
+      const control = host.allocate('fog-workers', pool.controlWords * 4, 'i32', LAYOUT);
+      const stackTops = Array.from({ length: pool.count - 1 }, (_, part) =>
+        stackTop(host, `fog-worker-stack-${part + 1}`),
+      );
+      pool.init({
+        module,
+        memory: host.memory,
+        job: s.work.job.byteOffset,
+        control: control.byteOffset,
+        stackTops,
+      });
+    }
+    this.run(s, 0, { tick: -1, level: 0, seed: 0, cell: host.cell ?? ORIGIN, inputs: new Map() });
     this.state = s;
-    this.run(s, 0, { tick: -1, level: 0, seed: 0, cell: ORIGIN, inputs: new Map() });
   }
 
   importPorts(): void {
@@ -416,10 +593,18 @@ export class DrainageFog implements Solver<DrainageFogParams> {
   }
 
   step(context: StepContext, dt: number): void {
+    if (!(dt > 0 && Number.isFinite(dt) && Number.isSafeInteger(context.tick) && context.tick >= 0))
+      throw fogInput('Invalid drainage fog clock. Step the solver on a valid world tick and finite positive interval.');
     this.run(this.requireState(), dt, context);
   }
 
   private run(s: State, dt: number, context: StepContext): void {
+    const cell = finiteCell(context.cell, 'Drainage fog step');
+    const elapsed = checked(
+      dt * s.scale,
+      'elapsed time. Reduce secondsPerSecond if the interval overflows',
+      dt === 0 ? 0 : Number.MIN_VALUE,
+    );
     const input = words(s, s.forcing);
     input.set(words(s, s.defaults));
     for (const { input: source, slot, label } of this.sources) {
@@ -427,11 +612,11 @@ export class DrainageFog implements Solver<DrainageFogParams> {
       if (!port) continue;
       const r = port.region;
       if (r.layout !== LAYOUT || (r.type !== 'f64' && r.type !== 'f32') || !sameCell(port.cell, context.cell))
-        throw new RangeError(`Invalid drainage fog ${label} port. Use layout-1 floats in this world cell.`);
+        throw fogInput(`Invalid drainage fog ${label} port. Use layout-1 floats in this world cell.`);
       const values = regionWords(s.host.memory, r);
       const uniform = values.length === source.stride;
       if (!uniform && values.length !== s.count * source.stride)
-        throw new RangeError(`Invalid drainage fog ${label} size. Give a uniform record or one record per cell.`);
+        throw fogInput(`Invalid drainage fog ${label} size. Give a uniform record or one record per cell.`);
       for (let i = 0; i < s.count; i++) {
         input[i * SIZE + slot] = checked(values[(uniform ? 0 : i * source.stride) + source.word]!, label);
       }
@@ -445,7 +630,7 @@ export class DrainageFog implements Solver<DrainageFogParams> {
         r.byteLength !== 4 * (s.width + 1) * (s.depth + 1) ||
         !sameCell(bed.cell, context.cell)
       )
-        throw new RangeError(
+        throw fogInput(
           'Invalid drainage fog bed input. Attach a TerrainBed with matching cells in the same world cell.',
         );
       const h = regionWords(s.host.memory, r),
@@ -453,44 +638,97 @@ export class DrainageFog implements Solver<DrainageFogParams> {
       for (let z = 0; z < s.depth; z++)
         for (let x = 0; x < s.width; x++) {
           const i = z + x * stride;
-          input[(x + z * s.width) * SIZE] = (h[i + 1]! + h[i + stride]!) * 0.5;
+          input[(x + z * s.width) * SIZE] = checked((h[i + 1]! + h[i + stride]!) * 0.5, 'terrain elevation');
         }
     }
     if (s.wind && dt > 0) {
       const wind = s.wind;
-      const shift = (axis: number) => (context.cell[axis]! - wind.cell[axis]!) * s.worldCellSize;
+      const windCell = finiteCell(wind.cell, 'Drainage fog wind');
+      const shift = (axis: number) => checked((cell[axis]! - windCell[axis]!) * s.worldCellSize, 'wind origin shift');
+      const [shiftX, shiftY, shiftZ] = [shift(0), shift(1), shift(2)];
+      const time = checked(context.tick * dt, 'wind sample time');
       const column = words(s, s.columns);
       for (let i = 0; i < s.count; i++) {
         const k = SIZE * i;
         const flow = wind.sample(
-          s.origin[0] + (i % s.width) * s.spacing[0] + shift(0),
-          input[k]! + column[5 * i]! * 0.5 + shift(1),
-          s.origin[1] + Math.floor(i / s.width) * s.spacing[1] + shift(2),
-          context.tick * dt,
+          checked(s.origin[0] + (i % s.width) * s.spacing[0] + shiftX, 'wind sample X'),
+          checked(input[k]! + column[5 * i]! * 0.5 + shiftY, 'wind sample Y'),
+          checked(s.origin[1] + Math.floor(i / s.width) * s.spacing[1] + shiftZ, 'wind sample Z'),
+          time,
           this.windSample,
         );
+        if (!flow?.velocity)
+          throw fogInput('Wind sampler returned no velocity. Return air velocity in metres per second.');
         input[k + 3] = checked(flow.velocity[0], 'sampled wind X');
         input[k + 4] = checked(flow.velocity[2], 'sampled wind Z');
       }
     }
-    s.kernel.fog_step(
-      s.columns.byteOffset,
+    this.integrate(s, elapsed, dt || 1);
+    const work = workerResult(s);
+    storedMass(s, words(s, s.work.columns));
+    words(s, s.columns).set(words(s, s.work.columns));
+    words(s, s.ledger).set(words(s, s.work.ledger));
+    words(s, s.output).set(words(s, s.work.output));
+    regionWords(s.host.memory, s.optical).set(regionWords(s.host.memory, s.work.optical));
+    words(s, s.clock).set([...cell, context.tick + 1]);
+    this.acceptedWork = work;
+  }
+
+  private integrate(s: State, elapsed: number, worldDt: number): void {
+    const { host, kernel, work } = s;
+    const job = work.job.byteOffset;
+    const offsets = new Uint32Array(host.memory.buffer, job, JOB_VALUES_OFFSET / 4);
+    offsets.set([
+      work.columns.byteOffset,
       s.scratch.byteOffset,
       s.phase.byteOffset,
       s.forcing.byteOffset,
-      s.settings.byteOffset,
+      work.settings.byteOffset,
       s.departure.byteOffset,
       s.settling.byteOffset,
-      s.ledger.byteOffset,
-      s.output.byteOffset,
-      s.optical.byteOffset,
+      work.ledger.byteOffset,
+      work.output.byteOffset,
+      work.optical.byteOffset,
+      work.cellWork.byteOffset,
+      work.receipts.byteOffset,
       s.width,
       s.depth,
       s.open,
-      dt * s.scale,
-      dt || 1,
-    );
-    words(s, s.clock).set([...context.cell, context.tick + 1]);
+      0,
+    ]);
+    const timing = new Float64Array(host.memory.buffer, job + JOB_VALUES_OFFSET, 3);
+    timing.set([elapsed, worldDt, 0]);
+    const settings = words(s, work.settings);
+    settings.set(words(s, s.settings));
+    settings[settings.length - 1] = s.liquidAbsorption;
+    words(s, work.columns).set(words(s, s.columns));
+    words(s, work.ledger).set(words(s, s.ledger));
+
+    const pool = this.pool;
+    if (!pool) {
+      nativeStatus(kernel.fog_step(job));
+      return;
+    }
+    const parts = pool.count;
+    const phase = (stage: number) =>
+      nativeStatus(pool.phase(stage, () => kernel.fog_thread_phase(job, stage, 0, parts)));
+    nativeStatus(kernel.fog_thread_begin(job, parts));
+    while (timing[0]! > 0) {
+      phase(0);
+      nativeStatus(kernel.fog_thread_plan(job, parts));
+      phase(1);
+      nativeStatus(kernel.fog_thread_route(job));
+      phase(2);
+      nativeStatus(kernel.fog_thread_fold(job));
+    }
+    phase(3);
+  }
+
+  /** Counts the most recently accepted local and optical work. */
+  workCounts(): DrainageFogWorkCounts {
+    this.requireState();
+    const work = this.acceptedWork!;
+    return { ...work, workers: work.workers.map((worker) => ({ ...worker })) };
   }
 
   exportPorts(tick: number): readonly Port[] {
@@ -534,7 +772,7 @@ export class DrainageFog implements Solver<DrainageFogParams> {
   writeColumnData(target: Float32Array): void {
     const s = this.requireState();
     if (!(target instanceof Float32Array) || target.length !== s.count * 4)
-      throw new RangeError('Wrong drainage fog optical buffer. Give a Float32Array of length 4 * width * depth.');
+      throw fogInput('Wrong drainage fog optical buffer. Give a Float32Array of length 4 * width * depth.');
     target.set(regionWords(s.host.memory, s.optical));
   }
 
@@ -542,7 +780,7 @@ export class DrainageFog implements Solver<DrainageFogParams> {
   read(x: number, z: number): DrainageFogSample {
     const s = this.requireState();
     if (!Number.isInteger(x) || !Number.isInteger(z) || x < 0 || z < 0 || x >= s.width || z >= s.depth)
-      throw new RangeError('Invalid drainage fog column. Pass integer X and Z indices inside the grid.');
+      throw fogInput('Invalid drainage fog column. Pass integer X and Z indices inside the grid.');
     const values = words(s, s.output);
     const k = (x + z * s.width) * SIZE;
     return {
@@ -559,19 +797,12 @@ export class DrainageFog implements Solver<DrainageFogParams> {
 
   /** Mass accounting across all cells, including water moved out by settling. */
   get budget(): DrainageFogBudget {
-    const s = this.requireState(),
-      values = words(s, s.columns);
-    let air = 0,
-      water = 0;
-    for (let i = 0; i < s.count; i++) {
-      air += values[5 * i]!;
-      water += values[5 * i + 4]!;
-    }
-    const factor = s.spacing[0] * s.spacing[1] * s.airDensity;
+    const s = this.requireState();
+    const [air, water] = storedMass(s, words(s, s.columns));
     const [entrainedAir, entrainedWater, surfaceWater, exportedAir, exportedWater, deposited] = words(s, s.ledger);
     return {
-      air: air * factor,
-      water: water * factor,
+      air,
+      water,
       entrainedAir: entrainedAir!,
       entrainedWater: entrainedWater!,
       surfaceWater: surfaceWater!,
@@ -581,7 +812,19 @@ export class DrainageFog implements Solver<DrainageFogParams> {
     };
   }
 
+  /** Releases workers and the instance's attachment state. */
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.pool?.close();
+  }
+
+  [Symbol.dispose](): void {
+    this.dispose();
+  }
+
   private requireState(): State {
+    if (this.disposed) throw new MargoError('disposed', 'Drainage fog is disposed. Load a new solver.');
     if (!this.state)
       throw new MargoError('state', 'Drainage fog is not attached. Add it to a PhysicsWorld with a grid first.');
     return this.state;

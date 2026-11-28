@@ -50,6 +50,28 @@ them; the rest is a record of what a stronger solver would need.
 - **No threads or work counts.** Rust and Wasm SIMD kernels are common; threading, floating origin and recorded work
   counts are rare (point 6).
 
+### ATMO-08 four-point pass
+
+- Point 5. `physics/tests/coupling/drainage-fog.test.js` checks finite wind at a distinct signed origin, rejection of
+  extreme derived column states and a CFL interval too small to advance the clock. The old accepted columns,
+  optical bytes, ledger, time and work survive failures. Grey-mode reference tests retain their fluxes and the
+  liquid-water-path case checks sensible and latent heat against the effective emissivity.
+- Point 6. `physics/tests/coupling/drainage-fog-workers.test.js` compares plain/shared one-participant runs with
+  two and four native participants in distinct signed cells. It checks exact optical, f64 column and world
+  snapshot replay through origin shift. The 77 × 45 case crosses eight stable intervals with 27,720 columns
+  evaluated in each substep stage and 13,856 executed f64x2 wave-speed pairs across the four participants.
+  `physics/tests/drainage-fog-workers.browser.mjs` also starts three actual helpers and checks the packaged assets.
+- Point 7. `environment/tests/drainage-fog.browser.mjs` drives the live terrain field, phase change, native
+  downslope flow and optical-grid rendering through the fixed-camera valley cutaway. Initial downslope acceleration
+  is 0.0462 m/s², the liquid centroid travels 5.48 m and the basin gains 12.14 g of condensate. Both renderers
+  match held and replayed RGBA and snapshot bytes with the same clear-terrain starting pass. The original PA-34 film scenes remain open.
+- Point 8. `docs/limits.md` records the single vertical layer, grey opacity, cell and worker requirements, optical
+  size and the microphysics and field accuracy still owed.
+- Point 2 stays open. `physics/scripts/atmo08-parisfog-measured.mjs` holds out visibility measured independently
+  from droplet diameter and liquid water. In ParisFog F9 all six samples overlap their broad measurement bands.
+  In F32 five of six miss. Predicted visibility is high at all twelve timestamps. The comparison covers optical
+  extinction at input times. It leaves formation, stability and vertical growth unvalidated.
+
 ### AERO-01 four-point pass
 
 - Point 5 (d4370faed2). `physics/tests/aero.test.js` compares a rotated compound's local bounding surface with the exact

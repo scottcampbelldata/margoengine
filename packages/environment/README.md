@@ -194,6 +194,8 @@ Additive and multiply glTF PBR materials, native transmission and additive point
 
 `FogGrid` connects the solved wet-air layer to `VolumetricFog`. It samples the current height and extinction of the
 surrounding fog columns at each froxel. Its upload follows the source's revision, including after restoring a snapshot.
+The valley cutaway in `tests/drainage-fog.browser.mjs` verifies uphill condensation, downhill transport, basin
+pooling and exact replay on WebGPU and WebGL2.
 
 ```ts
 import { Engine } from '@margoengine/core';

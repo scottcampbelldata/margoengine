@@ -15386,8 +15386,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 1527813,
-        "gzip": 988651
+        "raw": 1527299,
+        "gzip": 988328
       },
       "./decomposition": {
         "raw": 26988,
@@ -15446,8 +15446,8 @@
         "gzip": 5010
       },
       "./lightning": {
-        "raw": 24516,
-        "gzip": 9005
+        "raw": 24581,
+        "gzip": 9037
       },
       "./explosive": {
         "raw": 41750,
@@ -15466,8 +15466,8 @@
         "gzip": 6377
       },
       "./clouds": {
-        "raw": 31627,
-        "gzip": 11523
+        "raw": 31692,
+        "gzip": 11559
       },
       "./ageing": {
         "raw": 9179,
@@ -15526,8 +15526,8 @@
         "gzip": 9482
       },
       "./life": {
-        "raw": 26151,
-        "gzip": 10214
+        "raw": 26216,
+        "gzip": 10252
       },
       "./crush": {
         "raw": 59895,
@@ -15550,8 +15550,8 @@
         "gzip": 4846
       },
       "./vegetation": {
-        "raw": 33659,
-        "gzip": 12687
+        "raw": 33724,
+        "gzip": 12727
       },
       "./tracers": {
         "raw": 46886,
@@ -15602,24 +15602,24 @@
         "gzip": 15193
       },
       "./viscoplastic": {
-        "raw": 22989,
-        "gzip": 8737
+        "raw": 23054,
+        "gzip": 8774
       },
       "./tsunami": {
-        "raw": 23607,
-        "gzip": 9077
+        "raw": 23672,
+        "gzip": 9109
       },
       "./pack-ice": {
         "raw": 11423,
         "gzip": 4715
       },
       "./runoff": {
-        "raw": 18388,
-        "gzip": 7105
+        "raw": 18453,
+        "gzip": 7137
       },
       "./drainage-fog": {
-        "raw": 10045,
-        "gzip": 4267
+        "raw": 20199,
+        "gzip": 7972
       },
       "./vortices": {
         "raw": 13162,
@@ -15630,12 +15630,12 @@
         "gzip": 4916
       },
       "./airborne": {
-        "raw": 28007,
-        "gzip": 11050
+        "raw": 28072,
+        "gzip": 11082
       },
       "./boundary-layer": {
-        "raw": 14193,
-        "gzip": 5604
+        "raw": 14258,
+        "gzip": 5640
       },
       "./aeolian": {
         "raw": 11986,
@@ -15646,28 +15646,28 @@
         "gzip": 3902
       },
       "./landscape": {
-        "raw": 19711,
-        "gzip": 7653
+        "raw": 19776,
+        "gzip": 7686
       },
       "./sediment": {
-        "raw": 21386,
-        "gzip": 7963
+        "raw": 21451,
+        "gzip": 7993
       },
       "./underwater": {
-        "raw": 20542,
-        "gzip": 8163
+        "raw": 20607,
+        "gzip": 8197
       },
       "./orbit": {
-        "raw": 17302,
-        "gzip": 6820
+        "raw": 17367,
+        "gzip": 6858
       },
       "./granular-flow": {
         "raw": 14611,
         "gzip": 5574
       },
       "./lava": {
-        "raw": 25500,
-        "gzip": 9762
+        "raw": 25565,
+        "gzip": 9794
       },
       "./dfsph": {
         "raw": 19974,
@@ -19109,14 +19109,14 @@
       "brotli": 699
     },
     "packages/physics/dist/drainage-fog-kernel.wasm": {
-      "raw": 8955,
-      "gzip": 3273,
-      "brotli": 2865
+      "raw": 13174,
+      "gzip": 5419,
+      "brotli": 4801
     },
     "packages/physics/dist/drainage-fog-kernel-shared.wasm": {
-      "raw": 8955,
-      "gzip": 3273,
-      "brotli": 2870
+      "raw": 13174,
+      "gzip": 5419,
+      "brotli": 4822
     },
     "packages/physics/dist/iceberg-kernel.wasm": {
       "raw": 9128,
@@ -20090,13 +20090,13 @@
     "@margoengine/physics": {
       "entry": ".",
       "base": {
-        "raw": 332954,
-        "gzip": 106949
+        "raw": 332988,
+        "gzip": 106970
       },
       "lazy": {
         "name": "physics kernel (deflated Wasm blueprint and its column table)",
-        "raw": 1194858,
-        "gzip": 880916,
+        "raw": 1194310,
+        "gzip": 880542,
         "loadedBy": "`await Physics.load()`, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own"
       }
     },

@@ -11876,3 +11876,11 @@ probes, with f64x2 traction and torque pairs and ordered reduction. The coupled 
 279 thousand panel calls in five steps. Both packaged assets and real helper startup are checked in Chromium.
 The AirSolver and RigidSolver keep their existing world contracts. The paper mobile verifies the live load
 through rope constraints and renderer poses on WebGPU and WebGL2.
+
+### ATMO-08 accepted columns and fog optics
+
+The published column and optical regions keep their layout. Internal candidates hold the dry and liquid-water
+longwave closure, native work slots, updated mass ledger and optics. A finite CFL substep must advance the clock.
+The workers resolve independent local columns, while donor-face transfers and the ledger follow canonical order.
+A packaged worker test starts three helpers from a production application. The valley cutaway transfers real cold
+condensate over TerrainBed into FogGrid, with identical state and same-frame RGBA after seeking on both backends.

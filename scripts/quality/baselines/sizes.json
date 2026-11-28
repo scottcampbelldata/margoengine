@@ -15569,6 +15569,12 @@
       "commit": "aero01-native-wind-traction",
       "reason": "AERO-01: the measured Physics entry goes from 983,721 to 988,651 B gzip, below its existing 1,013,233 B cap. Its base goes from 102,161 to 106,949 B, increasing the base cap from 104,696 to 110,158 B. WindForce uses the same panel sampling and held-load path for scalar and native traction; a second public entry would duplicate the rigid and wind adapter and break its single attachment path. The rigid Wasm chunk stays 880,916 B gzip. The two separate optional wind Wasm binaries each cost 1,165 B gzip and load on demand. Core and Stage gain no bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "atmo08-threaded-fog-columns",
+      "reason": "ATMO-08: the optional drainage-fog entry grows from 4,267 to 7,972 B gzip (ceiling from 4,523 to 8,228). The bytes cover coded numeric rejection, private accepted-output staging and deterministic native-worker barriers. A separate entry would duplicate native ownership, world-clock steps and registry bindings. Each optional native variant measures 13,174 B raw and 5,419 B gzip. Existing entries importing the same worker pool stay within their ceilings. Core and Stage gain no bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16441,7 +16447,7 @@
     "@margoengine/physics/debug-view": 1965,
     "@margoengine/physics/decomposition": 11487,
     "@margoengine/physics/dfsph": 8136,
-    "@margoengine/physics/drainage-fog": 4523,
+    "@margoengine/physics/drainage-fog": 8228,
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/entry": 9712,
     "@margoengine/physics/explosive": 15583,

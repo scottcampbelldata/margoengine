@@ -6954,3 +6954,12 @@ replay. The 1,219-panel packaged Chromium case starts three helpers. Both draw b
 of the two rope-suspended paper cranes as a real gust reaches them. The original flypast remains open.
 The measured sphere coefficient still exceeds all eleven held-out plateau and recovery observations.
 [Research and evidence](../clean-room.md#aerodynamic-loads-from-shape-aero-01-windforce-in-margoenginephysics-2026-11-25).
+
+### ATMO-08 valley fog and native column work
+
+The accepted cold layer condenses on a cooled slope, moves downhill 5.48 m and pools 12.14 g of liquid in the
+technical valley scene. Both rendered paths and the signed-origin CPU run reproduce their accepted snapshots.
+The two- and four-participant cases produce the scalar column values. The 77 × 45 case executes
+27,720 resolved rows in eight CFL intervals. The separate ParisFog optical diagnostic misses five of six
+F32 visibility samples, so quantitative validation still needs work.
+[Physics and sources](../clean-room.md#drainage-fog-and-its-live-medium-atmo-08).

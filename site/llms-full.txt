@@ -14753,18 +14753,23 @@ raw, fetched only when the caller loads the solver.
 
 ### Radiation fog and cold-air pooling (ATMO-08)
 
-The cold-air layer resolves one vertical bulk temperature, velocity and droplet population per ground column.
-It models near-surface nocturnal radiation fog, valley pooling and exchange with overlying air. Its pressure and
-ambient weather inputs are held per coupling step. The grey longwave boundary does not resolve spectral radiation.
-The bulk fall speed uses small spherical liquid droplets. Multiple radiative strata, aerosol activation, supercooled
-phase changes and synoptic weather require their own field models. Open edges export the layer. Sealed edges retain
-it while settling and external surface inputs exchange water with the ground.
+The shallow layer resolves one vertical bulk temperature, velocity and droplet population per ground column.
+Ambient pressure, the background wind and external surface fluxes are held per coupling step. The longwave
+model adds grey liquid-water opacity to a prescribed dry background. Its fixed grey option remains available.
+Temperature stratification, droplet spectra, aerosol activation, mixed phases and spectral radiation remain open.
+The small spherical liquid droplet closure uses Stokes settling. In the ParisFog holdout it overpredicts visible
+range at all twelve timestamps, with five of six F32 measurements outside the reported bands.
 
-The visual grid interpolates extinction horizontally and uses the bulk column thickness vertically. Its storage is
-16 bytes per column plus the 48-byte header, limited by the device's storage binding and buffer sizes. Analytic fog
-volumes and the live grid each work as an optional `VolumetricFog` medium.
-The optional solver is 4,666 bytes gzip with an 8,955-byte lazy Wasm asset per memory mode. The optional
-fog renderer is 2,243 bytes gzip.
+Open edges export the layer, and sealed edges retain it while surface inputs and settling exchange water with the
+ground. Local phases use one, two or four native participants and require shared world memory for multiple
+participants. The render layout and serial face order are unchanged. Each accepted step checks its CFL clock
+progress and rejects nonfinite state before updating fields and their budgets. Old grey snapshots retain the same
+layout. To continue a legacy fixed-emissivity setup under the same law, keep its prescribed emissivity.
+
+The visual grid stores 16 bytes a column plus a 48-byte header. Its resolution is bounded by the device's
+storage-buffer binding and buffer size. `FogGrid` samples optical extinction and vertical extent through the
+optional volumetric medium on both renderers. The Physics optional entry is 7,972 B gzip. Each of
+the two native assets is 13,174 B raw and 5,419 B gzip.
 
 ### Layered snowpack (ICE-01)
 

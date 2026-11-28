@@ -16367,6 +16367,26 @@ The linear stream-power implicit row can be divided by its largest magnitude wit
   solver uses a conservative donor-cell flux for depth and the transported fields, with a face sill at the higher
   bed elevation. Environment interpolates the resulting extinction in X and Z before froxel accumulation.
 
+G. L. Stephens, [Radiation Profiles in Extended Water Clouds. II: Parameterization Schemes](https://doi.org/10.1175/1520-0469%281978%29035%3C2123%3ARPIEWC%3E2.0.CO%3B2)
+(1978), gives effective emissivity as a function of liquid-water path. The
+[Meteorological Research Institute's 2001 atmospheric model report](https://www.mri-jma.go.jp/Publish/Technical/DATA/VOL_42/42_047.pdf)
+reproduces the exponential law and the upward broadband coefficient of 0.130 m²/g. The solver uses
+130 m²/kg for a single grey layer. It multiplies dry transmissivity `1 − emissivity` by
+`exp(−130 ρ h qLiquid)`. The path uses the resolved pre-entrainment liquid and depth.
+Explicit grey mode retains the fixed emissivity. E. G. Wærsted et al.,
+[Radiation in fog](https://doi.org/10.5194/acp-17-10811-2017) (2017), give independent context for the
+importance of liquid-water optical thickness, ambient humidity and overlying cloud. The coefficient is fixed independently of those events.
+
+M. Mazoyer, F. Burnet and C. Denjean, [Experimental study on the evolution of droplet size distribution during the fog life cycle](https://doi.org/10.5194/acp-22-11305-2022)
+(2022), Fig. 7 gives optical microphysics measured separately from visibility. The diagnostic uses droplet
+diameter and liquid water at 2.5 m from particle probes and tests the 4 m diffusometer visibility at fixed
+times in F9 and F32 as the held-out output. T. Elias et al.,
+[Particulate contribution to extinction of visible radiation](https://doi.org/10.1016/j.atmosres.2009.01.006)
+(2009), report a 10–25% instrument uncertainty. The diagnostic adds the conservative 25% bound to figure
+readout, and reports microphysics readout separately. The input and comparison sensors differ in height.
+The five F32 failures keep independent optical accuracy open. Aerosol activation, stratification and
+independent valley-flow validation still require evidence.
+
 ### Layered snowpack and dense avalanche obstacles (ICE-01)
 
 - P. Bartelt and M. Lehning (2002), [A physical SNOWPACK model for the Swiss avalanche warning, Part I](https://doi.org/10.1016/S0165-232X%2802%2900074-5).

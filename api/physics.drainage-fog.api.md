@@ -14,6 +14,7 @@ export class DrainageFog implements Solver<DrainageFogParams> {
     init(host: SolverHost, params: DrainageFogParams): void;
     importPorts(): void;
     step(context: StepContext, dt: number): void;
+    workCounts(): DrainageFogWorkCounts;
     exportPorts(tick: number): readonly Port[];
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
@@ -25,6 +26,8 @@ export class DrainageFog implements Solver<DrainageFogParams> {
     writeColumnData(target: Float32Array): void;
     read(x: number, z: number): DrainageFogSample;
     get budget(): DrainageFogBudget;
+    dispose(): void;
+    [Symbol.dispose](): void;
 }
 
 export interface DrainageFogBudget {
@@ -50,6 +53,7 @@ export interface DrainageFogLoadOptions {
     readonly heat?: DrainageFogInput;
     readonly moisture?: DrainageFogInput;
     readonly followTerrain?: boolean;
+    readonly threads?: number;
 }
 
 export interface DrainageFogParams {
@@ -74,6 +78,7 @@ export interface DrainageFogParams {
     readonly moisture?: GridValue;
     readonly skyTemperature?: GridValue;
     readonly emissivity?: number;
+    readonly longwave?: 'grey' | 'liquid-water-path';
     readonly drag?: number;
     readonly entrainment?: number;
     readonly radius?: number;
@@ -91,6 +96,19 @@ export interface DrainageFogSample {
     readonly liquid: number;
     readonly extinction: number;
     readonly settling: number;
+}
+
+export interface DrainageFogWorkCounts extends DrainageFogWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly DrainageFogWorkerWork[];
+}
+
+export interface DrainageFogWorkerWork {
+    readonly resolvedRows: number;
+    readonly sourceRows: number;
+    readonly settledRows: number;
+    readonly publishedRows: number;
+    readonly simdPairs: number;
 }
 
 // Not exported from this entry, but used by the exports above:

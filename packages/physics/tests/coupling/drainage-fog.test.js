@@ -236,3 +236,107 @@ test('both slot-free Wasm targets preserve every byte of an occupied world arena
     assert.deepEqual(bytes, expected);
   }
 });
+
+test('held liquid water deepens the longwave absorber while explicit grey flux remains unchanged', async () => {
+  const sky = 263.15;
+  const areaTemperature = 284.15;
+  const initialLiquid = 0.0003;
+  const heating = async (radiation, startingLiquid) => {
+    using fog = await DrainageFog.load();
+    const world = build(fog, {
+      ...radiation,
+      initialTemperature: areaTemperature,
+      initialHumidity: 1,
+      initialLiquid: startingLiquid,
+      skyTemperature: sky,
+      secondsPerSecond: 60,
+    });
+    const before = fog.read(0, 0);
+    const water = fog.budget.water;
+    world.advance(1);
+    const next = fog.read(0, 0);
+    near(balancedWater(fog.budget), water);
+    return {
+      before,
+      enthalpy: cp * (next.temperature - before.temperature) + latent * (next.vapour - before.vapour),
+    };
+  };
+  const dryEmissivity = 0.15;
+  const fixed = await heating({ emissivity: dryEmissivity }, initialLiquid);
+  const layered = await heating({ emissivity: undefined }, initialLiquid);
+  const explicit = await heating({ emissivity: dryEmissivity, longwave: 'liquid-water-path' }, initialLiquid);
+  const columnMass = air * layered.before.depth;
+  const lwp = columnMass * layered.before.liquid;
+  const expectedEmissivity = 1 - (1 - dryEmissivity) * Math.exp(-130 * lwp);
+  const equivalentFlux = (5.670374419e-8 * (sky ** 4 - layered.before.temperature ** 4)) / columnMass;
+  near(fixed.enthalpy, dryEmissivity * equivalentFlux, 7e-11);
+  near(layered.enthalpy, expectedEmissivity * equivalentFlux, 7e-11);
+  assert.equal(layered.enthalpy, explicit.enthalpy);
+  assert.ok(layered.enthalpy < fixed.enthalpy);
+  const dryFixed = await heating({ emissivity: dryEmissivity }, 0);
+  const dryLayered = await heating({ emissivity: undefined }, 0);
+  assert.equal(dryLayered.enthalpy, dryFixed.enthalpy);
+});
+
+test('accepted fog columns, optics, time and work remain intact after a late native or input failure', async () => {
+  using fog = await DrainageFog.load();
+  let fault = 'normal';
+  const seen = [];
+  const fieldCell = [-523451, 399999, 500001];
+  const solverCell = [-523450, 400000, 500000];
+  const wind = {
+    medium: 'air',
+    cell: fieldCell,
+    sample(x, y, z, t, out) {
+      seen.push([x, y, z, t]);
+      out.velocity = [x > 512 && fault === 'overflow' ? 1e200 : fault === 'unreadable' ? NaN : 0, 0, 0];
+      out.density = air;
+      out.temperature = 284;
+      return out;
+    },
+  };
+  const world = build(
+    fog,
+    {
+      width: 3,
+      origin: [-1, 4],
+      initialHumidity: 1,
+      initialLiquid: 0.0002,
+      wind,
+      worldCellSize: 512,
+      entrainment: 0.02,
+    },
+    { cellSize: 512 },
+  );
+  world.setCell('drainage-fog', solverCell);
+  world.advance(1);
+  assert.deepEqual(seen[0].slice(0, 3), [511, 514, -508]);
+  function accepted() {
+    const optics = new Float32Array(12);
+    fog.writeColumnData(optics);
+    return {
+      optics,
+      columns: [0, 1, 2].map((i) => fog.read(i, 0)),
+      budget: fog.budget,
+      revision: fog.revision,
+      work: fog.workCounts(),
+    };
+  }
+  const same = accepted();
+  fault = 'overflow';
+  assert.throws(() => world.advance(2), { code: 'state', message: /unrepresentable column/ });
+  assert.deepEqual(accepted(), same);
+  fault = 'unreadable';
+  assert.throws(() => world.advance(3), { code: 'state', message: /sampled wind X/ });
+  assert.deepEqual(accepted(), same);
+});
+
+test('a nonadvancing CFL substep is rejected promptly and retains the last valid frame', async () => {
+  using fog = await DrainageFog.load();
+  const world = build(fog, { initialVelocity: [1e22, 0] });
+  const initial = fog.read(0, 0);
+  assert.ok(initial.velocity[0] > 1e21);
+  assert.throws(() => world.advance(1), { code: 'state', message: /cannot advance its stable interval/ });
+  assert.deepEqual(fog.read(0, 0), initial);
+  assert.equal(fog.revision, 0);
+});

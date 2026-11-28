@@ -6996,6 +6996,16 @@ kg/(m² s). Use the corresponding `SurfaceEnergySolver` words with `heat: { fiel
 `moisture: { field, stride: 3, word: 0 }` at load time. Use `followTerrain` to read a matching `TerrainBed`, or
 provide the elevations directly. `wind` is a background `Wind` field sampled at each layer's centre.
 
+Without an explicit emissivity setting, the longwave calculation combines the dry atmosphere with the current
+liquid-water path. The dry emissivity defaults to 0.15. For a prescribed grey layer, set `emissivity` as before,
+or choose `longwave: 'grey'`. To change the dry baseline while retaining liquid-water absorption, choose
+`longwave: 'liquid-water-path'` and set `emissivity`. Grey emissivity zero leaves the separate surface fluxes active.
+
+`DrainageFog.load({threads})` takes 1 (the default), 2 or 4 native participants. For 2 or 4, create the world
+with `worldMemory(true)` and run from a worker on the web. `workCounts()` reports the last accepted step,
+with row and SIMD pair counts for each participant. `using` releases the workers. Use `worldCellSize`
+(default 4096 m) to match a different world cell size when reading wind from another signed cell.
+
 `read(x, z)` gives temperature, motion, vapour and liquid mixing ratios, extinction and deposition. The layout-1 f64
 `columnField` publishes the same cells in x-fast order. `opticalField` is `[ground, top, extinction, 0]` per cell as
 f32. Readers can use the field registry or call `writeColumnData` for direct view binding. Pass the solver as

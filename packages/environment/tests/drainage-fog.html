@@ -2,51 +2,240 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Solved fog movement</title>
-  <style>body { margin: 0; } canvas { display: block; }</style>
+  <title>Cold-air drainage</title>
+  <style>body { margin: 0; } canvas { display: block; width: 680px; height: 402px; }</style>
 </head>
 <body>
-  <canvas width="256" height="160"></canvas>
+  <canvas width="680" height="402"></canvas>
   <script type="module">
-    import { Engine, PbrMaterial, box } from '/packages/core/dist/index.js';
+    import { EngineKernel } from '/packages/core/dist/index.js';
     import { FogGrid } from '/packages/environment/dist/fog-volumes.js';
     import { VolumetricFog } from '/packages/environment/dist/volumetric.js';
+    import { planeGeometry } from '/packages/geometry/dist/index.js';
+    import { UnlitMaterial, createMesh } from '/packages/materials/dist/index.js';
+    import { FilmClock } from '/packages/math/dist/clock.js';
     import { DrainageFog } from '/packages/physics/dist/drainage-fog.js';
-    import { PhysicsWorld } from '/packages/physics/dist/world.js';
-    import { Bloom } from '/packages/post/dist/bloom.js';
+    import { TerrainBed } from '/packages/physics/dist/earth.js';
+    import { PhysicsWorld, regionWords } from '/packages/physics/dist/world.js';
+    import { Tonemap } from '/packages/tonemap/dist/index.js';
+    import { Font, Text, TextRenderer } from '/packages/text/dist/index.js';
+    import { waitForPipelines } from '/scripts/support/gpu-ready.js';
 
-    const engine = await Engine.create(document.querySelector('canvas'), {
-      backend: 'webgpu', camera: { position: [0, 2.4, 13], target: [0, 2.2, 0], near: 0.1, far: 80 },
+    const width = 32;
+    const depth = 12;
+    const spacing = [1, 1];
+    const origin = [-(width - 1) / 2, -(depth - 1) / 2];
+    const relativeHumidity = 0.9985;
+    const nearSaturation = (x) => x >= -10 && x <= -3;
+    const surface = (x) => 0.32 * Math.max(0, 2.5 - x) + 0.22 * Math.max(0, x - 10.5);
+    const columns = (f) => Float64Array.from({ length: width * depth }, (_, i) => f(origin[0] + i % width));
+    const scale = 12;
+    const film = new FilmClock({ fps: 60 });
+    const world = new PhysicsWorld({ rate: film.fps, gravity: [0, -9.81, 0] });
+    const terrain = new TerrainBed();
+    const fog = await DrainageFog.load({ followTerrain: true });
+    world.add(terrain, {
+      columns: width,
+      rows: depth,
+      width,
+      depth,
+      centre: [0, 0],
+      elevations: surface,
     });
-    engine.stop();
-    Bloom.attach(engine, { strength: 0 });
-    const dark = new PbrMaterial({ color: '#202c24' });
-    engine.createMesh().setGeometry(box(30, 0.2, 30)).setPosition([0, -0.1, 0]).setMaterial(dark);
-    engine.createMesh().setGeometry(box(20, 7, 0.2)).setPosition([0, 3.5, -8]).setMaterial(dark);
-    const errors = [];
-    engine.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
-
-    const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
-    const fog = await DrainageFog.load();
-    const width = 18, depth = 10;
-    const liquid = Array.from({ length: width * depth }, (_, i) => (i % width >= 4 && i % width < 7 ? 0.003 : 0));
+    const bed = terrain.bed;
+    const ambientTemperature = 286.15;
+    const ambientHumidity = 0.90;
     world.add(fog, {
-      width, depth, spacing: [1, 1], origin: [-8.5, -5], initialDepth: 4, initialLiquid: liquid,
-      initialTemperature: 286, airTemperature: 280, initialHumidity: 1, initialVelocity: [2, 0],
-      drag: 0, settling: 0, emissivity: 0, entrainment: 0,
+      width,
+      depth,
+      spacing,
+      origin,
+      terrain: columns((x) => bed.sample(x, 0).elevation),
+      initialDepth: 1.45,
+      initialTemperature: 282.15,
+      initialHumidity: columns((x) => nearSaturation(x) ? relativeHumidity : 0.93),
+      airTemperature: ambientTemperature,
+      airHumidity: ambientHumidity,
+      skyTemperature: 260,
+      heat: columns((x) => nearSaturation(x) ? -125 : 0),
+      emissivity: 0.08,
+      longwave: 'liquid-water-path',
+      entrainment: 0,
+      secondsPerSecond: scale,
     });
-    const grid = new FogGrid(fog);
-    const pass = VolumetricFog.attach(engine, { density: 0, temporal: 0, grid: [36, 24, 24], range: 40, ambient: [1, 1, 1] });
 
-    window.step = async (frame, show) => {
-      world.advance(frame);
-      pass.options.volumes = show ? grid : undefined;
-      engine.render({ delta: 0 });
-      await engine.gpu.queue.onSubmittedWorkDone();
-      return { water: fog.budget.water, errors: errors.splice(0) };
+    const w = 680, h = 402;
+    const engine = await EngineKernel.create(document.querySelector('canvas'), {
+      backend: 'webgpu',
+      exactSize: [w, h],
+      camera: { position: [0.5, 7.2, 31], target: [0.4, 2.2, 0], fov: 35, near: 0.35, far: 74 },
+    });
+    engine.scene.background = '#2c3c51';
+    engine.lighting.direction.set([-0.67, 0.71, -0.21, 0.85]);
+    engine.lighting.radiance.set([0.92, 0.86, 0.78, 0.8]);
+    engine.lighting.ambient.set([0.62, 0.73, 0.9]);
+    Tonemap.attach(engine);
+
+    const landscape = planeGeometry(width, depth, width, depth);
+    for (let i = 0; i < landscape.positions.length; i += 3) {
+      const x = landscape.positions[i];
+      const z = -landscape.positions[i + 1];
+      const sample = bed.sample(x, z);
+      landscape.positions.set([x, sample.elevation, z], i);
+      landscape.normals.set(sample.normal, i);
+    }
+    createMesh(engine, landscape, new UnlitMaterial({ color: '#35463d' }));
+    // Geological section across the front of the surveyed bed, outside the fog's uphill route.
+    const sectionZ = depth / 2;
+    const sectionBottom = -2.65;
+    for (const [low, high, color] of [[0, 0.38, '#262c31'], [0.38, 0.79, '#39423e'], [0.79, 1, '#4a5444']]) {
+      const section = planeGeometry(width, 1, width);
+      for (let i = 0; i < section.positions.length; i += 3) {
+        const x = section.positions[i];
+        const k = section.positions[i + 1] < 0 ? low : high;
+        const y = sectionBottom + k * (bed.sample(x, sectionZ).elevation - sectionBottom);
+        section.positions.set([x, y, sectionZ], i);
+      }
+      createMesh(engine, section, new UnlitMaterial({ color }));
+    }
+
+    const glyphs = TextRenderer.attach(engine);
+    const title = new Font({ family: 'Arial, sans-serif', weight: 600 });
+    const info = new Font({ family: 'Arial, sans-serif', weight: 400 });
+    function label(text, position, font, fontSize, color) {
+      glyphs.add(new Text({ text, position, font, fontSize, color, billboard: true, onTop: true }));
+    }
+    label('Cold air drains into the valley', [-15.2, 10, 0], title, 1, '#e3e7e8');
+    label('Cooling on the slope · 12× physical time', [-15.1, 8.85, 0], info, 0.54, '#b6c8da');
+    label('COOLED SLOPE', [-11, 5.2, 0], info, 0.45, '#c4d3db');
+    label('VALLEY FLOOR', [4.4, -1.07, 6.2], info, 0.42, '#becfc4');
+
+    const gpu = engine.gpu;
+    const errors = [];
+    engine.onError = (error) => errors.push(String(error));
+    gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
+    gpu.pushErrorScope('validation');
+    const optical = new Float32Array(width * depth * 4);
+    const source = {
+      get width() { return fog.width; },
+      get depth() { return fog.depth; },
+      get spacing() { return fog.spacing; },
+      get origin() { return fog.origin; },
+      get revision() { return fog.revision; },
+      writeColumnData(target) {
+        fog.writeColumnData(target);
+        const port = world.fields.port(fog.opticalField.name);
+        if (!port || port.region.type !== 'f32' || port.region.layout !== 1)
+          throw new Error('FogGrid must upload the current layout-1 optical port.');
+        const accepted = regionWords(world.memory, port.region);
+        if (target.length !== accepted.length || target.some((v, i) => v !== accepted[i]))
+          throw new Error('FogGrid must upload the current accepted optical port.');
+      },
     };
-    window.retire = () => { pass.options.volumes = undefined; grid.dispose(); };
-    window.ready = true;
+    const grid = new FogGrid(source, [0.85, 0.93, 1]);
+    const pass = VolumetricFog.attach(engine, { volumes: grid, density: 0, temporal: 0, grid: [64, 32, 64], range: 56, ambient: [1, 1, 1] });
+
+    const draw = async () => {
+      engine.render({ delta: 0 });
+      await gpu.queue.onSubmittedWorkDone();
+    };
+    await waitForPipelines(draw);
+    function pixel([x, y, z]) {
+      const m = engine.camera.matrix;
+      const denominator = m[3] * x + m[7] * y + m[11] * z + m[15];
+      return [
+        0.5 * w * (1 + (m[0] * x + m[4] * y + m[8] * z + m[12]) / denominator),
+        0.5 * h * (1 - (m[1] * x + m[5] * y + m[9] * z + m[13]) / denominator),
+      ];
+    }
+    const row = 5;
+    const up = 9;
+    const pool = 19;
+    const cue = 12;
+    const end = 140;
+    const initial = world.takeSnapshot();
+    const snapshotBytes = new Map();
+    let index = 0;
+    let saved;
+    window.shot = {
+      async at(frame, show = true, action) {
+        film.frame = frame;
+        const goal = Math.max(0, Math.min(end, film.frame - cue));
+        if (action === 'restore') {
+          world.restoreSnapshot(saved.snapshot.bytes);
+          index = saved.index;
+        } else if (goal < index) {
+          world.restoreSnapshot(initial.bytes);
+        }
+        world.advance(goal);
+        index = goal;
+        const snapshot = world.takeSnapshot();
+        const earlier = snapshotBytes.get(goal);
+        if (!earlier) snapshotBytes.set(goal, snapshot.bytes);
+        else if (earlier.length !== snapshot.bytes.length || earlier.some((v, i) => v !== snapshot.bytes[i]))
+          throw new Error('Held and restored fog and bed snapshots must reproduce the accepted bytes.');
+        if (action === 'save') saved = { index, snapshot };
+        const port = world.fields.port(fog.columnField.name);
+        if (!port || port.region.type !== 'f64' || port.region.layout !== 1)
+          throw new Error('Measure the accepted layout-1 f64 fog columns.');
+        const fields = regionWords(world.memory, port.region);
+        let mass = 0, moment = 0, poolMass = 0;
+        for (let i = 0; i < width * depth; i++) {
+          const x = origin[0] + i % width;
+          const z = origin[1] + Math.floor(i / width);
+          const start = 9 * i;
+          const columnMass = 1.225 * fields[start + 1] * fields[start + 6] * spacing[0] * spacing[1];
+          if (Math.abs(fields[start] - bed.sample(x, z).elevation) > 1e-6)
+            throw new Error('Fog must follow the same terrain directly used for the cutaway.');
+          mass += columnMass;
+          moment += columnMass * x;
+          if (x >= 2.5 && x <= 10.5) poolMass += columnMass;
+        }
+        fog.writeColumnData(optical);
+        for (const i of [up, pool]) {
+          const p = fog.read(i, row);
+          const offset = (i + row * width) * 4;
+          if (optical[offset] !== Math.fround(p.ground) || optical[offset + 1] !== Math.fround(p.ground + p.depth) ||
+              optical[offset + 2] !== Math.fround(p.extinction))
+            throw new Error('The visible fog height and extinction must correspond to the same column as its thermodynamics.');
+        }
+        // Present the clear terrain before directing a new frame, so the renderer starts from the same target history.
+        pass.options.volumes = undefined;
+        pass.resetTime();
+        await draw();
+        if (show) {
+          pass.options.volumes = grid;
+          await draw();
+        }
+        return {
+          hash: snapshot.hash,
+          seconds: world.time * scale,
+          mass,
+          center: mass > 0 ? moment / mass : null,
+          poolMass,
+          upper: fog.read(up, row),
+          valley: fog.read(pool, row),
+          budget: fog.budget,
+        };
+      },
+      async dispose() {
+        pass.options.volumes = undefined;
+        grid.dispose();
+        glyphs.dispose();
+        const validation = (await gpu.popErrorScope())?.message ?? null;
+        engine.dispose();
+        return { validation, errors };
+      },
+    };
+    window.ready = {
+      cue,
+      end,
+      scale,
+      slope: surface(-1.5) - surface(-0.5),
+      ambientTemperature,
+      ambientHumidity,
+      basin: pixel([5.1, 1.7, 0]),
+    };
   </script>
 </body>
 </html>
