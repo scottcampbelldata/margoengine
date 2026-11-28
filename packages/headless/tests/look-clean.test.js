@@ -1156,3 +1156,62 @@ test('T8 motionBlur judges each edge by its surface`s own travel when given the 
   assert.ok(fast.value === 100 && !fast.pass, `a leaf really moving 12 px drawn sharp: ${fast.value}`);
   assert.throws(() => motionBlur(frame, motion, { velocity: { ...velocity, data: new Float32Array(2) } }), RangeError);
 });
+
+test('T4 shimmerMoving leaves out only the pixels a moving surface`s own blur reaches, so shimmer on a static edge beside a swaying branch still fails (KB-LOOK-TV-SHIMMER2)', () => {
+  // A still camera; a branch (250) over columns 20 to 23 sways 8 px a frame, so a 180 degree shutter smears it 2 px each
+  // way (half its motion over the open shutter). The next frame holds that smear on columns 18, 19, 24 and 25, and a
+  // static edge at column 30, 7 px from the branch, flashes one pixel in two.
+  const width = 48,
+    height = 32,
+    branch = (x) => x >= 20 && x < 24,
+    base = (x) => (branch(x) ? 250 : x >= 30 ? 200 : 60),
+    frame = image(width, height, (x) => base(x)),
+    smear = (x) => x === 18 || x === 19 || x === 24 || x === 25,
+    next = image(width, height, (x, y) => (x === 30 && y % 2 === 0 ? 0 : smear(x) ? 150 : base(x))),
+    motion = { width, height, data: new Float32Array(width * height * 2) },
+    velocity = { width, height, data: new Float32Array(width * height * 2) };
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) velocity.data[(y * width + x) * 2] = branch(x) ? 8 : 0;
+  const row = shimmerMoving(frame, { next, motion, velocity });
+  assert.equal(row.detail.animated, 4 * height);
+  assert.equal(row.detail.blurred, 4 * height, 'the smear within 2 px of the branch is left out');
+  assert.equal(row.detail.off, height / 2, 'the static edge`s shimmer is still counted');
+  assert.ok(row.value > 0.5 && !row.pass, `shimmer beside a swaying branch fails: ${row.value}`);
+  // The reach is the blur the shot really draws: a 1 px maxBlur leaves column 25's smear counted, a 360 degree shutter
+  // reaches 4 px, and neither reaches the static edge.
+  const capped = shimmerMoving(frame, { next, motion, velocity, maxBlur: 1 });
+  assert.equal(capped.detail.blurred, 2 * height);
+  assert.equal(capped.detail.off, height / 2 + 2 * height);
+  const open = shimmerMoving(frame, { next, motion, velocity, shutter: 360 });
+  assert.equal(open.detail.blurred, 8 * height);
+  assert.equal(open.detail.off, height / 2);
+  assert.equal(shimmerMoving(frame, { next, motion }).detail.blurred, undefined);
+  for (const bad of [{ maxBlur: 0 }, { maxBlur: 200 }, { shutter: 0 }, { shutter: 400 }])
+    assert.throws(() => shimmerMoving(frame, { next, motion, velocity, ...bad }), RangeError, JSON.stringify(bad));
+});
+
+test('T8 motionBlur fails a stepped trail: eight sharp copies over a 180 degree shutter are not a smear (KB-LOOK-TV-SUBSTEP1)', () => {
+  // Bars moving 96 and 64 px a frame, exposed at 180 degrees as 8 sharp copies (each sub-frame drawn without blurring over
+  // its own slice of the shutter, the old timber-valley trail) or as one continuous smear.
+  for (const [bar, travel] of [
+    [24, 96],
+    [3, 64],
+  ]) {
+    const width = 256,
+      height = 8,
+      motion = { width, height, data: new Float32Array(width * height * 2) };
+    for (let i = 0; i < width * height; i++) motion.data[i * 2] = travel;
+    const exposed = (copies) =>
+      image(width, height, (x) => {
+        let cover = 0;
+        for (let k = 0; k < copies; k++) {
+          const o = ((k + 0.5) / copies) * 0.5 * travel;
+          cover += Math.max(0, Math.min(x + 1, 60 + bar + o) - Math.max(x, 60 + o));
+        }
+        return Math.round(20 + 235 * (cover / copies));
+      });
+    const trail = motionBlur(exposed(8), motion),
+      smooth = motionBlur(exposed(256), motion);
+    assert.ok(trail.detail.edges > 0 && trail.value === 100 && !trail.pass, `${bar} px stepped: ${trail.value}`);
+    assert.ok(smooth.value === 0 && smooth.pass, `${bar} px smeared: ${smooth.value} of ${smooth.detail.edges}`);
+  }
+});

@@ -80,6 +80,29 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** one helper (`packages/shared/occlude-ambient.js`) multiplies every ambient term. Test:
   `packages/scatter/test/contact.browser.mjs` (1.000 against 0.502 before and after).
 
+### Open 2026-11-28: motionBlur calls a correctly smeared mover narrower than its smear sharp (KB-LOOK-TV-MBNARROW1, headless look)
+
+- **Repro:** a bar 12 px wide moving 64 px a frame, exposed over a 180 degree shutter as a continuous smear (256
+  sub-frames), read by `motionBlur(frame, motion)` reads 100 percent sharp (24 of 24 edges); a 24 px bar at 96 px reads 0.
+- **Cause:** the check expects each edge's 10 to 90 percent ramp to be at least a quarter of the travel (half the 180
+  degree smear). A box blur of length L over a bar of width w < L ramps over w, not L, with a plateau of L - w, so a
+  narrow mover's ramp is its own width however well it is blurred.
+- **Next:** judge the ramp against min(smear, the bar's width along the motion), read from the profile (ramp plus
+  plateau spans the smear); needs a ruling on the check, since it changes what passes.
+
+### Open 2026-11-28: shimmerMoving reads a defocused swaying leaf's soft edge as shimmer (KB-LOOK-TV-SHIMMER2, rest, headless look)
+
+- **Repro:** `DIR=<blowup render> node` with `shimmerMoving` on the timber-valley blowup mid probe (8 sub-frames,
+  180 degrees, `moving.velocity: true`): 1.72 percent off (bound 0.5), all in a band along the soft edges of the large
+  out-of-focus foreground leaves at x 1700 to 1920.
+- **Cause:** depth of field spreads each near leaf 20 px and more past the pixels that carry its velocity, so the sky
+  its bokeh covers changes on purpose but has the camera's velocity. The motion-blur reach (below) covers the motion
+  smear only. The frame looks right there.
+- **Done:** with `velocity`, shimmerMoving now leaves out what a moving surface's motion blur reaches (McGuire et al.
+  2012 tile-max, capped at `maxBlur`): mid 2.02 to 1.72, early 0.48 to 0.44. Regression in
+  `packages/headless/tests/look-clean.test.js` (a static edge flashing 7 px from a swaying branch still fails).
+- **Next:** asked for a ruling to add the moving surface's own circle-of-confusion radius to the reach.
+
 ### Fixed 2026-11-28: a shot drawn in sub-frames showed what moves fast as stepped copies, not a smear (KB-LOOK-TV-SUBSTEP1, shot tool, scenes)
 
 - **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-blowup.json --once --seconds 1.1` (RTX A6000,

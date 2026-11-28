@@ -278,6 +278,7 @@ export interface MovingFrames {
     velocity?: LookMotion;
     nextVelocity?: LookMotion;
     shutter?: number;
+    maxBlur?: number;
 }
 
 export const PENUMBRA_MIN_PIXELS: number;
@@ -457,7 +458,7 @@ export function shimmer(frames: readonly LookImage[], { mask, bound, threshold }
     threshold?: number;
 }): LookResult;
 
-export function shimmerMoving(frame: LookImage, { next, motion, back, velocity, nextVelocity }: MovingFrames, { mask, bound, threshold }?: FlickerOptions & {
+export function shimmerMoving(frame: LookImage, { next, motion, back, velocity, nextVelocity, shutter, maxBlur }: MovingFrames, { mask, bound, threshold }?: FlickerOptions & {
     threshold?: number;
 }): LookResult;
 

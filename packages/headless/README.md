@@ -678,7 +678,7 @@ console.log(lookReport([{ name: 'hearth', frame, results: rows }]).markdown.spli
 | `stairs` | T3: % of strong edges (a step over 24 codes) that are one pixel stair steps: a step with no value between its two plateaus in the 3 x 4 window of its two pixels (nothing further than a tenth of the range from both ends), on an edge that is not straight along a pixel row or column | 1 | the frame |
 | `colourEdges` | T7: the same on the a* and b* planes: colour edges 4:2:0 smears | 10 | the frame |
 | `chromaSmear` | T7: percent of pixels whose colour moves by CIE76 over 6 when the frame is cut to 4:2:0 chroma (BT.709 Y'CbCr, 2 x 2 averages, bilinear read back), no encoder needed | 2 | the frame |
-| `shimmerMoving` | T4: % of pixels more than 6 codes outside the range of the four next-frame pixels their camera motion lands between (a blend of those four is resampling, the TAA neighbourhood clamp of Karis 2014) | 0.5 | `moving`: the next frame and each pixel's motion (`reprojectionMotion` makes it from depth and the two view-projections) |
+| `shimmerMoving` | T4: % of pixels more than 6 codes outside the range of the four next-frame pixels their camera motion lands between (a blend of those four is resampling, the TAA neighbourhood clamp of Karis 2014); with `velocity`, what moves other than the camera and its motion blur's reach (McGuire et al. 2012 tile-max, at most `maxBlur`) are left out | 0.5 | `moving`: the next frame and each pixel's motion (`reprojectionMotion` makes it from depth and the two view-projections) |
 | `motionBlur` | T8: % of edge centres of pixels moving over 8 pixels a frame whose edge is narrower than half the shutter's smear (`shutter` degrees, default 180, smear `shutter / 360` of the travel; `checkShot` reads the angle from `manifest.render` when the shot drew sub-frames) | 5 | `moving` |
 | `silhouette` | T5: % of the subject's outline with 15 L* or more against what is behind | [80, 100] | the `subject` mask |
 | `silhouetteShape` | T5: % of the subject (at 320 x 180, three L* values) in one value | [70, 100] | the `subject` mask |
@@ -771,6 +771,35 @@ const size = 8,
 const row = shimmerMoving(image(), { next: image(), motion, velocity });
 console.log(row.detail.animated); // 64: every pixel moved 1 px more than the still camera
 ```
+
+**T4 leaves out what a moving surface's blur reaches** (KB-LOOK-TV-SHIMMER2, 2026-11-28). Motion blur smears a swaying
+branch over the still sky beside it, so that sky changes on purpose too. With `velocity`, `shimmerMoving` also skips a
+pixel within the blur radius of a surface the engine moves other than the camera: half that surface's motion over the open
+shutter (`MovingFrames.shutter`, default 180 degrees), at most `MovingFrames.maxBlur` (default 32 px, `MotionBlur`'s
+`maxBlur`), never further than the blur really draws. The search is the reconstruction filter of McGuire, Hennessy,
+Bukowski and Osman ("A Reconstruction Filter for Plausible Motion Blur", I3D 2012, https://doi.org/10.1145/2159616.2159639),
+as `@margoengine/post/motion-blur` draws it: the longest radius per `maxBlur` tile, the longest over each tile's 3 x 3
+neighbours, then a walk along it. `detail.blurred` counts them; a flashing pixel on a still edge beyond the reach still
+fails.
+
+```js
+import { shimmerMoving } from '@margoengine/headless/look';
+
+const width = 16,
+  height = 4,
+  image = () => ({ width, height, data: new Uint8Array(width * height * 4).fill(128) }),
+  motion = { width, height, data: new Float32Array(width * height * 2) },
+  velocity = { width, height, data: new Float32Array(width * height * 2) };
+for (let y = 0; y < height; y++) velocity.data[(y * width + 8) * 2] = 8; // column 8 sways 8 px a frame
+const row = shimmerMoving(image(), { next: image(), motion, velocity });
+console.log(row.detail.animated, row.detail.blurred); // 4 16: its 2 px smear each way is left out
+```
+
+**T8 fails a stepped trail** (KB-LOOK-TV-SUBSTEP1, 2026-11-28). A frame drawn as sharp copies, one per sub-frame, spans
+the shutter's smear but climbs in jumps between flat steps. `motionBlur` also calls an edge sharp when its ramp (the run
+between 10 and 90 percent around the edge, at least 8 pixels) climbs one way in three or more separate jumps, each over
+12 codes and over twice the ramp's mean climb a pixel. A smooth smear climbs evenly, steepest once in its middle; texture
+and thin objects, which fall back by over 12 codes inside the run, are not staircases.
 
 **T6 reads the precise frame and pools frames** (KB-LOOK-TV-TINTRES1, 2026-11-28). `bounce` and `shadowTint` also take
 `precise`, the frame before its 8 bits (RGB float32, sRGB coded 0 to 1: the shot tool's `probes/<name>.rgb32f`), read in

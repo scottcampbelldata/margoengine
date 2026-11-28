@@ -2402,6 +2402,11 @@ export interface MovingFrames {
    * the film standard: a frame drawn without sub-frames is still judged against a 180 degree smear.
    */
   shutter?: number;
+  /**
+   * The longest blur radius the shot's motion blur draws, in pixels (`MotionBlur` `maxBlur`), for `shimmerMoving`'s
+   * blur reach. Default 32, `MotionBlur`'s default.
+   */
+  maxBlur?: number;
 }
 
 function sampleLuma(y: Float32Array, width: number, height: number, x: number, v: number): number {
@@ -2453,11 +2458,14 @@ function outsideTaps(
  * T4 while moving: frame n is warped onto n + 1 by its motion (`reprojectionMotion` makes it from the depth and the two
  * view-projections), and the percent of pixels whose luma falls more than `threshold` (6 codes) outside [min, max] of
  * the four pixels of the next frame around where it lands is the shimmer (see `outsideTaps`: a blend of those four is
- * the warp resampling an edge, not a change). Pixels whose target leaves the frame are not counted.
+ * the warp resampling an edge, not a change). Pixels whose target leaves the frame are not counted. With `velocity`,
+ * a pixel a moving surface's motion blur reaches is left out too (`blurReach`: McGuire, Hennessy, Bukowski and Osman
+ * 2012 tile-max, capped at `maxBlur`), counted in `detail.blurred`.
+ * @throws RangeError for a shutter not more than 0 and up to 360 degrees, or a maxBlur not 1 to 128 pixels.
  */
 export function shimmerMoving(
   frame: LookImage,
-  { next, motion, back, velocity, nextVelocity }: MovingFrames,
+  { next, motion, back, velocity, nextVelocity, shutter = 180, maxBlur = 32 }: MovingFrames,
   { mask, bound, threshold = 6 }: FlickerOptions & { threshold?: number } = {},
 ): LookResult {
   const { width, height } = frame;
@@ -2479,13 +2487,17 @@ export function shimmerMoving(
     if (field.data.length !== width * height * 2)
       throw rangeError(`The ${name} holds two floats (x, y) per pixel`, 'headless');
   }
+  if (!(shutter > 0 && shutter <= 360)) throw rangeError('The shutter is more than 0 and up to 360 degrees', 'headless');
+  if (!(maxBlur >= 1 && maxBlur <= 128)) throw rangeError('maxBlur is 1 to 128 pixels', 'headless');
   const a = luma(frame),
     b = luma(next),
-    inside = maskBits(frame, mask, 'shimmerMoving');
+    inside = maskBits(frame, mask, 'shimmerMoving'),
+    reach = velocity ? blurReach(motion, velocity, shutter / 360, maxBlur) : undefined;
   let count = 0,
     off = 0,
     occluded = 0,
-    animated = 0;
+    animated = 0,
+    blurred = 0;
   for (let y = 0; y < height; y++)
     for (let x = 0; x < width; x++) {
       const i = y * width + x;
@@ -2504,6 +2516,10 @@ export function shimmerMoving(
         animated++;
         continue;
       }
+      if (reach && reach[i]) {
+        blurred++;
+        continue;
+      }
       count++;
       if (outsideTaps(b, width, height, tx, ty, a[i], threshold)) off++;
     }
@@ -2516,8 +2532,81 @@ export function shimmerMoving(
       off,
       ...(back ? { occluded } : {}),
       ...(velocity || nextVelocity ? { animated } : {}),
+      ...(velocity ? { blurred } : {}),
     },
   );
+}
+
+/**
+ * The pixels a moving surface's motion blur smears over: 1 where a surface the engine moves other than the camera
+ * (|v - f| > 0.5 px, as `animatedAt`) lies within its own blur radius, which is half its motion over the open shutter
+ * (`share` of the frame) and at most `maxBlur`, the radius `MotionBlur` draws. The search is the reconstruction filter's
+ * (M. McGuire, P. Hennessy, M. Bukowski and B. Osman, "A Reconstruction Filter for Plausible Motion Blur", I3D 2012,
+ * https://doi.org/10.1145/2159616.2159639): the longest radius per `maxBlur` tile, the longest over each tile's 3 x 3
+ * neighbours, then a walk along that neighbourhood radius, one sample per pixel each way; a pixel is in reach when a
+ * moving sample's own radius covers the distance to it. No pixel beyond the radius the blur really draws is left out.
+ */
+function blurReach(motion: LookMotion, velocity: LookMotion, share: number, maxBlur: number): Uint8Array {
+  const { width, height } = motion,
+    n = width * height,
+    rx = new Float32Array(n),
+    ry = new Float32Array(n),
+    moving = new Uint8Array(n),
+    k = Math.ceil(maxBlur),
+    tw = Math.ceil(width / k),
+    th = Math.ceil(height / k),
+    tiles = new Float32Array(tw * th * 2),
+    near = new Float32Array(tw * th * 2),
+    out = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    const dx = velocity.data[i * 2] - motion.data[i * 2],
+      dy = velocity.data[i * 2 + 1] - motion.data[i * 2 + 1],
+      l2 = dx * dx + dy * dy;
+    if (!(l2 > 0.25)) continue;
+    const l = Math.sqrt(l2),
+      r = Math.min(l * share * 0.5, maxBlur) / l;
+    moving[i] = 1;
+    rx[i] = dx * r;
+    ry[i] = dy * r;
+  }
+  const longest = (into: Float32Array, j: number, x: number, y: number) => {
+    if (x * x + y * y > into[j * 2] ** 2 + into[j * 2 + 1] ** 2) {
+      into[j * 2] = x;
+      into[j * 2 + 1] = y;
+    }
+  };
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const i = y * width + x;
+      if (moving[i]) longest(tiles, Math.floor(y / k) * tw + Math.floor(x / k), rx[i], ry[i]);
+    }
+  for (let ty = 0; ty < th; ty++)
+    for (let tx = 0; tx < tw; tx++)
+      for (let oy = -1; oy <= 1; oy++)
+        for (let ox = -1; ox <= 1; ox++) {
+          const sx = tx + ox,
+            sy = ty + oy;
+          if (sx < 0 || sy < 0 || sx >= tw || sy >= th) continue;
+          const j = sy * tw + sx;
+          longest(near, ty * tw + tx, tiles[j * 2], tiles[j * 2 + 1]);
+        }
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const t = Math.floor(y / k) * tw + Math.floor(x / k),
+        vx = near[t * 2],
+        vy = near[t * 2 + 1],
+        l = Math.hypot(vx, vy);
+      if (l < 0.5) continue;
+      const steps = Math.ceil(l);
+      for (let s = -steps; s <= steps && !out[y * width + x]; s++) {
+        const qx = Math.round(x + (vx * s) / steps),
+          qy = Math.round(y + (vy * s) / steps);
+        if (qx < 0 || qy < 0 || qx >= width || qy >= height) continue;
+        const q = qy * width + qx;
+        if (moving[q] && (qx - x) ** 2 + (qy - y) ** 2 <= (Math.hypot(rx[q], ry[q]) + 0.5) ** 2) out[y * width + x] = 1;
+      }
+    }
+  return out;
 }
 
 /**
@@ -2702,6 +2791,7 @@ export function depthFromDistance(
  * With `velocity` (the engine's own motion of each pixel, as `MovingFrames.velocity`) each pixel's travel is its
  * surface's real motion, not the camera's alone: a leaf swaying against the camera's sweep moves less than the camera
  * moves the place it covers, and is smeared by what it moves (KB-LOOK-TV-MBVEL1).
+ * An edge whose ramp is a staircase of sharp copies (`stepped`, one per sub-frame) is sharp too (KB-LOOK-TV-SUBSTEP1).
  * @throws RangeError for a shutter that is not more than 0 and up to 360 degrees.
  */
 export function motionBlur(
@@ -2756,9 +2846,43 @@ export function motionBlur(
       const from = low + 0.1 * (high - low),
         to = high - 0.1 * (high - low),
         between = profile.filter((v) => v > from && v < to).length;
-      if (between * spacing < (travel * smear) / 2) sharp++;
+      if (between * spacing < (travel * smear) / 2 || stepped(profile, spacing, from, to, cross)) sharp++;
     }
   return result('motionBlur', percent(sharp, edges), bound, { edges, sharp });
+}
+
+/**
+ * Whether a smeared edge's ramp is a staircase: copies of a sharp edge, one per sub-frame, instead of one smear
+ * (KB-LOOK-TV-SUBSTEP1). Over the ramp (the run of the profile between `from` and `to` around the edge's crossing at
+ * `cross`, at least 8 pixels long) a smear climbs evenly, or steepest once in its middle; a staircase climbs in separate jumps with flat
+ * steps between, all one way (a fall of over 12 codes against the ramp's way makes it texture or a thin object, not
+ * one edge). Read one pixel apart, a jump is a climb over 12 codes and over twice the ramp's mean climb (its 10 to
+ * 90 percent span over its length), and jumps are separate when a climb under the mean lies between them. Three or more
+ * is a staircase.
+ */
+function stepped(profile: number[], spacing: number, from: number, to: number, cross: number): boolean {
+  const within = (k: number) => profile[k] > from && profile[k] < to;
+  let first = within(cross) ? cross : cross - 1,
+    last = first;
+  if (!within(first)) return false;
+  while (first > 0 && within(first - 1)) first--;
+  while (last < profile.length - 1 && within(last + 1)) last++;
+  const length = (last - first) * spacing;
+  if (length < 8) return false;
+  const per = Math.max(1, Math.round(1 / spacing)),
+    mean = (to - from) / length;
+  const sign = Math.sign(profile[last] - profile[first]);
+  let jumps = 0,
+    flat = true;
+  for (let k = Math.max(0, first - per); k + per <= Math.min(profile.length - 1, last + per); k += per) {
+    const climb = sign * (profile[k + per] - profile[k]);
+    if (climb < -12) return false;
+    if (climb > 12 && climb > 2 * mean) {
+      if (flat) jumps++;
+      flat = false;
+    } else if (climb < mean) flat = true;
+  }
+  return jumps >= 3;
 }
 
 /** Options of the subject checks. */
