@@ -24,6 +24,5 @@ The browser check uses the gallery's startup preloads for this slug and can inst
 
 ## References
 
-- A.J. Fairfield, 2026, discusses breadth-first propagation for block lighting in [Modernizing Minecraft, Evolving the Rendering Pipeline](https://media.gdcvault.com/gdc2026/Slides/Fairfield_AJ_ModernizingTheRenderingOfMinecraft.pdf).
 - The archival presentation of exposed walls and pavements informed the original cutaway composition. [Historic England, The Roman Baths, Bath, Heritage Gateway Record](https://historicengland.org.uk/listing/heritage-gateway/results/record/f47f405f-d030-4528-9054-1126aee5bfb8/61600).
 - Josef Albers, 1963, informed the side-by-side warm and cool color treatment. [Interaction of Color, National Gallery of Art](https://www.nga.gov/artworks/55903-interaction-color).
