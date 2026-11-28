@@ -11,6 +11,9 @@ import { moonPhase, moonWaning } from './moon-phase.js';
 // it, so the disc stays the brightest thing in a night shot and blooms through a veil (elements plan step 6: the
 // earlier [0.92, 0.95, 1] drew the disc dimmer than the cloud it lit). The full moon's luminance is about 2,500 cd/m2,
 // thousands of times a moonlit cloud's, so any ratio a display shows is a floor, never too bright.
+// The glow takes the moon's tint at no more than its own level (the colour over its brightest channel above 1): when the
+// disc went to this radiance the glow went with it, eight times brighter, and drew a white halo some 14 degrees round
+// (KB-GPUMAIN1, the Vite starter's moon check). A colour up to 1 draws the glow as before.
 const NIGHT_MOON_COLOR = [6.4, 7.6, 9.6] as const;
 /** Stylized night (`night` option): gradient, twinkling stars and a phased moon with glow. */
 export const night: NonNullable<SkyFeatures['night']> = {
@@ -57,7 +60,7 @@ fn stylizedNight(r:vec3f,footprint:f32)->vec3f {
   let earthshine=0.02*(1.0-params.x);
   color=mix(color,gradient,cover)+frame.nightMoonColor.rgb*(0.8+0.2*limb)*(smoothstep(0.0,0.02,lit)+earthshine)*cover;
  }
- return color+frame.nightMoonColor.rgb*pow(max(cosine,0.0),32.0)*params.y*0.35;
+ let glow=frame.nightMoonColor.rgb;return color+glow/max(1.0,max(glow.r,max(glow.g,glow.b)))*pow(max(cosine,0.0),32.0)*params.y*0.35;
 }
 `,
   validate(n) {

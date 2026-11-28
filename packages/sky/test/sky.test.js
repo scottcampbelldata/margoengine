@@ -712,6 +712,22 @@ test('the moon disc hides the stars, not the air in front: a gibbous dark limb i
   );
 });
 
+// Regression (2026-11-28, KB-GPUMAIN1): the 2026-11-20 default moon radiance [6.4, 7.6, 9.6] (eight times the old
+// [0.92, 0.95, 1]) also scaled the glow, which then drew a white halo some 14 degrees round the moon, and the Vite starter's
+// moonlit scenery showed no disc against it. The glow takes the moon's tint over its brightest channel above 1.
+test('the moon glow keeps its own level when the disc is brighter than 1', () => {
+  const { night } = nightShaders();
+  assert.match(
+    night,
+    /let glow=frame\.nightMoonColor\.rgb;return color\+glow\/max\(1\.0,max\(glow\.r,max\(glow\.g,glow\.b\)\)\)\*pow\(max\(cosine,0\.0\),32\.0\)\*params\.y\*0\.35;\n/,
+    'The glow is the moon tint at no more than 1, times the glow intensity',
+  );
+  // The same arithmetic in JavaScript: the default disc's glow peaks at its old level, a colour up to 1 is unchanged.
+  const glowTint = (c) => c.map((v) => v / Math.max(1, ...c));
+  assert.deepEqual(glowTint([0.92, 0.95, 1]), [0.92, 0.95, 1]);
+  assert.ok(Math.max(...glowTint([6.4, 7.6, 9.6])) === 1);
+});
+
 test('opt-in sunlight synchronizes before rendering and reverse clocks wrap at midnight', () => {
   const h = optionalGPU(),
     direction = new Float32Array([3, 5, 4, 3]),

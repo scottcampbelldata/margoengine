@@ -1005,7 +1005,9 @@ Those are the defaults. Colours are non-negative linear RGB; `moonDirection` is 
 angular radius in radians between 0 and π/2; `moonPhase` clamps to −1 (new) … 1 (full), or takes a name (below); glow, star and twinkle
 intensities and `hazeDensity` clamp to zero or above (zero twinkle holds stars steady, zero haze removes the
 gradient). `moonLitBySun: true` (default false; `AstroSky` sets it) turns the lit side toward the sky's sun, as the real
-moon's is, instead of a fixed side. The stylized night shows where the sun is below the horizon, blended by `nightFactor` at dusk, and
+moon's is, instead of a fixed side. The glow takes the moon's tint at no more than 1 (`moonColor` over its brightest
+channel when that passes 1), so a disc brighter than display white keeps a soft halo; `glowIntensity` sets its level.
+The stylized night shows where the sun is below the horizon, blended by `nightFactor` at dusk, and
 its colours are written as given, also on display targets (the physical day sky is tonemapped there). It
 replaces the separate preset moon; leave `lighting.moon` unset with it. The shaders hold the stylized night only
 while `night` is set: setting or clearing `sky.options.night` compiles the sky, fog, reflection and lighting

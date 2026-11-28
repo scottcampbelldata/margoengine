@@ -40,6 +40,9 @@
 // Recorded again with KB-SKY-OBLIQUE1 (2026-11-27): the sky's view rays take the sign of their point's clip w, so a
 // planar reflection's oblique capture camera sees the sky above the mirror; under any ordinary camera the factor is
 // exactly 1 and nothing draws differently, so only the WGSL text moved.
+// Recorded again with KB-GPUMAIN1 (2026-11-28): the moon glow takes the moon's tint over its brightest channel above 1,
+// so the night WGSL changed text; no command and no buffer write changed, and only a night whose moon colour passes 1
+// (the default among them) draws its glow differently, at the level it had before the 2026-11-20 disc radiance.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
