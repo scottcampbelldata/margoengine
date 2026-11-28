@@ -71,6 +71,12 @@ console.log(ball.position, ball.mass); // mass 523.6 kg = 1000 x 4/3 pi 0.5^3
 A live page with all of it at once (instanced bodies on heightfield terrain, a pointer ray, an explosion, every shape with
 its computed mass): `examples/physics-rigid.html`.
 
+Bounces follow Newton's law of restitution. A strike into balls that touch is passed on one pair at a time, at its time of
+impact, and a body held by joints is struck with its joints holding it, so a Newton's cradle of balls hung on `revolute`
+joints swings one in, one out at either tier. Give its balls friction 0: a hung ball turns with its swing, and rigid
+Coulomb friction at the strike keeps only `1 - mu r / l` of the speed at each pair (`docs/limits.md`, "Touching
+Newton's cradle").
+
 ### From three.js and Rapier
 
 The three.js Rapier examples (`physics_rapier_basic`, `physics_rapier_instancing`, `physics_rapier_terrain`) load

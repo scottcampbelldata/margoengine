@@ -324,6 +324,28 @@ measured, not landed (the upgrade moved to Codex). What it did, in body axes (x 
   needs the drift angle). Radiated waves to SEA-04 were not started: `WakeSolver` reads layout-1 `seaSource` rows (x, z,
   radius, pressure, volume pushed over the step), so the hull would write one row a station.
 
+### DYN-01 handoff to its owner (2026-11-28)
+
+For the session that owns DYN-01 ("Claude (laptop)"). Scott ruled on 2026-11-27 that KB-PHYS-HUNGCRADLE1 be fixed while
+that session was offline; the row's owner is unchanged. What changed on `main`, all in the rigid kernel's strike:
+
+- `kernel/src/joints.rs`: `held_response` and `apply_held`, the response a strike gets from the joints holding its
+  bodies (two exact path solves, with and without a probe impulse). Up to 32 bodies and 16 joint paths; past that, and
+  for a body with no locking joint, the free mass as before.
+- `kernel/src/solver.rs`, `collide_pairwise`: a held body is struck and rubbed through `held_response`; a strike
+  across a gap is moved back by its time of impact after `integrate_poses` (`shift_poses`); a point's load is rest only
+  if held for the step it would take out the strike (was: any load); a line strike that does not close this substep sets
+  PAIR_STRIKE_LATER (`kernel/src/layout.rs`, 64), which `normal_rows` leaves open in both passes and `end_strikes`
+  clears after `solve_impacts`. `solve_impacts` bounces a held body through `held_response` too.
+- Tests: three hung cradle tests beside "Newton's cradle" in `packages/physics/tests/rigid-validation.test.js`.
+  Docs: `docs/limits.md` "Touching Newton's cradle", `docs/known-bugs.md` KB-PHYS-HUNGCRADLE1, clean-room PK61, the
+  playbook's "Held strikes" paragraph.
+
+Left for the owner: at friction 0 the standard tier loses about g h^2 / l a strike (2.3 percent of the swing in 60 s,
+0.15 at `high`), second order in the substep; a fix would be a collision step that keeps the discrete energy (Fetecau
+et al. 2003). The demo `demos/newtons-cradle` (branch `web-demos`) uses friction 0.1, under which rigid Coulomb
+friction clumps the cradle in 15 s; it wants friction 0.
+
 ### SOFT-01 handoff (2026-11-27)
 
 SOFT-01 passes to the session that owns cloth (the work queue's P6 owner). Landed on `main`, each with its tests and docs:

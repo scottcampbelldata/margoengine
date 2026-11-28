@@ -133,6 +133,26 @@ const TURN: f32 = 0.2;
 /// beta. Any share from 1/4 holds any tension; 1 is all of Tournier et al. 2015's term. See the head of this file.
 const TAUT: f64 = 1.0;
 
+/// The most bodies the probe of a strike on a held body follows through its locks (`held_response`).
+pub const HELD_BODIES: usize = 32;
+/// The most paths of locks that probe solves.
+pub const HELD_PATHS: usize = 16;
+/// Block Gauss-Seidel sweeps over the probe's paths when there are several; one path is exact in one.
+const HELD_SWEEPS: usize = 8;
+
+/// A strike's response on the joints holding its bodies, per unit of impulse along its normal (`held_response`).
+pub struct Held {
+    pub count: usize,
+    pub bodies: [usize; HELD_BODIES],
+    pub linear: [V3; HELD_BODIES],
+    pub angular: [V3; HELD_BODIES],
+    /// The point's change of speed along the normal: the inverse of its mass with the joints holding.
+    pub inverse: f32,
+    /// The work kinematic bodies do through the joints, per unit (native only; see `DRIVEN`).
+    #[cfg(not(target_arch = "wasm32"))]
+    pub driven: f64,
+}
+
 /// What a pass over the joints is for. See the head of this file.
 #[derive(Clone, Copy, PartialEq)]
 pub enum Pass {
@@ -1581,6 +1601,158 @@ impl World {
             self.settle(a, &body_a);
             self.settle(b, &body_b);
         }
+    }
+
+    /// How a strike of `probe` along `normal` at the arms of pair `row`'s bodies `a` and `b` moves every body the locks holding
+    /// them reach, with those locks holding: the strike's response on the joints, per unit of impulse. None when no lock holds
+    /// either body, or when the locks reach more than HELD_BODIES bodies or HELD_PATHS paths, where a strike takes the
+    /// bodies' own mass as before.
+    ///
+    /// A strike solved on the bodies alone and the joints after leaves the joints to take back, inelastically, what the
+    /// bodies' own mass got wrong: a ball hung on a rod has the mass m + I / L^2 at its centre, not m, so a touching cradle
+    /// of steel balls on 247 mm arms passed 99.1 percent of its energy on at each strike at restitution 1 and fell to 18
+    /// percent in 30 s (KB-PHYS-HUNGCRADLE1). The impulse of a held body is the operational-space inverse inertia at the
+    /// point, Lambda^-1 = J H^-1 J^T with the joints' constraints in H (Khatib 1987; Featherstone, "Rigid Body Dynamics
+    /// Algorithms", 2008, chapter 11, impulsive dynamics; Mirtich 1996, the collision of articulated bodies), and the bodies
+    /// take the joints' reaction with it, as Weinstein, Teran and Fedkiw 2006 have each collision followed by the joints'
+    /// velocity solve. It is read off this substep's own path solve: the paths are solved once with the probe pushed and once
+    /// without, and the difference over the probe is the response, which holds for any speeds the bodies have (the path
+    /// solve is affine in them), a kinematic body's included. The paths are solved exactly; several paths meet by block
+    /// Gauss-Seidel, HELD_SWEEPS sweeps. Nothing is remembered: a strike is no load for the warm start.
+    pub(crate) fn held_response(&mut self, row: usize, a: usize, b: usize, normal: V3, arm_a: V3, arm_b: V3, probe: f32) -> Option<Held> {
+        if probe == 0.0 || (self.uu(FIRST_JOINT, a) == NONE && self.uu(FIRST_JOINT, b) == NONE) {
+            return None;
+        }
+        let (from, solving) = self.window.joints;
+        let zero = v3(0.0, 0.0, 0.0);
+        let mut held = Held {
+            count: 2,
+            bodies: [usize::MAX; HELD_BODIES],
+            linear: [zero; HELD_BODIES],
+            angular: [zero; HELD_BODIES],
+            inverse: 0.0,
+            #[cfg(not(target_arch = "wasm32"))]
+            driven: 0.0,
+        };
+        (held.bodies[0], held.bodies[1]) = (a, b);
+        // The paths of locks on each body that moves, and every body they hold, until no new body brings a new path.
+        let (mut paths, mut count, mut next) = ([(0usize, 0usize); HELD_PATHS], 0usize, 0usize);
+        while next < held.count {
+            let body = held.bodies[next];
+            next += 1;
+            if self.flags(body) & KIND != DYNAMIC || !self.is_awake(body) {
+                continue;
+            }
+            for i in from..solving {
+                let joint = self.uu(SOLVE_JOINTS, i) as usize;
+                if self.uu(JOINT_FLAGS, joint) & (JOINT_LOCK * 63) == 0 || (self.uu(JOINT_A, joint) as usize != body && self.uu(JOINT_B, joint) as usize != body) {
+                    continue;
+                }
+                let (mut first, mut last) = (i, i);
+                while first > from && self.uu(SOLVE_VIA, first) != NONE {
+                    first -= 1;
+                }
+                while last + 1 < solving && self.uu(SOLVE_VIA, last + 1) != NONE {
+                    last += 1;
+                }
+                if paths[..count].iter().any(|&(start, _)| start == first) {
+                    continue;
+                }
+                if count == HELD_PATHS {
+                    return None;
+                }
+                paths[count] = (first, last);
+                count += 1;
+                for j in first..=last {
+                    let joint = self.uu(SOLVE_JOINTS, j) as usize;
+                    for end in [self.uu(JOINT_A, joint) as usize, self.uu(JOINT_B, joint) as usize] {
+                        if !held.bodies[..held.count].contains(&end) {
+                            if held.count == HELD_BODIES {
+                                return None;
+                            }
+                            held.bodies[held.count] = end;
+                            held.count += 1;
+                        }
+                    }
+                }
+            }
+        }
+        if count == 0 {
+            return None;
+        }
+        let n = held.count;
+        let mut saved = [(zero, zero); HELD_BODIES];
+        for (k, kept) in saved.iter_mut().enumerate().take(n) {
+            *kept = (self.v(LINEAR_X, held.bodies[k]), self.v(ANGULAR_X, held.bodies[k]));
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        let ledger = crate::solver::DRIVEN.with(|d| d.get());
+        let sweeps = if count == 1 { 1 } else { HELD_SWEEPS };
+        let mut runs = [[(zero, zero); HELD_BODIES]; 2];
+        #[cfg(not(target_arch = "wasm32"))]
+        let mut work = [0.0f64; 2];
+        for (run, speeds) in runs.iter_mut().enumerate() {
+            for (k, &(linear, angular)) in saved.iter().enumerate().take(n) {
+                self.set_v(LINEAR_X, held.bodies[k], linear);
+                self.set_v(ANGULAR_X, held.bodies[k], angular);
+            }
+            if run == 0 {
+                let (mut body_a, mut body_b) = self.pair_moving(row, a, b);
+                body_a.push(normal.scale(-probe), arm_a);
+                body_b.push(normal.scale(probe), arm_b);
+                self.settle(a, &body_a);
+                self.settle(b, &body_b);
+            }
+            for _ in 0..sweeps {
+                for &(first, last) in &paths[..count] {
+                    self.path_right(first, last, 0.0, 0.0, false);
+                    self.apply_path(first, last, 1.0, false);
+                }
+            }
+            for (k, speed) in speeds.iter_mut().enumerate().take(n) {
+                *speed = (self.v(LINEAR_X, held.bodies[k]), self.v(ANGULAR_X, held.bodies[k]));
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                work[run] = crate::solver::DRIVEN.with(|d| d.get()) - ledger;
+                crate::solver::DRIVEN.with(|d| d.set(ledger));
+            }
+        }
+        for (k, &(linear, angular)) in saved.iter().enumerate().take(n) {
+            self.set_v(LINEAR_X, held.bodies[k], linear);
+            self.set_v(ANGULAR_X, held.bodies[k], angular);
+        }
+        let per = 1.0 / probe;
+        for k in 0..n {
+            // A body that cannot move has no response, whatever its speed columns were written with.
+            if self.flags(held.bodies[k]) & KIND != DYNAMIC || !self.is_awake(held.bodies[k]) {
+                continue;
+            }
+            held.linear[k] = runs[0][k].0.sub(runs[1][k].0).scale(per);
+            held.angular[k] = runs[0][k].1.sub(runs[1][k].1).scale(per);
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            held.driven = (work[0] - work[1]) / probe as f64;
+        }
+        let at = |k: usize, arm: V3| held.linear[k].add(held.angular[k].cross(arm));
+        held.inverse = at(1, arm_b).sub(at(0, arm_a)).dot(normal);
+        if held.inverse > 0.0 { Some(held) } else { None }
+    }
+
+    /// Gives the bodies of `held` a strike of `impulse` with the joints holding: `held_response`'s response times it. A body
+    /// that cannot move has no response and does not move.
+    pub(crate) fn apply_held(&mut self, held: &Held, impulse: f32) {
+        for k in 0..held.count {
+            let body = held.bodies[k];
+            if self.flags(body) & KIND != DYNAMIC || !self.is_awake(body) {
+                continue;
+            }
+            self.set_v(LINEAR_X, body, self.v(LINEAR_X, body).add(held.linear[k].scale(impulse)));
+            self.set_v(ANGULAR_X, body, self.v(ANGULAR_X, body).add(held.angular[k].scale(impulse)));
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        crate::solver::DRIVEN.with(|d| d.set(d.get() + held.driven * impulse as f64));
     }
 
     /// What a joint's impulses, kept in RIGHT, would add to each of its bodies, with the arm on each.

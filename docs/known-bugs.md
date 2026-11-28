@@ -6,6 +6,40 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: a hung, touching Newton's cradle lost energy at every strike and clumped (KB-PHYS-HUNGCRADLE1, physics DYN-01)
+
+- **Repro:** five 26 mm steel balls (`density: 'steel'`, `restitution: 1`, friction 0.1), each hung from one fixed
+  body by a `revolute` joint about z on a 247 mm arm, touching in a line; the first lifted 34 degrees and let go;
+  `new Physics(null)` stepped at 60 Hz with no air drag (the web demo `demos/newtons-cradle`). One ball in, one out
+  was clean at first, but the energy read 99.0 percent after the first strike, 88.2 at 7 s, and at 12 to 15 s all five
+  swung together (58 to 18 percent at 30 s). The same at `fidelity: 'high'` and with a 0.1 mm gap between balls.
+- **Cause:** four, all in the strike pass (`collide_pairwise`, `kernel/src/solver.rs`) and its bounce after the solve
+  (`solve_impacts`). (1) A jointed body was struck with its free mass, m along the line, where its joint holds it to
+  m + I / l^2 about the pivot; the joints then took the difference back inelastically, about 1 percent a strike.
+  (2) A strike across a gap was applied at the substep's start, so the striker stopped short by its gap (0.2 mm),
+  crept back onto the line below any strike and pushed it. (3) Any load at all on a point read as rest: the few
+  micronewton-seconds two hung balls press on each other while their joints close their drift made the end pair a
+  resting one, and the strike that reached it was shared. (4) A strike the pass saw end its substep a micrometre short
+  met the line in the contact solve's speculative row and its relaxing pass, which shared it. With friction, the rub
+  through the strike also took the free mass, spun the ball, and its joint turned the spin into swing.
+- **Fix:** a held body is struck, and rubbed, with the joints holding it (`held_response` and `apply_held`,
+  `kernel/src/joints.rs`: the operational-space response of Khatib 1987, read from two exact path solves); a strike
+  across a gap moves every body it changed back by its time of impact once the substep has moved them (`shift_poses`,
+  Mirtich and Canny 1995); a load is rest only when held for the step it would take out the strike; a strike into a
+  line that does not close this substep is left open in the contact solve (PAIR_STRIKE_LATER) for the pass to make
+  the next substep.
+- **Result:** at friction 0 the cradle swings one in, one out for 60 s at both tiers, middle balls within 0.03 degrees;
+  the end ball's turning height is 99.85 percent of the release at `high` and 97.7 percent at `standard` after 60 s.
+  What remains is second order in the substep, about g h^2 / l a strike (0.019 percent at 8 substeps, 0.0012 at 32), a
+  symplectic Euler step's modified energy handed from a falling ball to a level one (docs/limits.md). At e = 0.995
+  the end ball rises to ((1 + e) / 2)^8 of the release, the exact pairwise value. At friction 0.1 a hung ball's contact
+  slips at v r / l through every strike, and rigid Coulomb friction then takes 1 - mu r / l of the speed a pair and
+  sends the ball behind back: the cradle clumps within 15 s, as the rigid model says it must (a real cradle's
+  contacts grip by their tangential compliance, which no web engine models). A cradle that should swing for minutes
+  takes friction 0.
+- **Regression:** `packages/physics/tests/rigid-validation.test.js`, the three "hung" cradle tests at both tiers (all six
+  fail without the fix).
+
 ### Fixed 2026-11-27: a swapped or resized texture under a moved shadow stopped the engine on a destroyed texture (KB-SHADOW-STALEMOVE1, materials, shader)
 
 - **Repro:** add a mesh to `Shadows` whose vertex move reads a texture, draw, then swap or resize that texture: a
@@ -89,22 +123,6 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   partial raster; 24 loads of each gave 2 to 4 distinct pictures, and 1 with `--disable-partial-raster`. The
   comparison run captures with that flag (`captureArgs`, `scripts/support/visual-compat-pages.js`; regression
   `tests/visual-compat-pages.test.js`). Thresholds and the exact-frame rule are unchanged.
-
-### Open 2026-11-27: a hung, touching Newton's cradle loses energy at every strike and clumps after about ten seconds (KB-PHYS-HUNGCRADLE1, physics DYN-01)
-
-- **Repro:** five 26 mm steel balls (`density: 'steel'`, `restitution: 1`, friction 0.1), each hung from one fixed
-  body by a `revolute` joint about z on a 247 mm arm, touching in a line; the first lifted 34 degrees and let go;
-  `new Physics(null)` stepped at 60 Hz with no air drag (the web demo `demos/newtons-cradle`). One ball in, one out is
-  clean at first, but the total energy (kinetic plus potential) reads 99.0 percent after the first strike, 96.6 at
-  2 s, 88.2 at 7 s, then at about 12 to 15 s all five swing together and it reads 58 to 18 percent at 30 s. The same
-  at `fidelity: 'high'` (59.7 percent at 30 s) and with a 0.1 mm gap between balls.
-- **Cause:** not found yet, but not the joint: one ball hung the same way alone holds its energy within 0.9 percent
-  over 60 s (100.15, 100.44, 99.11, 100.41, 99.43 percent at 1, 5, 15, 30 and 60 s). So the loss is in the strike or
-  the contact solve between hung balls: about 0.85 percent a strike with restitution 1, and the strike pass may share
-  a strike once joint drift leaves a small load between neighbours (a point carrying load into a substep is treated
-  as resting, `docs/limits.md`, "Touching Newton's cradle"), which would explain the clumping.
-- **Wanted:** a hung cradle at restitution 1 keeps one in, one out for at least 60 s with energy within 1 percent,
-  as a regression test beside "Newton's cradle" in `packages/physics/tests/rigid-validation.test.js`.
 
 ### Open: GPULiquid's accurate profile moves momentum at a free surface (KB-LIQUID-SURFMOM1, water)
 

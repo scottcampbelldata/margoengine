@@ -531,7 +531,7 @@ KB2161 (docs/known-bugs.md, "A chain laid out level under a 1000:1 end mass stre
 | ID | Solver | State today | Owner | Status |
 | --- | --- | --- | --- | --- |
 | SEA-05 | Nearshore waves and surf zone | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 8c7453cd8 |
-| DYN-01 | 3D rigid body and contact | sound; P1 work landed 2026-11-27: fields, instanced bodies, contactcontinue, coded errors, example page, validation suite; open points listed under physics-parity-bar.md P1 | Claude (laptop), on Scott's order, 2026-11-27 | CLAIMED |
+| DYN-01 | 3D rigid body and contact | sound; P1 work landed 2026-11-27: fields, instanced bodies, contactcontinue, coded errors, example page, validation suite; open points listed under physics-parity-bar.md P1; KB-PHYS-HUNGCRADLE1 fixed on Scott's ruling while the owner was offline, see the DYN-01 handoff in physics-solver-audit.md | Claude (laptop), on Scott's order, 2026-11-27 | CLAIMED |
 | DYN-02 | 2D rigid body | sound | Claude | CLAIMED |
 | DYN-03 | Articulated bodies, joints, motors, robots | P3 parity: limits and motors on every free axis, coded errors, joint debug view, quick start, migration note, example page (see physics-parity-bar.md P3) | Claude (laptop), on Scott's order, 2026-11-27 | LANDED 2026-11-27 |
 | DYN-06 | Mass properties and collision geometry | partial: PA-09 and coded mesh errors landed 2026-11-27; PA-87 open (see physics-parity-bar.md P2) | Claude (laptop), on Scott's order, 2026-11-27 | CLAIMED |

@@ -324,7 +324,7 @@ impl World {
             tick(self, 10, inner);
             self.hold_multibodies();
             self.refresh_joints(h, true);
-            self.collide_pairwise(h, substep as usize);
+            let shifts = self.collide_pairwise(h, substep as usize);
             self.note_approach();
             self.warm_start();
             self.warm_start_joints();
@@ -356,6 +356,7 @@ impl World {
             self.clamp_speeds();
             tick(self, 9, inner);
             self.integrate_poses(h, substep, substeps);
+            self.shift_poses(&shifts);
             if staged {
                 self.window.kin = Some(substep + 1);
             }
@@ -377,6 +378,7 @@ impl World {
                 self.solve_contacts(h, stiffness, false, substep as usize, least, pass == relaxes);
             }
             self.solve_impacts(substep as usize);
+            self.end_strikes(&shifts);
             self.project_multibodies();
             self.clamp_speeds();
             tick(self, 9, inner);
@@ -756,6 +758,17 @@ impl World {
             let at = self.uu(list, slot) as usize;
             self.integrate_pose(at, h, substep, substeps);
         }
+    }
+
+    /// Moves a body's pose by `shift` at its centre of mass and turns it by the rotation vector `turn`, between the substep's
+    /// pose updates: a strike's time of impact (`collide_pairwise`). TURNED is left alone, as the shift is a part of one
+    /// substep's motion, which the substep's own pose update counts.
+    pub fn shift_pose(&mut self, at: usize, shift: V3, turn: V3) {
+        let center = self.v(CENTER_X, at).add(shift);
+        let rotation = Q::from_rotation_vector(turn).mul(self.q(ROTATION_X, at)).normalized();
+        self.set_v(CENTER_X, at, center);
+        self.set_q(ROTATION_X, at, rotation);
+        self.set_v(POSITION_X, at, center.sub(rotation.rotate(self.v(LOCAL_CENTER_X, at))));
     }
 
     /// One body's pose after a substep's velocities.

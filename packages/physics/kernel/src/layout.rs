@@ -985,6 +985,10 @@ pub const PAIR_A_RULES: u32 = 4;
 pub const PAIR_B_RULES: u32 = 8;
 /// A part of a mesh pair: off the broad phase's lists, solved like any pair, silent in events.
 pub const PAIR_IS_PART: u32 = 16;
+/// Set through one substep's solve: a point of the pair strikes a body that touches a third, still apart, and the strike pass
+/// (`collide_pairwise`) found it does not close this substep, so the pass and not the contact solve strikes it when it does.
+/// 32 is a mesh part's own bit (mesh.rs).
+pub const PAIR_STRIKE_LATER: u32 = 64;
 
 // Top bits of an event's first word, over the collider's row.
 pub const EVENT_STARTED: u32 = 1 << 31;

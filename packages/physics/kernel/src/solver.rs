@@ -34,6 +34,7 @@
 // is still open notes the speed it will meet the surface with, gravity's gain over the gap added.
 use crate::contact::tangent_of;
 use crate::integrate::apply_inverse_inertia;
+use crate::joints::HELD_BODIES;
 use crate::layout::*;
 use crate::math::*;
 use crate::world::World;
@@ -203,7 +204,7 @@ impl World {
 
     /// The two bodies of a pair as its solve sees them: the one that dominates takes no push from this pair.
     #[inline(always)]
-    fn pair_moving(&self, row: usize, a: usize, b: usize) -> (Moving, Moving) {
+    pub(crate) fn pair_moving(&self, row: usize, a: usize, b: usize) -> (Moving, Moving) {
         let (mut body_a, mut body_b) = (self.moving(a), self.moving(b));
         let flags = self.uu(PAIR_FLAGS, row);
         if flags & PAIR_A_RULES != 0 {
@@ -519,10 +520,11 @@ impl World {
     /// the bounce after it. Each impulse is -(1 + e) times the approach times the point's normal mass, which takes energy
     /// out for e up to 1, so no sweep can add energy; friction then takes the slip toward rest within mu times that impulse,
     /// which takes energy out too.
-    pub fn collide_pairwise(&mut self, h: f32, turn: usize) {
+    pub fn collide_pairwise(&mut self, h: f32, turn: usize) -> Shifts {
+        let mut shifts = Shifts { count: 0, entries: [(usize::MAX, v3(0.0, 0.0, 0.0), v3(0.0, 0.0, 0.0)); SHIFTS], later: false };
         let (start, end) = self.window.pairs;
         if !(start..end).any(|i| self.s(PAIR_RESTITUTION, self.uu(SOLVE_PAIRS, i) as usize) > 0.0) {
-            return;
+            return shifts;
         }
         let threshold = self.bounce_speed(h);
         // Touching is within the slop, where the solver holds resting points.
@@ -544,6 +546,8 @@ impl World {
         // Bodies a strike of this pass moved: struck in a line, they are not lone. ponytail: the first 32 a substep; past
         // them a strike is left to the contact solve, which shares it.
         let (mut hit, mut hits) = ([usize::MAX; 32], 0usize);
+        // When in the substep each listed body was struck: a strike passed down a touching line happens when the first one did.
+        let mut struck_at = [0.0f32; 32];
         for _ in start..end {
             let mut struck = false;
             for i in start..end {
@@ -561,40 +565,125 @@ impl World {
                     let (mut body_a, mut body_b) = self.pair_moving(row, a, b);
                     let (arm_a, arm_b) = (self.v(CONTACT_ARM_A_X, at), self.v(CONTACT_ARM_B_X, at));
                     let speed = body_b.at(arm_b).sub(body_a.at(arm_a)).dot(normal) - surface_normal;
-                    // A point that carried a load into this substep rests: a strike is a point that held nothing (as `normal_rows`
-                    // marks one), so a rocking pile is left to the contact solve.
-                    if self.s(CONTACT_NORMAL_IMPULSE, at) > 0.0 || speed >= -threshold || gap + speed * h > 0.0 || (gap > 0.0 && !hit[..hits].contains(&a) && !hit[..hits].contains(&b) && !pressed(self, a, row) && !pressed(self, b, row)) {
+                    let impulse = -(1.0 + bounce) * speed * self.s(CONTACT_NORMAL_MASS, at);
+                    // A point pressed by a load rests: a strike is a point that held nothing (as `normal_rows` marks one), so a
+                    // rocking pile is left to the contact solve. The load it carried into the substep is a force of that over
+                    // h, and a force that held for the whole step would take out at least this strike's impulse is a pile's
+                    // weight on a point that rocks; a load that would not is no rest the strike meets, and the strike is an
+                    // impact. Any load at all read as rest: the few micronewton-seconds that two hung touching balls press
+                    // on each other while their joints close their drift (a millionth of the strike's half newton-second)
+                    // made the last pair of a cradle a resting one, the strike that reached it was shared, two balls left at
+                    // half the speed and the line lost half its energy (KB-PHYS-HUNGCRADLE1).
+                    let load = self.s(CONTACT_NORMAL_IMPULSE, at);
+                    if (load > 0.0 && load * self.header().step_dt >= impulse * h) || speed >= -threshold || (gap > 0.0 && !hit[..hits].contains(&a) && !hit[..hits].contains(&b) && !pressed(self, a, row) && !pressed(self, b, row)) {
                         continue;
                     }
-                    let impulse = -(1.0 + bounce) * speed * self.s(CONTACT_NORMAL_MASS, at);
-                    let applied = normal.scale(impulse);
-                    body_a.push(applied.scale(-1.0), arm_a);
-                    body_b.push(applied, arm_b);
+                    // A strike into a line that does not close this substep is the pass's when it does: the contact solve's
+                    // speculative row leaves it open (`normal_rows`), so the speeds the solve adds cannot close it there.
+                    // They differ from the pass's by what the warm starts and the joints add, a pendulum's pull along its
+                    // swing: a ball that the pass saw end its substep a micrometre short met the line in the speculative
+                    // row, which shared the strike, and the cradle swung as one 75 s in (KB-PHYS-HUNGCRADLE1).
+                    if gap + speed * h > 0.0 {
+                        self.set_u(PAIR_FLAGS, row, self.uu(PAIR_FLAGS, row) | PAIR_STRIKE_LATER);
+                        shifts.later = true;
+                        continue;
+                    }
+                    // A body a joint holds is struck with the joints holding it (`held_response`): the impulse is the one its
+                    // held mass takes, and the joints give nothing back inelastically after.
+                    let held = self.held_response(row, a, b, normal, arm_a, arm_b, impulse);
+                    // The bodies this strike changes, and their speeds before it.
+                    let mut moved = [(usize::MAX, v3(0.0, 0.0, 0.0), v3(0.0, 0.0, 0.0)); HELD_BODIES];
+                    let mut count = 2;
+                    match &held {
+                        Some(held) => {
+                            count = held.count;
+                            for (k, entry) in moved.iter_mut().enumerate().take(count) {
+                                *entry = (held.bodies[k], self.v(LINEAR_X, held.bodies[k]), self.v(ANGULAR_X, held.bodies[k]));
+                            }
+                        }
+                        None => {
+                            (moved[0], moved[1]) = ((a, self.v(LINEAR_X, a), self.v(ANGULAR_X, a)), (b, self.v(LINEAR_X, b), self.v(ANGULAR_X, b)));
+                        }
+                    }
+                    let impulse = match &held {
+                        Some(held) => {
+                            let impulse = -(1.0 + bounce) * speed / held.inverse;
+                            self.apply_held(held, impulse);
+                            (body_a, body_b) = self.pair_moving(row, a, b);
+                            impulse
+                        }
+                        None => {
+                            let applied = normal.scale(impulse);
+                            body_a.push(applied.scale(-1.0), arm_a);
+                            body_b.push(applied, arm_b);
+                            impulse
+                        }
+                    };
                     // Coulomb friction through the strike, as in the paper's collision step: the slip brought to rest along its
                     // own line, in the cone of mu times this impulse (a struck ball otherwise kept its whole sideways speed).
+                    // Held bodies rub with the joints holding, as they are struck: a hung ball's contact point slips across the
+                    // line at its swing's spin times its radius, and its free mass took a rub that spun the ball, which its
+                    // joint then turned into swing, so the strike was shared and the line swung (KB-PHYS-HUNGCRADLE1).
                     let relative = body_b.at(arm_b).sub(body_a.at(arm_a)).sub(self.v(PAIR_SURFACE_X, row));
                     let slip = relative.sub(normal.scale(relative.dot(normal)));
                     let length = sqrt(slip.dot(slip));
-                    let give = if length > 0.0 {
+                    let most = self.s(PAIR_FRICTION, row) * impulse;
+                    if length > 0.0 && most > 0.0 {
                         let line = slip.scale(1.0 / length);
-                        body_a.give(line, arm_a) + body_b.give(line, arm_b)
-                    } else {
-                        0.0
-                    };
-                    if give > 0.0 {
-                        let most = self.s(PAIR_FRICTION, row) * impulse;
-                        let stop = length / give;
-                        let rub = slip.scale(-(if stop < most { stop } else { most }) / length);
-                        body_a.push(rub.scale(-1.0), arm_a);
-                        body_b.push(rub, arm_b);
+                        let rubbed = match held {
+                            Some(_) => self.held_response(row, a, b, line, arm_a, arm_b, most),
+                            None => None,
+                        };
+                        match rubbed {
+                            Some(rubbed) => {
+                                let stop = length / rubbed.inverse;
+                                self.apply_held(&rubbed, -(if stop < most { stop } else { most }));
+                                (body_a, body_b) = self.pair_moving(row, a, b);
+                            }
+                            None => {
+                                let give = body_a.give(line, arm_a) + body_b.give(line, arm_b);
+                                if give > 0.0 {
+                                    let stop = length / give;
+                                    let rub = slip.scale(-(if stop < most { stop } else { most }) / length);
+                                    body_a.push(rub.scale(-1.0), arm_a);
+                                    body_b.push(rub, arm_b);
+                                }
+                            }
+                        }
                     }
                     self.settle(a, &body_a);
                     self.settle(b, &body_b);
                     self.set_s(PAIR_FORCE, row, self.s(PAIR_FORCE, row) + impulse);
+                    // The time of impact: a point still apart meets when its gap closes, gap / -speed into the substep, and
+                    // a body struck in this pass passes the strike on when it took it. The substep moves every body with
+                    // the speed it leaves the pass with, so each body this strike changed is moved back by that change times
+                    // the time once the substep has moved it (`shift_poses`; Mirtich and Canny 1995: advance to the
+                    // collision, apply the impulse, go on). Moved as it came, a ball struck 0.2 mm short of a touching
+                    // line stopped 0.2 mm short of it, swung back onto it at a millimetre a second, below any strike, and
+                    // pushed the line, which then swung as one. The poses move after the solve, not now: moved now, the
+                    // ball the line sends off would overlap its neighbour by up to its whole substep's travel through the
+                    // contact solve, whose push then moved it further.
+                    let listed = |body: usize| hit[..hits].iter().position(|&listed| listed == body).map_or(0.0, |place| struck_at[place]);
+                    let own = if gap > 0.0 { gap / -speed } else { 0.0 };
+                    let when = own.max(listed(a)).max(listed(b)).min(h);
+                    if when > 0.0 {
+                        for &(body, linear, angular) in &moved[..count] {
+                            if self.flags(body) & KIND != DYNAMIC || !self.is_awake(body) {
+                                continue;
+                            }
+                            let (gain, spin) = (self.v(LINEAR_X, body).sub(linear), self.v(ANGULAR_X, body).sub(angular));
+                            shifts.add(body, gain.scale(-when), spin.scale(-when));
+                        }
+                    }
                     for body in [a, b] {
-                        if hits < hit.len() && !hit[..hits].contains(&body) {
-                            hit[hits] = body;
-                            hits += 1;
+                        match hit[..hits].iter().position(|&listed| listed == body) {
+                            Some(place) => struck_at[place] = struck_at[place].max(when),
+                            None if hits < hit.len() => {
+                                hit[hits] = body;
+                                struck_at[hits] = when;
+                                hits += 1;
+                            }
+                            None => {}
                         }
                     }
                     struck = true;
@@ -602,6 +691,24 @@ impl World {
             }
             if !struck {
                 break;
+            }
+        }
+        shifts
+    }
+
+    /// Once the substep has moved the poses: each body a strike of `collide_pairwise` changed is moved by its time of impact.
+    pub fn shift_poses(&mut self, shifts: &Shifts) {
+        for &(body, shift, turn) in &shifts.entries[..shifts.count] {
+            self.shift_pose(body, shift, turn);
+        }
+    }
+
+    /// Once the substep is solved: the pairs `collide_pairwise` left to strike later are plain pairs again.
+    pub fn end_strikes(&mut self, shifts: &Shifts) {
+        if shifts.later {
+            for i in self.window.pairs.0..self.window.pairs.1 {
+                let row = self.uu(SOLVE_PAIRS, i) as usize;
+                self.set_u(PAIR_FLAGS, row, self.uu(PAIR_FLAGS, row) & !PAIR_STRIKE_LATER);
             }
         }
     }
@@ -986,6 +1093,7 @@ impl World {
         let (rotation_a, rotation_b) = (self.pose_rotation(a), self.pose_rotation(b));
         let normal = self.v(PAIR_NORMAL_X, row);
         let bounce = self.s(PAIR_RESTITUTION, row);
+        let later = self.uu(PAIR_FLAGS, row) & PAIR_STRIKE_LATER != 0;
         let surface_normal = self.v(PAIR_SURFACE_X, row).dot(normal);
         let count = self.uu(PAIR_CONTACTS, row) as usize;
         let zero = v3(0.0, 0.0, 0.0);
@@ -1035,6 +1143,13 @@ impl World {
             // noticed; acting here would slow the body first and hide it.
             if !biased && gap > 0.0 {
                 most[k] = pressed;
+            }
+            // A strike into a line the pass left for a later substep stays open here, in the pushing and the relaxing passes
+            // alike: the pass strikes it one pair at a time (`collide_pairwise`, PAIR_STRIKE_LATER) the next substep, from
+            // an overlap of at most what this substep's other rows added to its speed, times h. Held in the relaxing pass,
+            // the overlap stopped it dead, a strike with no bounce.
+            if later && approach[k] < -threshold {
+                most[k] = 0.0;
             }
             (turn_a[k], turn_b[k]) = (arm_a.cross(normal), arm_b.cross(normal));
             (spin_a[k], spin_b[k]) = (body_a.inertia.mul(turn_a[k]), body_b.inertia.mul(turn_b[k]));
@@ -1214,13 +1329,29 @@ impl World {
                 let speed = body_b.at(arm_b).sub(body_a.at(arm_a)).dot(normal);
                 let wanted = -self.s(PAIR_RESTITUTION, row) * self.s(CONTACT_APPROACH, at);
                 let pressed = self.s(CONTACT_NORMAL_IMPULSE, at);
-                let total = pressed + self.s(CONTACT_NORMAL_MASS, at) * (wanted - speed);
+                let free = self.s(CONTACT_NORMAL_MASS, at) * (wanted - speed);
+                // A body a joint holds bounces with the joints holding it (`held_response`), as in `collide_pairwise`.
+                self.settle(a, &body_a);
+                self.settle(b, &body_b);
+                let held = self.held_response(row, a, b, normal, arm_a, arm_b, free);
+                let total = pressed + match &held {
+                    Some(held) => (wanted - speed) / held.inverse,
+                    None => free,
+                };
                 let total = if total > 0.0 { total } else { 0.0 };
-                let applied = normal.scale(total - pressed);
                 self.set_s(CONTACT_NORMAL_IMPULSE, at, total);
                 self.set_s(PAIR_FORCE, row, self.s(PAIR_FORCE, row) + total - pressed);
-                body_a.push(applied.scale(-1.0), arm_a);
-                body_b.push(applied, arm_b);
+                match &held {
+                    Some(held) => {
+                        self.apply_held(held, total - pressed);
+                        (body_a, body_b) = self.pair_moving(row, a, b);
+                    }
+                    None => {
+                        let applied = normal.scale(total - pressed);
+                        body_a.push(applied.scale(-1.0), arm_a);
+                        body_b.push(applied, arm_b);
+                    }
+                }
                 i += 1;
             }
             // Unbiased, so the soft step's scales are not read.
@@ -1230,6 +1361,29 @@ impl World {
             self.settle(b, &body_b);
         }
         self.window.impacts = 0;
+    }
+}
+
+/// The most bodies one substep's strikes move to their time of impact (`collide_pairwise`); past them a strike's body moves
+/// with the substep as it did before, by up to its gap.
+pub const SHIFTS: usize = 64;
+
+/// What `collide_pairwise` moves each struck body by once the substep has moved it: its centre and a rotation vector.
+pub struct Shifts {
+    pub count: usize,
+    pub entries: [(usize, V3, V3); SHIFTS],
+    /// Whether a pair was marked PAIR_STRIKE_LATER this substep.
+    pub later: bool,
+}
+
+impl Shifts {
+    fn add(&mut self, body: usize, shift: V3, turn: V3) {
+        if let Some(entry) = self.entries[..self.count].iter_mut().find(|entry| entry.0 == body) {
+            (entry.1, entry.2) = (entry.1.add(shift), entry.2.add(turn));
+        } else if self.count < SHIFTS {
+            self.entries[self.count] = (body, shift, turn);
+            self.count += 1;
+        }
     }
 }
 

@@ -127,6 +127,10 @@ Closed since (2026-11-27, Claude, laptop):
   before the contact solve (Guendelman, Bridson and Fedkiw 2003), so one or two struck balls send as many off, spaced or
   touching, at both tiers; towers of ten boxes at restitution 0, 0.5 and 1 still stand and sleep
   (`tests/rigid-validation.test.js`).
+- Point 3: the hung cradle, KB-PHYS-HUNGCRADLE1 fixed (2026-11-28): balls on revolute joints are struck with the joints
+  holding them, at the strike's time of impact, so five touching hung balls swing one in, one out for 60 s at both tiers;
+  at e = 0.995 the end ball rises to ((1 + e) / 2)^8, and with friction it leaves at the rigid Coulomb (1 - mu r / l)^4
+  (`tests/rigid-validation.test.js`).
 - Point 2: KB-PHYS-DOMINOSCALE1 fixed (2026-11-27): the separating axis test's face bias was 1 mm at every size and now
   follows shapes below a reach of 0.2 m, so rows the same in every dimensionless number topple at one speed, and real 48 mm
   dominoes with `lengthUnit: 0.05` and a 1/240 s step match all five measurements within 0.1 (`tests/rigid-measured.test.js`).
