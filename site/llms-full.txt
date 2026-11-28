@@ -35014,8 +35014,9 @@ stay in the four frozen result JSONs. Full Cycles transport includes cast shadow
 and bounce light absent from this default unshadowed Margo scene. The combined
 control removes both; it does not attribute the entire residual to shadows.
 Rough refraction, filtering, mesh-boundary versus slab paths and reference noise
-remain mixed causes. No physical-equivalence claim is made. Native thickness
-textures remain unsupported by this route. The lane G native tint repair now
+remain mixed causes. No physical-equivalence claim is made. Thickness maps are
+read on both routes since 2026-11-27: the native tint (212d482e00, KB4000) and the
+pass (66c3e8ae5c; packages/gltf/test/native-volume-path.test.js). The lane G native tint repair now
 retains natural optical depth until the world-space refracted path is known;
 the old thickness-200/scale-1/200 case draws black red/green channels before
 repair and exact [137,188,255,255] afterwards. Thickness 1200, instancing and
