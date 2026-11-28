@@ -2,6 +2,7 @@ import { Engine } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
 import { createSplitter } from './model.js';
 import { reflectionDirection, splitSpectrum } from './optics.js';
+import { lerp as mix } from '@margoengine/math/mathutils';
 
 const canvas=document.querySelector('#scene');
 const loading=document.querySelector('#loading');
@@ -15,7 +16,6 @@ const lifetime=new AbortController();
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
 const wide={target:[.004,.111,.018],offset:[-.46,.94,1.46],fitAspect:1.17};
 const overhead={target:[.017,.144,.045],offset:[-.047,1.66,.403],fitAspect:1.17};
-const mix=(a,b,t)=>a+(b-a)*t;
 let degrees=Number(angle.value),spectrum=splitSpectrum(degrees);
 let engine,splitter,observer,frame,last=0;
 let zoom=0,detail=false,dirty=true,pending=false;

@@ -1,10 +1,13 @@
+import { airIndexTemperatureSlope } from '@margoengine/optics/imaging';
+
 export const ambientIndex=1.000273;
 export const ambientKelvin=293.15;
 export const focusRun=.380;
 export const focusOffset=.255;
 export const focalLength=Math.hypot(focusRun,focusOffset);
 export const sourceWidth=.000047;
-export const derivativeGain=(ambientIndex-1)*Math.sqrt(2*Math.PI)/(ambientIndex*ambientKelvin);
+// Deflection per unit of the line-of-sight temperature gradient of a Gaussian lobe (Gladstone-Dale dn/dT, Settles 2001).
+export const derivativeGain=-airIndexTemperatureSlope(ambientIndex,ambientKelvin)*Math.sqrt(2*Math.PI)/ambientIndex;
 export const bladeOut=-1;
 
 // Positive Gaussian components with a wider, wandering core as the plume rises.
@@ -25,22 +28,6 @@ export function components(y,time) {
     };
   });
 }
-export function projectedHeat(x,y,time) {
-  return components(y,time).reduce((sum,{sigma,center,temperature})=>{
-    const u=(x-center)/sigma;
-    return sum+temperature*Math.sqrt(2*Math.PI)*sigma*Math.exp(-.5*u*u);
-  },0);
-}
-export function deflection(x,y,time) {
-  return derivativeGain*components(y,time).reduce((sum,{sigma,center,temperature})=>{
-    const u=(x-center)/sigma;
-    return sum+temperature*u*Math.exp(-.5*u*u);
-  },0);
-}
-export function transmission(cutoff,x,y,time) {
-  return Math.max(0,Math.min(1,1-cutoff+deflection(x,y,time)*focalLength/sourceWidth));
-}
-
 // Emit the same constants for the closed-form gradient evaluated by the Margo material.
 export function plumeWGSL() {
   const f=(value)=>value.toFixed(10);

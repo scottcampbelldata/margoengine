@@ -2,6 +2,7 @@ import { Engine } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
 import { createBench, screenFocus } from './model.js';
 import { bladeOut } from './optics.js';
+import { lerp as mix } from '@margoengine/math/mathutils';
 
 const canvas=document.querySelector('#scene');
 const loading=document.querySelector('#loading');
@@ -16,7 +17,6 @@ const motion=matchMedia('(prefers-reduced-motion: reduce)');
 const wide={aim:[0,.103,.070],offset:[-.42,1.10,1.37],fit:1.37,fov:42};
 const detail={aim:screenFocus,offset:[-.012,.316,.336],fit:1.10,fov:38};
 const still=.68;
-const mix=(a,b,t)=>a+(b-a)*t;
 let engine,bench,resizeObserver,screenObserver,frame;
 let cutoff=Number(range.value),out=false,close=false,inView=true,dirty=true,applied=false,zoom=0;
 let last=0,time=still;
