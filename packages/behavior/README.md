@@ -110,6 +110,105 @@ console.log(formatTrace(debug.trace));
 `tree.trace` holds one entry per node ticked (`path`, `depth`, `type`, `name`, `status`, and utility `scores`), ready
 for an inspector panel or a log. Give any node a `label` to name it in the trace. Tracing is off by default.
 
+### Reusable subtrees (`margoengine/behavior/subtrees`)
+
+`subtree(name)` stands for a tree registered under that name in a registry you pass in; there is no global registry.
+`SubtreeTree` expands the references once and then runs as a `BehaviorTree`, and every place a subtree appears keeps
+its own state (a `cooldown` used twice through one subtree counts twice).
+
+```ts
+import { action, condition, cooldown, selector, sequence } from 'margoengine/behavior';
+import { SubtreeTree, resolveTree, subtree, validateTree, type SubtreeRegistry } from 'margoengine/behavior/subtrees';
+
+const subtrees: SubtreeRegistry = {
+  attack: sequence(condition('inRange'), cooldown(1, action('swing'))),
+  // A registered document may use other registered subtrees.
+  guard: { format: 'margo-behavior', version: 1, root: selector(subtree('attack'), action('patrol')) },
+};
+const handlers = { conditions: { inRange: () => true }, actions: { swing: () => 'success' as const, patrol: () => 'success' as const } };
+const root = selector(subtree('guard'), subtree('attack'));
+console.log(validateTree(root, subtrees, { conditions: ['inRange'], actions: ['swing', 'patrol'] })); // []
+console.log(validateTree(subtree('missing'), subtrees)[0].path); // 'root': names where the problem is
+const expanded = resolveTree(root, subtrees); // a plain tree document, references expanded
+const tree = new SubtreeTree(root, { subtrees, handlers });
+console.log(expanded.root.type, tree.tick(1 / 60)); // 'selector' 'success'
+```
+
+- `validateTree(input, registry, handlerNames?)` returns every issue with its path (unknown references, cycles,
+  invalid nodes, unknown handler names) without throwing; `resolveTree` throws a `TypeError` naming the first. Both
+  accept a node, a `{format: 'margo-behavior', version: 1, root}` document or its JSON text.
+- The expanded tree is bounded like any tree: at most 100,000 nodes and 256 levels after expansion, so a reference
+  reused many times or nested deeply is refused instead of exhausting memory.
+
+### Tree text (`margoengine/behavior/text`)
+
+`parseTreeText` reads a compact text form of a tree and `printTreeText` writes it back; printing a parsed text gives
+the text again. Nodes are written as `name(attribute=value) { children }`, attribute values are JSON, and `//`, `#`
+and `/* */` comments are skipped.
+
+```ts
+import { BehaviorTree } from 'margoengine/behavior';
+import { SubtreeTree } from 'margoengine/behavior/subtrees';
+import { parseTreeText, printTreeText, MAX_TREE_TEXT_LENGTH } from 'margoengine/behavior/text';
+
+const handlers = { conditions: { hungry: () => true }, actions: { eat: () => 'success' as const, wander: () => 'success' as const } };
+const text = `
+  # a villager
+  tree {
+    selector {
+      sequence { condition(name="hungry") action(name="eat") }  // eat first
+      subtree(name="idle")
+    }
+  }`;
+const subtrees = { idle: { type: 'action' as const, name: 'wander' } };
+const doc = parseTreeText(text, { subtrees, handlers: { conditions: ['hungry'], actions: ['eat', 'wander'] } });
+console.log(new SubtreeTree(doc, { subtrees, handlers }).tick(), MAX_TREE_TEXT_LENGTH); // 'success' 8388608
+console.log(printTreeText(doc, { subtrees })); // the same tree in the canonical layout
+// Without subtrees the result is a plain tree document for BehaviorTree.
+console.log(new BehaviorTree(parseTreeText('action(name="eat")'), { handlers }).tick()); // 'success'
+try {
+  parseTreeText('sequence { action(name="eat") ');
+} catch (error) {
+  console.log((error as Error).message); // 'Tree text 1:31: unclosed node body; correct the text at this location'
+}
+```
+
+- A syntax error throws a `TypeError` with the line and column; a semantic one (an unknown node, a bad attribute, a
+  reference not in `subtrees`, a handler not in `handlers`) names the node's path.
+- Input is bounded before scanning: at most `MAX_TREE_TEXT_LENGTH` (8,388,608) UTF-16 code units, and the tree limits
+  above (100,000 nodes, 256 levels, also for nested attribute arrays).
+
+### Live inspector (`margoengine/behavior/inspect`)
+
+`TreeInspector` draws a collapsible panel of a tree: every node, untouched ones included, with its status from the last
+tick and a utility node's scores. Build the tree with `trace: true`, or the panel says why it shows no statuses.
+
+```ts
+import { BehaviorTree, action, sequence, wait } from 'margoengine/behavior';
+import { TreeInspector } from 'margoengine/behavior/inspect';
+
+const tree = new BehaviorTree(sequence(wait(0.5), action('wave')), {
+  trace: true,
+  handlers: { actions: { wave: () => 'success' } },
+});
+const stop = new AbortController();
+const inspector = new TreeInspector(tree, document.body, { title: 'Villager', autoRefresh: false, signal: stop.signal });
+tree.tick(0.25);
+inspector.refresh(); // 'Tick 1 | 0.250 s | running | Last tick'
+console.log(inspector.element.textContent?.includes('running')); // true
+inspector.pause(); // stop copying; the tree keeps running
+tree.tick(0.25);
+inspector.resume(); // copies the latest tick at once
+stop.abort(); // or inspector.dispose(): removes only this panel
+```
+
+- `autoRefresh` (default true) refreshes on the container window's animation frames; with `false`, call `refresh()`.
+  The summary shows the tick count, time and status; it reads "Last tick" when a trace is present, and statuses are
+  those of the last tick, so a node the last tick did not reach shows as idle.
+- `pause()` and `resume()` (also the panel's own button) stop and restart the copying, never the tree. `dispose()` is
+  idempotent; `refresh()` after it throws a `MargoError` `disposed`. Without a window to schedule frames, automatic
+  refresh throws a `TypeError`: pass `autoRefresh: false`.
+
 ### Blackboard
 
 `blackboardKey<T>(name, fallback)` declares a typed key; `blackboard.get(key)` returns the value or the fallback,
@@ -148,6 +247,43 @@ Response curves (`linear`, `power`, `logistic`, `step`, `inverse`) map an input 
 `combineConsiderations` multiplies consideration scores with Mark and Dill's compensation factor, so options with more
 considerations are not penalised for it. The `utility` node's `inertia` keeps the running option unless another beats
 it by that margin; options must score above `threshold` (default 0) to run.
+
+## Fuzzy logic (`margoengine/behavior/fuzzy`)
+
+`FuzzySystem` evaluates a Mamdani rule system written as JSON (Mamdani and Assilian 1975): linguistic input and output
+variables made of membership sets, and rules joined with `and`, `or`, `not` and the hedges `very` and `fairly`.
+
+```ts
+import { FuzzySystem, and, fairly, is, leftShoulder, not, rightShoulder, triangle, very } from 'margoengine/behavior/fuzzy';
+
+const system = new FuzzySystem({
+  inputs: {
+    distance: { sets: { near: leftShoulder(0, 5, 15), far: rightShoulder(5, 15, 40) }, range: [0, 40] },
+    health: { sets: { low: leftShoulder(0, 20, 60), high: rightShoulder(30, 70, 100) }, range: [0, 100] },
+  },
+  outputs: {
+    aggression: { sets: { flee: triangle(0, 0, 50), fight: triangle(50, 100, 100) }, range: [0, 100] },
+  },
+  rules: [
+    { if: and(is('distance', 'near'), is('health', 'high')), then: { variable: 'aggression', set: 'fight' } },
+    { if: very(is('health', 'low')), then: { variable: 'aggression', set: 'flee' } },
+    { if: and(fairly(is('distance', 'far')), not(is('health', 'low'))), then: { variable: 'aggression', set: 'fight' }, weight: 0.5 },
+  ],
+});
+const brave = system.evaluate({ distance: 4, health: 90 });
+const scared = system.evaluate({ distance: 4, health: 10 }, { method: 'mean-of-max', samples: 512 });
+console.log(brave.aggression > 50, scared.aggression < 50); // true true
+console.log(JSON.stringify(system.toJSON()).length > 0); // the document, for saving or a designer tool
+```
+
+- Sets: `triangle`, `trapezoid`, `leftShoulder`, `rightShoulder`, `sCurve`, `gaussian` and `singleton`; `membership(set,
+  x)` reads one. A variable's `range` is its finite sampling domain (default the extent of its sets).
+- A rule's `weight` (0 to 1, default 1) scales its activation; a rule may set several outputs; consequences of one
+  output combine by maximum. `very` squares a membership and `fairly` takes its square root.
+- Defuzzification: `centroid` (default), `mean-of-max` and `max-average`, sampled at `samples` cell midpoints (default
+  256, at most 1,000,000), singletons at their exact positions. When no rule fires, an output is `fallback` (default 0).
+- `evaluate` is pure: every named input must be given, nothing is kept between calls, and the constructor copies the
+  document, so later edits to your object change nothing.
 
 ## Steering and flocking
 
@@ -274,6 +410,40 @@ awareness to at least that value. Memories fade over `forgetTime` and go at 0; t
 `OccupancyMap` holds the chance a lost target is at each node of a grid or any graph you give it: `diffuse` spreads it,
 with an optional velocity to favour a direction, `observe` pins it and returns how surprising the place was, `cull`
 clears nodes seen empty, and `best` is where to look next. Walking there and calling `cull` again is a search.
+
+## Trigger regions (`margoengine/behavior/triggers`)
+
+`TriggerSystem` turns agents moving through sphere and box regions into `enter`, `stay` and `exit` events, one phase
+per region and agent each `update`, and writes each agent's memory to its blackboard for trees to read.
+
+```ts
+import { Blackboard } from 'margoengine/behavior';
+import { TriggerSystem, boxRegion, sphereRegion, touchesRegion, triggerStateKey } from 'margoengine/behavior/triggers';
+
+using triggers = new TriggerSystem('village');
+triggers.set('well', sphereRegion([0, 0, 0], 2));
+triggers.set('market', boxRegion([5, 0, -3], [11, 3, 3]));
+const squad = new Blackboard(); // two agents share one board; each has its own key
+const agents = [
+  { id: 'ana', position: [1, 0, 0], radius: 0.4, blackboard: squad },
+  { id: 'ben', position: [4.8, 0, 0], radius: 0.4, blackboard: squad },
+];
+console.log(triggers.update(agents)); // ana enters well, ben enters market (his sphere touches the box)
+agents[0].position = [3, 0, 0];
+console.log(triggers.update(agents).map((e) => `${e.agent} ${e.phase} ${e.region}`)); // ['ana exit well', 'ben stay market']
+console.log(squad.get(triggerStateKey('ben', 'village')).inside); // ['market']
+triggers.setEnabled('market', false); // ben exits market on the next update
+console.log(triggers.update(agents).map((e) => e.phase), touchesRegion(sphereRegion([0, 0, 0], 2), [2.3, 0, 0], 0.4)); // ['exit'] true
+```
+
+- Contact is overlap of the agent's bounding sphere (`radius`, default 0: a point) with the region, touching included;
+  box distance is exact at edges and corners.
+- `set(id, region)` adds or moves a region and keeps its identity, so a moved region gives `stay`, not `exit` and
+  `enter`. `setEnabled(id, false)` and `delete(id)` make contacts exit on the next update, as does an agent with
+  `enabled: false` or one left out of the list. Changes apply at the next `update`.
+- Events name agents by id and regions by name, so they serialize as they are; `events` holds the last update's.
+  `triggerStateKey(id, namespace)` is the agent's blackboard key, `{inside, events}`; the namespace (default
+  `triggers`) keeps several systems on one board apart. `dispose()` (or `using`) sends the final exits and clears.
 
 ## Environment queries
 
