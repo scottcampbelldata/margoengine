@@ -55,8 +55,30 @@ import {
 } from './wake-breaking.js';
 import { bindWakeFft, loadWakeFft, type WakeFft } from './wake-fft.js';
 import { WakeModeStep } from './wake-modes.js';
+import {
+  bindWakeModes,
+  loadWakeModes,
+  type WakeModeBuilds,
+  type WakeNativeModes,
+  type WakeNativeWorkCounts,
+} from './wake-native-modes.js';
+
+export type { WakeNativeWorkerWork, WakeNativeWorkCounts } from './wake-native-modes.js';
 
 const PI = 3.141592653589793;
+const F64 = Float64Array.BYTES_PER_ELEMENT;
+const MAX_PINNED_PHASE = 1_048_576;
+
+function wakeFailure(fix: string): MargoError {
+  return new MargoError('state', 'Invalid wake step. ' + fix + ' See https://margoengine.com/errors#physics-wake');
+}
+
+type WakeTrial = {
+  height: Float64Array;
+  potential: Float64Array;
+  velocity?: Float64Array;
+  breaking?: Float64Array;
+};
 
 function wakeFftLength(length: number): boolean {
   if (!Number.isInteger(length) || length < 4 || length > 4096) return false;
@@ -142,6 +164,9 @@ export interface WakeSample {
  */
 export class WakeSolver implements Solver<WakeParams> {
   private readonly id: string;
+  private modeBuilds?: WakeModeBuilds;
+  private nativeModes?: WakeNativeModes;
+  private disposed = false;
   private host!: SolverHost;
   private nx = 0;
   private nz = 0;
@@ -171,6 +196,10 @@ export class WakeSolver implements Solver<WakeParams> {
   private sOver!: Float64Array;
   private sTimes!: Float64Array;
   private stepDt = 0;
+  private publishedDt = 0;
+  private projectedRows = 0;
+  private projectedBands = 0;
+  private trial!: WakeTrial;
   private modeStep?: WakeModeStep;
   private surfaceRise?: Region;
   private damp!: Float64Array;
@@ -180,7 +209,7 @@ export class WakeSolver implements Solver<WakeParams> {
   /** The depths of the water's velocity layers, m below the still level, and their region (u, v, w per layer). */
   private belowDepths: number[] = [];
   private below?: Region;
-  private spectra!: [Float64Array, Float64Array, Float64Array];
+  private spectra!: readonly [Float64Array, Float64Array, Float64Array];
 
   /**
    * @param id The solver's id, default 'wake'.
@@ -221,7 +250,7 @@ export class WakeSolver implements Solver<WakeParams> {
     }
   }
 
-  /** Load the optional Rust/Wasm SIMD FFT. The synchronous constructor uses the TypeScript transform. */
+  /** Loads the optional Rust/Wasm FFT and modal advance. Native participants include the caller and default to one. */
   static async load(
     options: {
       readonly id?: string;
@@ -229,12 +258,27 @@ export class WakeSolver implements Solver<WakeParams> {
       readonly submergedSource?: SubmergedWakeSource;
       readonly breaking?: WakeBreakingOptions;
       readonly signal?: AbortSignal;
+      readonly threads?: 1 | 2 | 4;
     } = {},
   ): Promise<WakeSolver> {
-    const { id, sourceField, submergedSource, breaking, signal } = options;
+    const { id, sourceField, submergedSource, breaking, signal, threads = 1 } = options;
     const wake = new WakeSolver(id, sourceField, submergedSource, breaking);
     wake.fftModule = await loadWakeFft(signal);
+    wake.modeBuilds = await loadWakeModes(wake.fftModule, threads, signal);
     return wake;
+  }
+
+  /** Releases the optional modal helpers after stopping the world. */
+  [Symbol.dispose](): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    if (this.nativeModes) this.nativeModes.close();
+    else this.modeBuilds?.[Symbol.dispose]();
+  }
+
+  /** Native mode work for the last accepted step. */
+  readNativeWork(): WakeNativeWorkCounts | undefined {
+    return this.nativeModes?.workCounts();
   }
 
   describe(): SolverDescription {
@@ -255,6 +299,8 @@ export class WakeSolver implements Solver<WakeParams> {
    * @throws MargoError (state) for invalid grid, water, rate or source parameters, with the correction in the message.
    */
   init(host: SolverHost, params: WakeParams = {}): void {
+    if (this.disposed) throw wakeFailure('Load a new wake after disposing its native plan.');
+    if (this.host) throw wakeFailure('Create a separate wake before attaching another world.');
     const {
       cells = [256, 256],
       cellSize = 1,
@@ -309,20 +355,29 @@ export class WakeSolver implements Solver<WakeParams> {
       throw new MargoError('state', 'Pass a function initial(x, z) => [height, potential] or omit it for still water.');
     if (this.submergedSource && cells[0] * cells[1] > SUBMERGED_WAKE_MAX_CELLS)
       throw new MargoError('state', 'A projected wake supports up to 1,048,576 cells; reduce the grid dimensions.');
-    this.fft = this.fftModule ? bindWakeFft(this.fftModule, cells[0], cells[1]) : new RealFft2(cells[0], cells[1]);
+    const fftInstance = this.fftModule ? new WebAssembly.Instance(this.fftModule) : undefined;
+    this.fft = this.fftModule
+      ? bindWakeFft(this.fftModule, cells[0], cells[1], fftInstance)
+      : new RealFft2(cells[0], cells[1]);
     [this.nx, this.nz] = cells;
     this.host = host;
     this.current = [current[0], current[1]];
     this.dx = cellSize;
     this.x0 = centre[0] - (this.nx * cellSize) / 2;
     this.z0 = centre[1] - (this.nz * cellSize) / 2;
+    if (
+      !Number.isFinite(this.x0 + this.nx * cellSize) ||
+      !Number.isFinite(this.z0 + this.nz * cellSize) ||
+      !(cellSize * cellSize > 0 && Number.isFinite(cellSize * cellSize))
+    )
+      throw wakeFailure('Use a finite grid extent and a representable positive cell area.');
     this.patchGrid = { nx: this.nx, nz: this.nz, dx: cellSize, x0: this.x0, z0: this.z0 };
     this.rho = density;
     this.level = rate as RateLevel;
     this.sources = sources;
     const [gx, gy, gz] = host.gravity;
     this.g = hypot(gx, gy, gz);
-    if (!(this.g > 0)) throw new MargoError('state', 'A wake needs gravity; give the world a gravity above 0.');
+    if (!(this.g > 0 && Number.isFinite(this.g))) throw wakeFailure('Give the world finite gravity above zero.');
     const n = this.nx * this.nz,
       half = this.nx / 2 + 1;
     this.height = host.allocate(`${this.id}:height`, n * 8, 'f64', WAKE_LAYOUT);
@@ -355,7 +410,6 @@ export class WakeSolver implements Solver<WakeParams> {
         kinematicViscosity,
         current,
       );
-      this.factors(1 / rateOf(this.level));
       if (!waterBelow) this.surfaceRise = host.allocate(`${this.id}:rise`, n * 8, 'f64', WAKE_LAYOUT);
     } else {
       this.c = new Float64Array(half * this.nz);
@@ -375,16 +429,25 @@ export class WakeSolver implements Solver<WakeParams> {
         phi = regionWords(host.memory, this.potential) as Float64Array;
       for (let j = 0; j < this.nz; j++)
         for (let i = 0; i < this.nx; i++) {
-          const [a, b] = initial(this.x0 + (i + 0.5) * cellSize, this.z0 + (j + 0.5) * cellSize);
-          if (!(Number.isFinite(a) && Number.isFinite(b)))
+          const row = initial(this.x0 + (i + 0.5) * cellSize, this.z0 + (j + 0.5) * cellSize);
+          if (!(row?.length === 2 && Number.isFinite(row[0]) && Number.isFinite(row[1])))
             throw new MargoError('state', "A wake's initial height and potential are finite numbers; pass them.");
-          h[i + this.nx * j] = a;
-          phi[i + this.nx * j] = b;
+          h[i + this.nx * j] = row[0];
+          phi[i + this.nx * j] = row[1];
         }
+      // The first sample and a restore of the same initial wake have zero finite-difference rise.
+      (regionWords(host.memory, this.previous) as Float64Array).set(h);
     }
     this.press = new Float64Array(n);
     const size = 2 * half * this.nz;
-    this.spectra = [new Float64Array(size), new Float64Array(size), new Float64Array(size)];
+    this.nativeModes =
+      this.modeBuilds && bindWakeModes(this.modeBuilds, half * this.nz, Boolean(this.modeStep), fftInstance);
+    this.spectra = this.nativeModes?.spectra ?? [
+      new Float64Array(size),
+      new Float64Array(size),
+      new Float64Array(size),
+    ];
+    if (this.modeStep) this.factors(1 / rateOf(this.level));
     this.depth = depth;
     this.projected = this.submergedSource
       ? new ProjectedWakeSource(this.patchGrid, this.submergedSource.depths, depth)
@@ -396,23 +459,34 @@ export class WakeSolver implements Solver<WakeParams> {
       if (depth < Infinity) this.belowDepths.push(depth);
       this.below = host.allocate(`${this.id}:below`, this.belowDepths.length * 3 * n * 8, 'f64', WAKE_LAYOUT);
     }
-    this.updateWaterVelocity();
+    const velocity = this.below ?? this.surfaceRise;
+    this.trial = {
+      height: new Float64Array(n),
+      potential: new Float64Array(n),
+      velocity: velocity && new Float64Array(velocity.byteLength / F64),
+      breaking: this.breaking && new Float64Array(this.breaking.byteLength / F64),
+    };
+    if (velocity) {
+      const field = regionWords(host.memory, velocity) as Float64Array;
+      this.updateWaterVelocity(regionWords(host.memory, this.potential) as Float64Array, field);
+      if (!field.every(Number.isFinite))
+        throw wakeFailure('Use smaller initial potentials and a resolved grid so velocities stay finite.');
+    }
   }
 
   /** Retain the potential's vertical velocity for the configured wave model or its full depth layers. */
-  private updateWaterVelocity(): void {
-    if (this.below) this.layers();
-    if (!this.surfaceRise) return;
-    const memory = this.host.memory;
-    const phi = regionWords(memory, this.potential) as Float64Array;
-    const rise = regionWords(memory, this.surfaceRise) as Float64Array;
+  private updateWaterVelocity(phi: Float64Array, out: Float64Array): void {
+    if (this.below) {
+      this.layers(phi, out);
+      return;
+    }
     const spectrum = this.spectra[0];
     this.fft.forward(phi, spectrum);
     for (let m = 0; m < this.kk.length; m++) {
       spectrum[2 * m]! *= this.kk[m]!;
       spectrum[2 * m + 1]! *= this.kk[m]!;
     }
-    this.fft.inverse(spectrum, rise);
+    this.fft.inverse(spectrum, out);
   }
 
   /**
@@ -420,14 +494,11 @@ export class WakeSolver implements Solver<WakeParams> {
    * horizontal velocity and k sinh(k (D - d)) / cosh(k D) for the vertical, all times its decay cosh(k (D - d)) / cosh(k D)
    * (Tessendorf's eq. 18 with no flow through the bottom; e^(-k d) and k e^(-k d) in deep water), transformed back.
    */
-  private layers(): void {
-    const memory = this.host.memory,
-      phi = regionWords(memory, this.potential) as Float64Array,
-      out = regionWords(memory, this.below!) as Float64Array,
-      { nx, nz, dx, fft } = this,
+  private layers(phi: Float64Array, out: Float64Array): void {
+    const { nx, nz, dx, fft } = this,
       n = nx * nz,
       half = nx / 2 + 1,
-      [F, A, B] = this.spectra,
+      [F, A] = this.spectra,
       deep = !(this.depth < Infinity);
     fft.forward(phi, F);
     const field = new Float64Array(n);
@@ -464,7 +535,6 @@ export class WakeSolver implements Solver<WakeParams> {
         out.set(field, (layer * 3 + (c === 2 ? 1 : c === 0 ? 0 : 2)) * n);
       }
     });
-    void B;
   }
 
   /**
@@ -521,45 +591,56 @@ export class WakeSolver implements Solver<WakeParams> {
   /** The per-mode factors of a step of `dt` s, made once for each new dt. */
   private factors(dt: number): void {
     if (dt === this.stepDt) return;
+    // A refused update can have written a prefix of coefficients. Rebuild the next trial even at the old duration.
+    this.stepDt = 0;
     if (this.modeStep) {
-      this.modeStep.prepare(dt);
+      this.modeStep.prepare(dt, this.nativeModes);
       this.stepDt = dt;
       return;
     }
     for (let m = 0; m < this.kk.length; m++) {
       const omega = Math.sqrt(this.g * this.kk[m]!),
         phase = omega * dt;
+      if (m > 0 && !(omega > 0 && Number.isFinite(omega) && phase < MAX_PINNED_PHASE))
+        throw wakeFailure('Use a finer time step or a resolved gravity and depth for each nonzero wake mode.');
       this.c[m] = cos(phase);
       this.sOver[m] = omega > 0 ? sin(phase) / omega : dt;
       this.sTimes[m] = omega * sin(phase);
     }
+    this.nativeModes?.prepareGravity(this.kk, this.c, this.sOver, this.sTimes, 1 / (this.rho * this.g));
     this.stepDt = dt;
   }
 
   step(context: StepContext, dt: number): void {
-    const memory = this.host.memory,
-      h = regionWords(memory, this.height) as Float64Array,
-      phi = regionWords(memory, this.potential) as Float64Array,
-      previous = regionWords(memory, this.previous) as Float64Array,
-      { nx, nz, press } = this,
-      t = (context.tick + 0.5) / rateOf(context.level);
+    if (this.disposed || !this.host) throw wakeFailure('Add a live wake to the world before stepping it.');
+    if (!(dt > 0 && Number.isFinite(dt))) throw wakeFailure('Pass a finite positive wake duration.');
+    const { memory } = this.host;
+    const { height: h, potential: phi, velocity, breaking } = this.trial;
+    const { nx, nz, press } = this;
+    const t = (context.tick + 0.5) / rateOf(context.level);
+    if (!Number.isFinite(t)) throw wakeFailure('Supply a finite tick on the wake world clock.');
+    h.set(regionWords(memory, this.height));
+    phi.set(regionWords(memory, this.potential));
     this.factors(dt);
-    previous.set(h);
     press.fill(0);
-    // Sources at the step's middle: each a raised-cosine patch of its pressure, and its volume spread over the same patch.
-    for (const source of this.sources?.(t) ?? []) this.stamp(source, h);
+    // Stamp only into trial arrays. A rejected port or callback has no visible prefix.
+    const sources = this.sources?.(t);
+    if (sources !== undefined && !Array.isArray(sources))
+      throw wakeFailure('Return an array of SeaSource rows from the wake source function.');
+    for (const source of sources ?? []) this.stamp(source, h);
     const sourcePort = this.sourceField && context.inputs.get(this.sourceField.name);
     if (sourcePort) this.stampField(sourcePort, context.cell, h);
-    const [H, P, F] = this.spectra,
-      fft = this.fft;
+    if (!h.every(Number.isFinite) || !press.every(Number.isFinite))
+      throw wakeFailure('Reduce incoming wake volume or pressure so overlapping sources stay finite.');
+    const [H, P, F] = this.spectra;
+    const fft = this.fft;
     fft.forward(h, H);
-    if (this.submergedSource) {
-      const port = context.inputs.get(this.submergedSource.field.name);
-      if (port) this.stampSubmerged(port, context.cell, H);
-    }
+    const submergedPort = this.submergedSource && context.inputs.get(this.submergedSource.field.name);
+    if (submergedPort) this.stampSubmerged(submergedPort, context.cell, H);
     fft.forward(phi, F);
     fft.forward(press, P);
-    if (this.modeStep) this.modeStep.advance(H, F, P);
+    if (this.nativeModes) this.nativeModes.advance();
+    else if (this.modeStep) this.modeStep.advance(H, F, P);
     else this.advanceGravityModes(H, F, P);
     fft.inverse(H, h);
     fft.inverse(F, phi);
@@ -568,19 +649,29 @@ export class WakeSolver implements Solver<WakeParams> {
       h[i]! *= keep;
       phi[i]! *= keep;
     }
-    this.updateWaterVelocity();
-    if (this.breaking)
-      writeWakeBreaking(
-        regionWords(memory, this.breaking) as Float64Array,
-        this.grid,
-        previous,
-        h,
-        phi,
-        dt,
-        this.current,
-        press,
-        this.damp,
-      );
+    if (!h.every(Number.isFinite) || !phi.every(Number.isFinite))
+      throw wakeFailure('Reduce wake forcing so the height and potential stay finite through the transform.');
+    if (velocity) {
+      this.updateWaterVelocity(phi, velocity);
+      if (!velocity.every(Number.isFinite))
+        throw wakeFailure('Reduce wake forcing or resolve the grid so water velocity stays finite.');
+    }
+    // Reopen the arena views after callbacks. An input may have grown the owning memory.
+    const acceptedHeight = regionWords(memory, this.height) as Float64Array;
+    if (breaking) {
+      writeWakeBreaking(breaking, this.grid, acceptedHeight, h, phi, dt, this.current, press, this.damp);
+      if (!breaking.every(Number.isFinite))
+        throw wakeFailure('Use a resolved wake grid and smaller forcing to keep the breaking field finite.');
+    }
+    (regionWords(memory, this.previous) as Float64Array).set(acceptedHeight);
+    acceptedHeight.set(h);
+    (regionWords(memory, this.potential) as Float64Array).set(phi);
+    if (velocity) (regionWords(memory, (this.below ?? this.surfaceRise)!) as Float64Array).set(velocity);
+    if (breaking) (regionWords(memory, this.breaking!) as Float64Array).set(breaking);
+    this.publishedDt = dt;
+    this.projectedRows = submergedPort ? this.projected!.rows : 0;
+    this.projectedBands = submergedPort ? this.projected!.bands : 0;
+    this.nativeModes?.accept();
   }
 
   private advanceGravityModes(H: Float64Array, F: Float64Array, P: Float64Array): void {
@@ -609,16 +700,32 @@ export class WakeSolver implements Solver<WakeParams> {
     }
   }
 
-  private stampField(port: Port, cell: Cell, height: Float64Array): void {
+  private sourceRows(port: Port, cell: Cell, field: string, layout: number, stride: number, max: number): Float64Array {
     const { region } = port;
-    if (region.type !== 'f64' || region.layout !== WAKE_SOURCE_LAYOUT || region.byteLength % (WAKE_SOURCE_WORDS * 8))
-      throw new MargoError('state', 'Invalid wake source layout. Use five f64 words per layout-1 source row.');
-    if (cell.some((coordinate, i) => coordinate !== port.cell[i]))
-      throw new MargoError(
-        'state',
-        'Wake source coordinates use another world cell. Set the source and wake to the same cell.',
-      );
-    const words = regionWords(this.host.memory, region) as Float64Array;
+    const memory = region?.memory ?? this.host.memory;
+    const rowBytes = stride * F64;
+    if (
+      port.field !== field ||
+      region?.type !== 'f64' ||
+      region.layout !== layout ||
+      !Number.isSafeInteger(region.byteOffset) ||
+      region.byteOffset < 0 ||
+      region.byteOffset % F64 ||
+      !Number.isSafeInteger(region.byteLength) ||
+      region.byteLength < 0 ||
+      region.byteLength % rowBytes ||
+      region.byteLength / rowBytes > max ||
+      !(memory instanceof WebAssembly.Memory) ||
+      region.byteOffset + region.byteLength > memory.buffer.byteLength
+    )
+      throw wakeFailure('Publish aligned layout-1 f64 wake source rows in their owning memory.');
+    if (!port.cell || port.cell.length !== 3 || cell.some((coordinate, i) => coordinate !== port.cell[i]))
+      throw wakeFailure('Place the wake and source in the same signed world cell.');
+    return regionWords(memory, region) as Float64Array;
+  }
+
+  private stampField(port: Port, cell: Cell, height: Float64Array): void {
+    const words = this.sourceRows(port, cell, this.sourceField!.name, WAKE_SOURCE_LAYOUT, WAKE_SOURCE_WORDS, Infinity);
     for (let at = 0; at < words.length; at += WAKE_SOURCE_WORDS) {
       const x = words[at]!;
       const z = words[at + 1]!;
@@ -631,6 +738,7 @@ export class WakeSolver implements Solver<WakeParams> {
 
   /** Adds one source to the step's pressure grid and its volume to the height, as a raised cosine of its radius. */
   private stamp(source: SeaSource, h: Float64Array): void {
+    if (!source) throw wakeFailure('Supply a SeaSource row with position, radius, pressure and volume.');
     const { x, z, radius, pressure, volume } = source;
     if (
       !(
@@ -650,29 +758,22 @@ export class WakeSolver implements Solver<WakeParams> {
   }
 
   private stampSubmerged(port: Port, cell: Cell, heightSpectrum: Float64Array): void {
-    const { region } = port;
-    const rowBytes = SUBMERGED_WAKE_WORDS * Float64Array.BYTES_PER_ELEMENT;
-    if (
-      region.type !== 'f64' ||
-      region.layout !== SUBMERGED_WAKE_LAYOUT ||
-      region.byteLength % rowBytes ||
-      region.byteLength / rowBytes > SUBMERGED_WAKE_MAX_ROWS
-    )
-      throw new MargoError('state', 'Use the layout-1 f64 submerged wake port with up to 16,384 rows.');
-    if (cell.some((coordinate, i) => coordinate !== port.cell[i]))
-      throw new MargoError(
-        'state',
-        'Submerged wake sources use another world cell; place the source and wake in the same cell.',
-      );
-    const words = regionWords(region.memory ?? this.host.memory, region) as Float64Array;
-    this.projected!.add(words, this.fft, heightSpectrum);
+    const rows = this.sourceRows(
+      port,
+      cell,
+      this.submergedSource!.field.name,
+      SUBMERGED_WAKE_LAYOUT,
+      SUBMERGED_WAKE_WORDS,
+      SUBMERGED_WAKE_MAX_ROWS,
+    );
+    this.projected!.add(rows, this.fft, heightSpectrum);
   }
 
   /** Per-step transforms for the current configuration and last active submerged bands. */
   fftWork(): { backend: 'typescript' | 'wasm-simd'; forward: number; inverse: number; transferBytes: number } {
     const layers = this.belowDepths.length;
     const velocity = layers > 0 || this.surfaceRise !== undefined;
-    const forward = 3 + Number(velocity) + (this.projected?.bands ?? 0);
+    const forward = 3 + Number(velocity) + this.projectedBands;
     const inverse = 2 + (layers > 0 ? 3 * layers : Number(velocity));
     const bytes = 8 * (this.nx + this.nx + 2) * this.nz;
     return {
@@ -685,7 +786,7 @@ export class WakeSolver implements Solver<WakeParams> {
 
   /** Nonzero projected rows and additional forward FFTs in the last executed step. */
   submergedSourceWork(): { readonly rows: number; readonly transforms: number } {
-    return { rows: this.projected?.rows ?? 0, transforms: this.projected?.bands ?? 0 };
+    return { rows: this.projectedRows, transforms: this.projectedBands };
   }
 
   /**
@@ -693,6 +794,7 @@ export class WakeSolver implements Solver<WakeParams> {
    * (0 outside it). Writes into `out` when given and returns it.
    */
   sample(x: number, z: number, out?: WakeSample): WakeSample {
+    if (!this.host) throw wakeFailure('Add the wake to a world before sampling its surface.');
     const s = out ?? { height: 0, slope: [0, 0], velocity: [0, 0, 0] },
       memory = this.host.memory,
       h = regionWords(memory, this.height) as Float64Array,
@@ -728,7 +830,7 @@ export class WakeSolver implements Solver<WakeParams> {
       const layers = regionWords(memory, this.below) as Float64Array;
       s.velocity[1] = this.heightAt(layers.subarray(nx * nz), x, z);
     } else {
-      s.velocity[1] = this.stepDt > 0 ? (s.height - this.heightAt(previous, x, z)) / this.stepDt : 0;
+      s.velocity[1] = this.publishedDt > 0 ? (s.height - this.heightAt(previous, x, z)) / this.publishedDt : 0;
     }
     return s;
   }
@@ -756,6 +858,7 @@ export class WakeSolver implements Solver<WakeParams> {
 
   /** The height grid as it stands, a view over the world's memory (x fastest, then z). */
   heights(): Float64Array {
+    if (!this.host) throw wakeFailure('Add the wake to a world before reading its height grid.');
     return regionWords(this.host.memory, this.height) as Float64Array;
   }
 

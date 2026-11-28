@@ -321,6 +321,11 @@
       <p><strong>Cause.</strong> A source, listener, atmosphere, terrain or audio path is invalid or exceeds the numerical range.</p>
       <p><strong>Fix.</strong> Supply finite local source and listener coordinates, a valid bed and wind, and positive kelvin and density. Use a shorter local path if derived distances overflow. Use all eight finite band gains and keep travel time within the audio delay capacity.</p>
     </section>
+    <section id="physics-wake">
+      <h2><a href="#physics-wake">@margoengine/physics/sea dispersive wake and source fields</a></h2>
+      <p><strong>Cause.</strong> A wake step, incoming source bank or computed wave exceeds the supported range.</p>
+      <p><strong>Fix.</strong> Use a live wake, positive finite duration and resolved grid. Supply finite pressure and volume in aligned f64 rows in their owning memory and match the wake and source signed cells. Reduce forcing when a wave or its velocity would overflow.</p>
+    </section>
     <section id="physics-sail">
       <h2><a href="#physics-sail">@margoengine/physics/soft sail air loads</a></h2>
       <p><strong>Cause.</strong> A cloth grid, wind sample, signed origin, air-load trial or sail snapshot does not match the solver.</p>

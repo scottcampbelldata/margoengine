@@ -1,5 +1,6 @@
 import { MargoError } from '@margoengine/math/errors';
 import { cos, exp, sin } from '@margoengine/math/pinned';
+import type { WakeNativeModes } from './wake-native-modes.js';
 
 const TAU = 6.283185307179586;
 const ROW = 8;
@@ -68,7 +69,7 @@ export class WakeModeStep {
     }
   }
 
-  prepare(dt: number): void {
+  prepare(dt: number, native?: WakeNativeModes): void {
     const { natural, shifted, dissipation, vertical, coefficients } = this;
     for (let m = 1; m < natural.length; m++) {
       const at = m * ROW,
@@ -98,6 +99,7 @@ export class WakeModeStep {
       coefficients[at + 6] = f * (upperRe + lowerRe);
       coefficients[at + 7] = f * (upperIm + lowerIm);
     }
+    native?.prepareCurrent(vertical, natural, coefficients);
   }
 
   advance(height: Float64Array, potential: Float64Array, pressure: Float64Array): void {

@@ -4,7 +4,6 @@ import hashlib
 import json
 from pathlib import Path
 import re
-import sys
 import urllib.request
 import xml.etree.ElementTree as ET
 from zipfile import ZipFile
@@ -13,7 +12,7 @@ from zipfile import ZipFile
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SEA-04 measured comparison. Only `fetch` downloads.")
     parser.add_argument("command", nargs="?", choices=("fetch", "plan", "score"))
-    parser.add_argument("variant", nargs="?", default="", choices=("", "crest"))
+    parser.add_argument("variant", nargs="?", default="", choices=("", "crest", "upstream"))
     ARGS, unknown = parser.parse_known_args()
     # Named before a missing command is, so a mistyped flag is the thing the message shows.
     if unknown:
@@ -39,8 +38,7 @@ START = 37.5
 PERIOD = 1.22
 RATE = 60
 SCORE = (FOCUS-PERIOD, FOCUS+PERIOD)
-VARIANT = sys.argv[2] if len(sys.argv)>2 else ""
-assert VARIANT in ("", "crest", "upstream")
+VARIANT = ARGS.variant if __name__ == "__main__" else ""
 SUFFIX = "-"+VARIANT if VARIANT else ""
 ORIGIN = (-2.5, -5.0)
 DOMAIN = (5.0, 8.0)

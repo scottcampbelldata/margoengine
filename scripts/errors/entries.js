@@ -440,6 +440,14 @@ export const entries = [
     fix: 'Supply finite local source and listener coordinates, a valid bed and wind, and positive kelvin and density. Use a shorter local path if derived distances overflow. Use all eight finite band gains and keep travel time within the audio delay capacity.',
   },
   {
+    id: 'physics-wake',
+    title: '@margoengine/physics/sea dispersive wake and source fields',
+    kind: 'family',
+    messages: [],
+    cause: 'A wake step, incoming source bank or computed wave exceeds the supported range.',
+    fix: 'Use a live wake, positive finite duration and resolved grid. Supply finite pressure and volume in aligned f64 rows in their owning memory and match the wake and source signed cells. Reduce forcing when a wave or its velocity would overflow.',
+  },
+  {
     id: 'physics-sail',
     title: '@margoengine/physics/soft sail air loads',
     kind: 'family',

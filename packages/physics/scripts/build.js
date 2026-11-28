@@ -21,6 +21,7 @@ const exposeOptionalUrls = {
       !code.includes('-kernel.wasm') &&
       !code.includes('-kernel-shared.wasm') &&
       !code.includes('wake-fft.wasm') &&
+      !code.includes('wake-fft-shared.wasm') &&
       !code.includes('solver-phase-thread.js') &&
       !code.includes('hull-panel-thread.js') &&
       !code.includes('hull-slamming-thread.js')
@@ -29,7 +30,7 @@ const exposeOptionalUrls = {
     return {
       code: code
         .replace(
-          /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:wake-fft|thin-film-kernel-threaded|crush-shell-kernel-threaded|(?:school|swim|airborne|falling|pedestrian|landscape|boundary-layer|cloud-projection|vegetation|wind-traction|wing-lattice|foam-transport|entry-profile|ageing|celestial|accretion|room-sound|outdoor-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|ice-thermal|pack-ice|drainage-fog|thin-film|crush-shell|rogue-pair|wave-transport|surf-force|surge-potential|vortex-water|viscoplastic|underwater|thermal|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph|hull-panel|hull-slamming|flood-volume|tracer-random|cloth)-kernel(?:-shared)?)\.wasm\?no-inline["'])/g,
+          /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:wake-fft(?:-shared)?|thin-film-kernel-threaded|crush-shell-kernel-threaded|(?:school|swim|airborne|falling|pedestrian|landscape|boundary-layer|cloud-projection|vegetation|wind-traction|wing-lattice|foam-transport|entry-profile|ageing|celestial|accretion|room-sound|outdoor-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|ice-thermal|pack-ice|drainage-fog|thin-film|crush-shell|rogue-pair|wave-transport|surf-force|surge-potential|vortex-water|viscoplastic|underwater|thermal|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph|hull-panel|hull-slamming|flood-volume|tracer-random|cloth)-kernel(?:-shared)?)\.wasm\?no-inline["'])/g,
           '',
         )
         .replace(
@@ -264,7 +265,8 @@ await copyFile(
   resolve(root, 'src/tracer-random-kernel-shared.wasm'),
   resolve(dist, 'tracer-random-kernel-shared.wasm'),
 );
-await copyFile(resolve(root, 'src/sea/wake-fft.wasm'), resolve(dist, 'wake-fft.wasm'));
+for (const name of ['wake-fft.wasm', 'wake-fft-shared.wasm'])
+  await copyFile(resolve(root, 'src/sea', name), resolve(dist, name));
 for (const name of ['loads-kernel.wasm', 'loads-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/loads', name), resolve(dist, name));
 

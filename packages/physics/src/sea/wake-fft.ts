@@ -31,8 +31,13 @@ export async function loadWakeFft(signal?: AbortSignal): Promise<WebAssembly.Mod
   }
 }
 
-export function bindWakeFft(module: WebAssembly.Module, nx: number, nz: number): WakeFft {
-  const { exports } = new WebAssembly.Instance(module);
+export function bindWakeFft(
+  module: WebAssembly.Module,
+  nx: number,
+  nz: number,
+  instance = new WebAssembly.Instance(module),
+): WakeFft {
+  const { exports } = instance;
   const { memory, wake_fft_init: init, wake_fft_buffer: buffer, wake_fft_transform: transform } = exports;
   if (
     !(memory instanceof WebAssembly.Memory) ||

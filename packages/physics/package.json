@@ -106,6 +106,7 @@
     "test:gpu:strand-film": "cd ../.. && node packages/physics/tests/strand-film.browser.mjs && node packages/physics/tests/strand-film.browser.mjs --compat",
     "test:browser:granular-mpm": "cd ../.. && node packages/physics/tests/granular-mpm.browser.mjs",
     "test:browser:synoptic": "cd ../.. && node packages/physics/tests/synoptic.browser.mjs",
+    "test:gpu:sea04-workers": "cd ../.. && node scripts/run-with-timeout.mjs --max=2 -- node packages/physics/tests/sea04-workers.browser.mjs",
     "test:gpu:synoptic-workers": "cd ../.. && node packages/physics/tests/synoptic-workers.browser.mjs",
     "test:gpu:synoptic-film": "cd ../.. && node scripts/run-with-timeout.mjs --max=3 -- node packages/physics/tests/synoptic-film.browser.mjs && node scripts/run-with-timeout.mjs --max=3 -- node packages/physics/tests/synoptic-film.browser.mjs --compat",
     "test:gpu:seismic-workers": "cd ../.. && node packages/physics/tests/seismic-workers.browser.mjs",

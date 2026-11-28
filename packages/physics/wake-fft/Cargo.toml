@@ -8,6 +8,9 @@ publish = false
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+shared-modes = []
+
 [dependencies]
 margoengine-physics-kernel-common = { path = "../kernel-common" }
 

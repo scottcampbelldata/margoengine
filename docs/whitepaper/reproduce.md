@@ -5542,3 +5542,9 @@ Burton et al. provide the original lab geometry and an orientation trace. The tr
 - Build Physics with `node packages/physics/scripts/build.js`. Run `node --test packages/physics/tests/sail.test.js packages/physics/tests/coupling/sail-state.test.js packages/physics/tests/coupling/sail-workers.test.js packages/physics/tests/coupling/sailing.test.js`.
 - Run `npm run test:gpu:sail-workers -w @margoengine/physics` for 1, 2 and 4 participants and `npm run test:gpu:sail-film -w @margoengine/physics` for the fixed camera, cloth and hull on both renderers.
 - Run `node packages/physics/scripts/aero02-sail-measured.mjs` for the independent rigid cambered sail comparison by trim, grid resolution and incidence sensitivity.
+
+### SEA-04 accepted wake, native modes and measured limits
+
+- Build Physics with `node packages/physics/scripts/build.js` and Water with its workspace build. Run `node --test packages/physics/tests/coupling/sea04-accepted.test.js packages/physics/tests/sea-wake-fft-native.test.js packages/physics/tests/sea-wake-modes.test.js` for accepted sources, exact FFTs and capillary modes.
+- Run `npm run test:gpu:sea04-workers -w @margoengine/physics` for the native participant proof and `npm run test:gpu:quay-diffraction-film -w @margoengine/water` for the finite quay and open basin on both renderers.
+- Follow [DHI cylinder and other measured wake comparisons](../../packages/physics/scripts/sea04-measured.md). The independent upstream-gauge DHI plan uses WG1 as input and scores the separate WG9 record. The short capillary check uses Scott’s Table 1 wavelengths at published temperature and surface tension.

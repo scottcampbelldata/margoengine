@@ -12494,3 +12494,8 @@ One trial holds prognostics, layered variables, atmospheric budget, diagnostic c
 ### AERO-02 signed sail loads and optional native lattice
 
 The sail samples the cloth’s signed frame at each collocation point. Every candidate impulse must fit the destination cloth velocity before any load is applied. Optional native SIMD solves the influence and downwash in independent joined rows while the caller retains the existing pressure damping order. Rigid snapshots include accepted native load and work words, and the soft solver carries its particles. The technical lake witness pairs signed wind, cloth and live hull. The measured S3 polar reports the limits of the quasi-steady closure.
+
+
+### SEA-04 staged dispersive wake and native modes
+
+The wake trial holds surface, potential, depth velocity and crest rows until source validation and transforms finish. The signed registry checks every borrowed region in its own memory. Modal participants each own a disjoint range of complex modes, with fixed pinned coefficients and the same exact FFT order. A finite-quay witness renders the accepted reflected and diffracted waves. DHI, Scott and Craeye measurements document remaining linear-wave limits.

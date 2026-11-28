@@ -197,6 +197,11 @@ type NativePhaseSolver =
       readonly phase: 'regional diagnostics';
     }
   | {
+      readonly subject: 'Wake modes';
+      readonly phaseExport: 'wake_mode_phase';
+      readonly phase: 'modal propagation';
+    }
+  | {
       readonly subject: 'Seismic';
       readonly phaseExport: 'seismic_thread_phase';
       readonly phase: 'velocity and stress stencil';

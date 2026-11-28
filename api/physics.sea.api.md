@@ -65,6 +65,16 @@ export interface WakeHullMaskGrid extends Pick<QuayPotentialGrid, 'cells' | 'cel
     readonly origin?: readonly [number, number];
 }
 
+export interface WakeNativeWorkCounts extends WakeNativeWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly WakeNativeWorkerWork[];
+}
+
+export interface WakeNativeWorkerWork {
+    readonly modes: number;
+    readonly pairedModes: number;
+}
+
 export interface WakeParams {
     cells?: readonly [number, number];
     cellSize?: number;
@@ -126,7 +136,10 @@ export class WakeSolver implements Solver<WakeParams> {
         readonly submergedSource?: SubmergedWakeSource;
         readonly breaking?: WakeBreakingOptions;
         readonly signal?: AbortSignal;
+        readonly threads?: 1 | 2 | 4;
     }): Promise<WakeSolver>;
+    [Symbol.dispose](): void;
+    readNativeWork(): WakeNativeWorkCounts | undefined;
     describe(): SolverDescription;
     init(host: SolverHost, params?: WakeParams): void;
     velocityAt(x: number, y: number, z: number, out?: [number, number, number]): [number, number, number];

@@ -133,6 +133,13 @@ export const BLUEPRINTS = [
     script: 'packages/physics/scripts/build-wake-fft.mjs',
   },
   {
+    name: 'wake-fft-shared',
+    crate: 'packages/physics/wake-fft',
+    blueprint: 'packages/physics/src/sea/wake-fft-shared.wasm',
+    script: 'packages/physics/scripts/build-wake-fft.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'mann-fft',
     crate: 'packages/weather/mann-fft',
     blueprint: 'packages/weather/src/mann-fft.wasm',

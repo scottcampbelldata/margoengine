@@ -103,7 +103,8 @@
 <tr><th scope="row"><code>pack-ice-kernel.wasm</code></th><td>Rust SIMD pack-ice contacts and floe fracture</td><td class="num">6,549</td><td class="num">3,094</td><td class="num">2,815</td><td>PackIceSolver.load() from the optional /pack-ice entry</td></tr>
 <tr><th scope="row"><code>pack-ice-kernel-shared.wasm</code></th><td>Rust SIMD pack-ice contacts and floe fracture, shared world memory</td><td class="num">6,549</td><td class="num">3,095</td><td class="num">2,815</td><td>PackIceSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>thin-film-kernel.wasm</code></th><td>Rust SIMD conservative thin-film flow and capillarity</td><td class="num">32,746</td><td class="num">12,619</td><td class="num">10,878</td><td>ThinFilmSolver.load() from the optional /thin-film entry</td></tr>
-<tr><th scope="row"><code>wake-fft.wasm</code></th><td>Rust SIMD horizontal Fourier transforms for the dispersive wake</td><td class="num">26,728</td><td class="num">10,832</td><td class="num">9,407</td><td>WakeSolver.load() from the optional /sea entry</td></tr>
+<tr><th scope="row"><code>wake-fft.wasm</code></th><td>Rust SIMD Fourier transforms and modal propagation for the dispersive wake</td><td class="num">28,185</td><td class="num">11,513</td><td class="num">9,963</td><td>WakeSolver.load() from the optional /sea entry</td></tr>
+<tr><th scope="row"><code>wake-fft-shared.wasm</code></th><td>Joined native SIMD gravity and gravity-capillary wake modes</td><td class="num">1,081</td><td class="num">626</td><td class="num">581</td><td>WakeSolver.load({ threads: 2 or 4 }) from the optional /sea entry</td></tr>
 <tr><th scope="row"><code>hull-panel-kernel.wasm</code></th><td>Rust SIMD three-dimensional hull radiation and diffraction</td><td class="num">52,774</td><td class="num">23,275</td><td class="num">20,324</td><td>bakeHullPanels() from the optional /seakeeping entry</td></tr>
 <tr><th scope="row"><code>hull-panel-thread.js</code></th><td>Private hull frequency solve helper</td><td class="num">1,099</td><td class="num">630</td><td class="num">543</td><td>bakeHullPanels() with threads: 2 or 4 from the optional /seakeeping entry</td></tr>
 <tr><th scope="row"><code>hull-slamming-kernel.wasm</code></th><td>Rust SIMD Wagner strip slamming quadrature</td><td class="num">20,492</td><td class="num">8,775</td><td class="num">7,665</td><td>bakeHullSlamming() from the optional /seakeeping entry</td></tr>
@@ -5028,7 +5029,7 @@
 <tr><td><code>./bubbles</code></td><td class="num">6,520</td><td class="num">3,033</td></tr>
 <tr><td><code>./entry</code></td><td class="num">36,117</td><td class="num">14,182</td></tr>
 <tr><td><code>./flip</code></td><td class="num">38,669</td><td class="num">13,878</td></tr>
-<tr><td><code>./sea</code></td><td class="num">36,863</td><td class="num">14,183</td></tr>
+<tr><td><code>./sea</code></td><td class="num">48,781</td><td class="num">18,220</td></tr>
 <tr><td><code>./seakeeping</code></td><td class="num">146,484</td><td class="num">53,191</td></tr>
 <tr><td><code>./celestial</code></td><td class="num">29,974</td><td class="num">13,117</td></tr>
 <tr><td><code>./life</code></td><td class="num">26,328</td><td class="num">10,317</td></tr>

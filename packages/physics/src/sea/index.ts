@@ -10,6 +10,8 @@ export {
   WAKE_SOURCE_WORDS,
   WakeSolver,
   type WakeBreakingOptions,
+  type WakeNativeWorkCounts,
+  type WakeNativeWorkerWork,
   type WakeParams,
   type WakeSample,
 } from './wake.js';

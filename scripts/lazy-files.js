@@ -137,9 +137,17 @@ export const LAZY_FILES = [
     package: '@margoengine/physics',
     file: 'packages/physics/dist/wake-fft.wasm',
     label: 'wake-fft.wasm',
-    kind: 'Rust SIMD horizontal Fourier transforms for the dispersive wake',
+    kind: 'Rust SIMD Fourier transforms and modal propagation for the dispersive wake',
     measure: 'file',
     when: 'WakeSolver.load() from the optional /sea entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/wake-fft-shared.wasm',
+    label: 'wake-fft-shared.wasm',
+    kind: 'Joined native SIMD gravity and gravity-capillary wake modes',
+    measure: 'file',
+    when: 'WakeSolver.load({ threads: 2 or 4 }) from the optional /sea entry',
   },
   {
     package: '@margoengine/physics',

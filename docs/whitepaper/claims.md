@@ -7256,3 +7256,7 @@ The stepped atmosphere, layered fields, budget and borrowed shallow-water forcin
 ### AERO-02 accepted sail loads and independent cambered polar
 
 Sails sample signed air against the cloth’s collocation position and velocity. The entire candidate, including the resulting f32 cloth velocity, is checked before applying its impulses. Native matrix and wake phases preserve fixed order, with genuine simultaneous pairs and joined workers. Rigid snapshots store the native attachment’s accepted loads and work. Cloth and hull state are recorded together when the framework registers both solvers. The measured rigid downwind sail exposes a force deficit of the quasi-steady closure. [Measured limits](../limits.md#aero-02-measured-cambered-sail-polar)
+
+### SEA-04 transactional wake sources and measured limits
+
+The dispersive wake prepares a finite candidate before publishing its levels, potential, depth velocities and crest rows. Registered wake sources and projected volume respect their signed cell and owning memory. The optional FFT and advance retain exact physical bytes across deterministic native partitions. The finite quay and open basin use the same incident packet for the live renderer witness. The DHI cylinder, Scott capillary and Craeye rain comparisons quantify the limits of the separate linear closures. [Measured comparisons](../../packages/physics/scripts/sea04-measured.md)

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22174031,
+  "total": 22178189,
   "history": [
     {
       "date": "2026-10-24",
@@ -16098,6 +16098,12 @@
       "commit": "aero-02-native-sail-publication",
       "reason": "AERO-02 physics/soft 188159 to 192320 B gzip within its full-entry ceiling. Soft base 63624 to 68377 B, ceiling 65533 to 70429 B. Added signed staged sail loads, restore words and an optional shared native lattice loader. A separate sail entry would break the existing export or repeat the soft attachment bridge and shared lattice. Soft blueprint and core/stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "sea-04-wake-native-modes-and-transaction",
+      "reason": "SEA-04 @margoengine/physics/sea 14183 to 18220 B gzip, ceiling 14609 to 18767 B. The entry stages wake fields and dispatches optional gravity and gravity-capillary mode ranges. A split would repeat the spectral coefficient and pressure layouts plus loader lifecycle. The standalone shared modal asset loads only for multiple participants. No core or stage bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -17015,7 +17021,7 @@
     "@margoengine/physics/room-sound": 9139,
     "@margoengine/physics/runoff": 7186,
     "@margoengine/physics/schooling": 5102,
-    "@margoengine/physics/sea": 14609,
+    "@margoengine/physics/sea": 18767,
     "@margoengine/physics/seakeeping": 54745,
     "@margoengine/physics/sediment": 8037,
     "@margoengine/physics/seismic": 8556,

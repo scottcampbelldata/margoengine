@@ -15682,8 +15682,8 @@
         "gzip": 13878
       },
       "./sea": {
-        "raw": 36863,
-        "gzip": 14183
+        "raw": 48781,
+        "gzip": 18220
       },
       "./seakeeping": {
         "raw": 146484,
@@ -19350,9 +19350,9 @@
       "brotli": 10878
     },
     "packages/physics/dist/wake-fft.wasm": {
-      "raw": 26728,
-      "gzip": 10832,
-      "brotli": 9407
+      "raw": 28185,
+      "gzip": 11513,
+      "brotli": 9963
     },
     "packages/physics/dist/hull-panel-kernel.wasm": {
       "raw": 52774,
@@ -20393,6 +20393,11 @@
       "raw": 6846,
       "gzip": 2755,
       "brotli": 2591
+    },
+    "packages/physics/dist/wake-fft-shared.wasm": {
+      "raw": 1081,
+      "gzip": 626,
+      "brotli": 581
     }
   },
   "splits": {
