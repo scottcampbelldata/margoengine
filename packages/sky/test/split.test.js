@@ -40,6 +40,9 @@ const pick = (names) => Object.fromEntries(names.map((name) => [name, entries[na
 // behind the eye (a planar reflection's oblique near plane); WGSL text only, the same commands and uploads.
 // night-fog, afterlight and preetham-clouds-fog recorded again with KB-SKY-BAREBELOW1 (2026-11-28): the fog WGSL fogs
 // a bare pixel below the horizon to infinity; WGSL text only, the same commands and uploads.
+// night-fog, afterlight and preetham-clouds-fog recorded again with KB-SKY-HAZETINT1 (2582a438c1, 2026-11-28): the fog
+// WGSL gained the clear air's blue share of a sky-coloured haze and its uniform floats 10 and 11; night-fog's fixed
+// colour writes them 0 (WGSL text only), the other two upload their share; the same commands in every trace.
 test('the full Sky records exactly the GPU work, WGSL and uploads of the recorded traces', () => {
   for (const name of Object.keys(configs)) {
     const h = trace(Sky, name);
