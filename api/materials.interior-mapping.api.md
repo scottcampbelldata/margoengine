@@ -56,7 +56,7 @@ export interface RoomedBuilding {
 
 export function facadeRooms(building: RoomedBuilding): Required<Omit<RoomGrid, 'height'>>;
 
-export function interiorMapping(options?: InteriorMappingOptions): WgslMaterial;
+export function interiorMapping(options?: InteriorMappingOptions): WgslMaterialOptions;
 
 export function traceRoom(point: Vec3, normal: Vec3, direction: Vec3, rooms?: RoomGrid): RoomHit | undefined;
 
@@ -677,16 +677,6 @@ interface VertexAttribute {
 }
 
 type VertexAttributeType = 'f32' | 'vec2f' | 'vec3f' | 'vec4f' | 'i32' | 'vec2i' | 'vec3i' | 'vec4i' | 'u32' | 'vec2u' | 'vec3u' | 'vec4u';
-
-class WgslMaterial extends Material {
-    readonly wgsl: string;
-    readonly uniforms: Record<string, number | Float32Array>;
-    readonly textures: Record<string, Texture>;
-    constructor(options: WgslMaterialOptions);
-    clone(): this;
-    shader(source: string, group: number): string;
-    bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[];
-}
 
 interface WgslMaterialOptions extends MaterialOptions {
     wgsl: string;

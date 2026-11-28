@@ -11,6 +11,7 @@ import {
   materialSettingDefaults,
   skinFromSettings,
 } from '../dist/settings.js';
+import { WgslMaterial } from '../dist/index.js';
 import { interiorMapping } from '../dist/interior-mapping.js';
 
 test('skin and eye slider rows share the row shape and build their features', () => {
@@ -59,10 +60,10 @@ test('skin and eye slider rows share the row shape and build their features', ()
 });
 
 test('interior rows build the material and write it live, their defaults its own', () => {
-  const made = interiorMapping(interiorOptionsFromSettings({ 'interior.lit': 0.6 }, { depth: 2 }));
+  const made = new WgslMaterial(interiorMapping(interiorOptionsFromSettings({ 'interior.lit': 0.6 }, { depth: 2 })));
   assert.ok(Math.abs(made.uniforms.lit - 0.6) < 1e-6);
   assert.equal(made.uniforms.depth, 2);
-  const plain = interiorMapping();
+  const plain = new WgslMaterial(interiorMapping());
   for (const row of MATERIAL_SETTINGS.filter((r) => r.group === 'interior')) {
     const key = row.name.slice('interior.'.length),
       built = [plain.uniforms[key]].flat().flatMap((v) => (typeof v === 'number' ? [v] : [...v]));

@@ -697,8 +697,8 @@ alone, resize, device restore and disposal; add `-- --compat` for the WebGL2 com
 
 ## Rooms behind windows: optional /interior-mapping
 
-`interiorMapping(options)` makes a window material with a room behind the glass, traced in the fragment shader, so a
-facade shows depth and parallax with no geometry behind its windows (van Dongen's interior mapping). Rooms are the
+`new WgslMaterial(interiorMapping(options))` makes a window material with a room behind the glass, traced in the
+fragment shader, so a facade shows depth and parallax with no geometry behind its windows (van Dongen's interior mapping). Rooms are the
 cells of a grid along each upright facade: `width` apart (or `[along x, along z]`), on the storeys of `floors` (or every
 `height`), `depth` deep, counted from `origin` and turned with the building's `yaw`. `facadeRooms(building)` reads that
 grid from a `generateBuilding` result, one room to a bay and storey: give the material to its `glass` part and build it
@@ -719,18 +719,20 @@ with `interior: 'none'`. The surface is dark glossy glass, so the sun and enviro
 box, the window toward +Z. A 2D texture is an atlas of `tiles` rooms, each drawn in one-point perspective with the back
 wall filling the middle `backWall` share of its tile. Either way each cell takes a room, sometimes mirrored.
 `traceRoom(point, normal, direction, grid)` is the shader's trace on the CPU, for picking a room.
+`interiorMapping` returns the material's options and the entry imports no material code, so `facadeRooms` and
+`traceRoom` load neither the materials package nor glTF.
 `@margoengine/materials/settings` has the live rows (`interior.*`, `interiorOptionsFromSettings`, `applyInteriorSettings`).
 
 ```ts
 import {Engine} from '@margoengine/core';
-import {Material, createMesh} from '@margoengine/materials';
+import {Material, WgslMaterial, createMesh} from '@margoengine/materials';
 import {facadeRooms, interiorMapping, traceRoom} from '@margoengine/materials/interior-mapping';
 import {generateBuilding} from '@margoengine/procedural/building-rules';
 const canvas = document.body.appendChild(document.createElement('canvas'));
 canvas.width = 640; canvas.height = 360;
 const engine = await Engine.create(canvas, {camera: {position: [16, 7, 30], target: [0, 5, 8]}});
 const building = generateBuilding({style: 'western-1910-brick', interior: 'none'});
-const windows = interiorMapping({...facadeRooms(building), lit: 0.3});
+const windows = new WgslMaterial(interiorMapping({...facadeRooms(building), lit: 0.3}));
 for (const [name, geometry] of Object.entries(building.parts)) {
   const look = building.palette[name as keyof typeof building.palette];
   createMesh(engine, geometry, name === 'glass' ? windows : new Material({color: [...look.color, 1], roughness: look.roughness}));

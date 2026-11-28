@@ -153,7 +153,7 @@ export function eyeFromSettings(values: MaterialSettingValues = {}, base: EyeOpt
 }
 /**
  * `interiorMapping()` options from the interior rows (the room grid, colours and map come from `base`):
- * `interiorMapping(interiorOptionsFromSettings(values, grid))`.
+ * `new WgslMaterial(interiorMapping(interiorOptionsFromSettings(values, grid)))`.
  */
 export function interiorOptionsFromSettings(
   values: MaterialSettingValues = {},
@@ -161,7 +161,7 @@ export function interiorOptionsFromSettings(
 ): InteriorMappingOptions {
   return { ...base, ...(pick(values, 'interior') as InteriorMappingOptions) };
 }
-/** Writes the interior rows on an `interiorMapping()` material; a row left out takes its default. */
+/** Writes the interior rows on a material made from `interiorMapping()`; a row left out takes its default. */
 export function applyInteriorSettings(material: WgslMaterial, values: MaterialSettingValues = {}): void {
   Object.assign(material.uniforms, pick(values, 'interior'));
 }

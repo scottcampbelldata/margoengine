@@ -1365,6 +1365,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression test:** `tests/check-downloads.test.js`, `tests/download-script-arguments.test.js` and the
   `*-download.test.js` files of decoders, loaders and biomes.
 
+### Fixed 2026-11-27: materials/interior-mapping loaded the glTF material models on import (KB-INTERIOR-STATIC1)
+
+- **Repro.** `npm run quality -- --gate=sizes --details`: the entry measured 31,075 B and carried leak items for
+  `@margoengine/gltf/pbr-model` and `@margoengine/gltf/extended-materials`, though `facadeRooms` and `traceRoom` are
+  plain arithmetic.
+- **Cause.** `interiorMapping()` constructed a `WgslMaterial`, so the entry imported the Material classes statically.
+- **Fix.** `interiorMapping()` returns the material's options and the caller makes it,
+  `new WgslMaterial(interiorMapping(options))`. The entry is 4,837 B with no static import, its budget 5,093 B, and the
+  two leak items are gone.
+- **Regression test:** `packages/materials/test/interior-mapping.test.js` ("the entry loads no glTF or material code
+  until the caller imports it").
+
 ### Fixed 2026-11-27: the stated size of margoengine/game is stale (KB-KITS-GAMESIZE1)
 
 - **Repro.** `node --test tests/umbrella.test.js` after `npm run build:packages`: `margoengine/game: 399110 B,

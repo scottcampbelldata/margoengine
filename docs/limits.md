@@ -6753,8 +6753,10 @@ Optional cameras/hologram is 3,511 B min+gzip (new entry, previously 0 B); core 
 
 ## Interior mapping (2026-11-27)
 
-Optional materials/interior-mapping is 31,075 B min+gzip (new entry; most of it is the shared Material and
-WgslMaterial code the entry reaches, which an app that makes materials meshes already loads); core + stage unchanged.
+Optional materials/interior-mapping is 4,837 B min+gzip (31,075 B while it made the material itself, which loaded
+the Material classes and gltf/pbr-model and gltf/extended-materials with it); core + stage unchanged. It returns the
+options and imports no package, so `new WgslMaterial(interiorMapping(options))` loads the material code only through
+the app's own import of the materials package.
 Rooms are boxes on one grid along each upright facade, 2 to 33 floor levels, rooms 0.1 to 1,000 m; level surfaces keep
 their own material look, a bay window or dormer looks into its wall's grid, curved and leaning walls are not followed,
 one furniture plane and either a curtain or a blind a window, room light casts no shadow and lights nothing outside, and

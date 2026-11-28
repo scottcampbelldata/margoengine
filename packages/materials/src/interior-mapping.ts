@@ -13,9 +13,10 @@
 //   https://jcgt.org/published/0009/03/02/: the pcg3d hash that gives each room its own look.
 // - C. Schlick, "An Inexpensive BRDF Model for Physically-based Rendering", Computer Graphics Forum 13(3), 1994,
 //   https://doi.org/10.1111/1467-8659.1330233: the share of light the glass reflects, taken from what comes through.
+// Types only: this entry loads no material code, so the caller's own import of the materials package makes the material.
 import type { MaterialOptions } from './built-material.js';
 import type { Texture } from './texture-core.js';
-import { WgslMaterial } from './wgsl-material.js';
+import type { WgslMaterialOptions } from './wgsl-material.js';
 
 type Vec3 = readonly [number, number, number];
 const MAX_LEVELS = 32;
@@ -397,12 +398,13 @@ fn shade(i: Out, s: Surface) -> Surface {
 }
 
 /**
- * A window material with a room behind the glass: give it to the window surfaces of a facade (the `glass` part of a
- * rules building, with `...facadeRooms(building)`). The surface is dark glossy glass, so sun and environment reflect
+ * The options of a window material with a room behind the glass, for
+ * `new WgslMaterial(interiorMapping({...facadeRooms(building)}))` (`WgslMaterial` of `@margoengine/materials`): give
+ * the material to the window surfaces of a facade (the `glass` part of a rules building). The surface is dark glossy glass, so sun and environment reflect
  * in it, and the room shows through as emitted light. Rooms differ by cell; `daylight`, `lit`, `lamp` and `lampColor`
  * stay live in `material.uniforms`. Level surfaces are left as they are. Walls must stand upright.
  */
-export function interiorMapping(options: InteriorMappingOptions = {}): WgslMaterial {
+export function interiorMapping(options: InteriorMappingOptions = {}): WgslMaterialOptions {
   const {
       origin,
       yaw,
@@ -462,7 +464,7 @@ export function interiorMapping(options: InteriorMappingOptions = {}): WgslMater
     uniforms.tiles = [tiles[0], tiles[1]];
     uniforms.back = range(backWall, 'backWall', 0.01, 0.99);
   }
-  return new WgslMaterial({
+  return {
     color: [0.004, 0.005, 0.006],
     roughness: 0.06,
     metalness: 0,
@@ -471,5 +473,5 @@ export function interiorMapping(options: InteriorMappingOptions = {}): WgslMater
     wgsl: shader(map?.dimension as 'cube' | '2d' | undefined),
     uniforms,
     ...(map && { textures: { roomMap: map } }),
-  });
+  };
 }

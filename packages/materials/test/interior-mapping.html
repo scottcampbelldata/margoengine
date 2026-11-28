@@ -2,7 +2,7 @@
 <canvas width="320" height="240" style="width:320px;height:240px;display:block"></canvas>
 <script type="module">
 import {Engine} from '/packages/core/dist/index.js';
-import {CubeTexture,Texture,createMesh} from '/packages/materials/dist/index.js';
+import {CubeTexture,Texture,WgslMaterial,createMesh} from '/packages/materials/dist/index.js';
 import {interiorMapping,facadeRooms} from '/packages/materials/dist/interior-mapping.js';
 import {planeGeometry} from '/packages/geometry/dist/index.js';
 
@@ -27,7 +27,7 @@ window.check={
   mesh?.destroy();dark();
   engine.camera.position=camera;engine.camera.target=[0,0,0];
   const look=kind==='cube'?{map:cube()}:kind==='atlas'?{map:atlas()}:plain;
-  mesh=createMesh(engine,planeGeometry(6,4.5),interiorMapping({...rooms,...clear,...look}));
+  mesh=createMesh(engine,planeGeometry(6,4.5),new WgslMaterial(interiorMapping({...rooms,...clear,...look})));
   return {...await frame(),fov:engine.camera.fov};
  },
  async extra(values){Object.assign(mesh.material.uniforms,values);return frame();},
@@ -38,7 +38,7 @@ window.check={
   const parts=[];
   for(const [name,g] of Object.entries(b.parts)){
    const m=b.palette[name];
-   parts.push(createMesh(engine,g,name==='glass'?interiorMapping({...facadeRooms(b),daylight:0.55,lit:0.35}):new (await import('/packages/materials/dist/index.js')).Material({shading:'basic',color:m.color.map(c=>c*0.7)})));
+   parts.push(createMesh(engine,g,name==='glass'?new WgslMaterial(interiorMapping({...facadeRooms(b),daylight:0.55,lit:0.35})):new (await import('/packages/materials/dist/index.js')).Material({shading:'basic',color:m.color.map(c=>c*0.7)})));
   }
   engine.scene.background='#9fb4c8';
   engine.camera.position=[16,7,30];engine.camera.target=[0,5,8];

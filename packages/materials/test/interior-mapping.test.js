@@ -1,11 +1,17 @@
 // @margoengine/materials/interior-mapping: the room grid and its trace (van Dongen 2008, the slab exit of Kay and
-// Kajiya 1986), the grid of a rules building, the material's options and live values, and its coded errors.
+// Kajiya 1986), the grid of a rules building, the material's options and live values, its coded errors, and that the
+// entry loads no material or glTF code.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { parseSync } from 'rolldown/utils';
 import { Texture, WgslMaterial } from '../dist/index.js';
 import { facadeRooms, interiorMapping, traceRoom } from '../dist/interior-mapping.js';
 import { generateBuilding } from '../../procedural/dist/building-rules.js';
 
+/** The material a caller makes from the options. */
+const make = (options) => new WgslMaterial(interiorMapping(options));
 const close = (a, b, label) => a.forEach((v, i) => assert.ok(Math.abs(v - b[i]) < 1e-9, `${label}: ${a} is not ${b}`));
 const rooms = { width: 3, height: 2.8, depth: 4 };
 
@@ -82,7 +88,7 @@ test('every window of a rules building looks into one room of its own bay and st
 });
 
 test('the material takes the grid and the looks, keeps its values live and refuses bad ones', () => {
-  const m = interiorMapping({ floors: [0, 3, 5.5], width: [2.5, 3.5], depth: 3, daylight: 0.5 });
+  const m = make({ floors: [0, 3, 5.5], width: [2.5, 3.5], depth: 3, daylight: 0.5 });
   assert.ok(m instanceof WgslMaterial);
   assert.equal(m.uniforms.count, 2);
   assert.deepEqual([...m.uniforms.width], [2.5, 3.5]);
@@ -90,16 +96,16 @@ test('the material takes the grid and the looks, keeps its values live and refus
   assert.equal(m.uniforms.daylight, 0.5);
   m.uniforms.lit = 0.9;
   assert.ok(Math.abs(m.uniforms.lit - 0.9) < 1e-6);
-  assert.equal(interiorMapping().uniforms.count, 0);
-  assert.ok(Math.abs(interiorMapping().uniforms.furniture - 0.7) < 1e-6);
-  const pictured = interiorMapping({
+  assert.equal(make().uniforms.count, 0);
+  assert.ok(Math.abs(make().uniforms.furniture - 0.7) < 1e-6);
+  const pictured = make({
     map: new Texture({ data: new Uint8Array(64), width: 4, height: 4 }),
     tiles: [2, 2],
   });
   assert.equal(pictured.uniforms.furniture, 0);
   assert.deepEqual([...pictured.uniforms.tiles], [2, 2]);
   assert.ok(pictured.wgsl.includes('roomMap') && !m.wgsl.includes('roomMap'));
-  const many = interiorMapping({ floors: Array.from({ length: 33 }, (_, k) => k * 3) });
+  const many = make({ floors: Array.from({ length: 33 }, (_, k) => k * 3) });
   assert.deepEqual([...many.uniforms.floors8], [96, 96, 96, 96]);
   for (const bad of [
     { width: 0 },
@@ -119,8 +125,30 @@ test('the material takes the grid and the looks, keeps its values live and refus
     { map: new Texture({ data: new Uint8Array(64), width: 4, height: 4 }), backWall: 1 },
   ])
     assert.throws(
-      () => interiorMapping(bad),
+      () => make(bad),
       (e) => (e instanceof RangeError || e instanceof TypeError) && e.message.includes('#materials-interior-mapping'),
       JSON.stringify(bad),
     );
+});
+
+/** Every package specifier the built file at `url` loads statically, through its own chunks too. */
+function staticImports(url, seen = new Set(), packages = new Set()) {
+  if (seen.has(url.href)) return packages;
+  seen.add(url.href);
+  const file = fileURLToPath(url);
+  for (const node of parseSync(file, readFileSync(file, 'utf8')).program.body) {
+    if (!node.source || !/^(Import|ExportAll|ExportNamed)Declaration$/.test(node.type)) continue;
+    if (node.source.value.startsWith('.')) staticImports(new URL(node.source.value, url), seen, packages);
+    else packages.add(node.source.value);
+  }
+  return packages;
+}
+
+test('the entry loads no glTF or material code until the caller imports it', () => {
+  // The caller passes the options to WgslMaterial, which it imports itself: the entry's own static graph holds no
+  // package at all.
+  const entry = new URL('../dist/interior-mapping.js', import.meta.url);
+  assert.deepEqual([...staticImports(entry)], []);
+  // The walk does follow chunks and packages: the root, which has the material classes, reaches the glTF models.
+  assert.ok(staticImports(new URL('../dist/index.js', import.meta.url)).has('@margoengine/gltf/pbr-model'));
 });

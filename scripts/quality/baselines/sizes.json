@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21615382,
+  "total": 21588465,
   "history": [
     {
       "date": "2026-10-24",
@@ -15957,7 +15957,7 @@
     "@margoengine/materials/fur": 4113,
     "@margoengine/materials/hair": 4112,
     "@margoengine/materials/instance-attributes": 3264,
-    "@margoengine/materials/interior-mapping": 32008,
+    "@margoengine/materials/interior-mapping": 5093,
     "@margoengine/materials/layered": 3230,
     "@margoengine/materials/mips": 12353,
     "@margoengine/materials/object-normal": 950,
@@ -17119,8 +17119,6 @@
     "leak @margoengine/materials/fake-shadows -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/materials/fur -> @margoengine/gltf/extended-materials": 1,
     "leak @margoengine/materials/fur -> @margoengine/gltf/pbr-model": 1,
-    "leak @margoengine/materials/interior-mapping -> @margoengine/gltf/extended-materials": 1,
-    "leak @margoengine/materials/interior-mapping -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/materials/portal -> @margoengine/gltf/extended-materials": 1,
     "leak @margoengine/materials/portal -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/materials/serialization -> @margoengine/gltf/extended-materials": 1,
