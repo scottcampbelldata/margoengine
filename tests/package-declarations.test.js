@@ -170,7 +170,11 @@ const packages = (await readdir(join(repository, 'packages'), { withFileTypes: t
   .map((entry) => entry.name);
 
 test('every package build that npm pack runs copies shared declarations into dist', async () => {
-  const missing = [];
+  const missing = [],
+    optionalCopies = /\bawait packageDeclarations\(root\)/.test(
+      await readFile(join(repository, 'scripts/build-optional.js'), 'utf8'),
+    );
+  assert.ok(optionalCopies, 'scripts/build-optional.js copies the shared declarations');
   for (const name of packages) {
     let manifest;
     try {
@@ -185,7 +189,10 @@ test('every package build that npm pack runs copies shared declarations into dis
     const script = /^node (\S+\.js)/.exec(manifest.scripts.build)?.[1];
     assert.ok(script, `${name} build runs a node script`);
     const text = await readFile(resolve(repository, 'packages', name, script), 'utf8');
-    if (!/\bpackageDeclarations\(/.test(text)) missing.push(`${name} (${script})`);
+    // weather's scripts/build.js runs scripts/build-optional.js first (the shared optional-package build), then copies
+    // its Wasm: the declarations come from that build, so the script need not call packageDeclarations itself.
+    if (!/\bpackageDeclarations\(/.test(text) && !(/scripts\/build-optional\.js['"]/.test(text) && optionalCopies))
+      missing.push(`${name} (${script})`);
   }
   assert.deepEqual(missing, []);
 });
