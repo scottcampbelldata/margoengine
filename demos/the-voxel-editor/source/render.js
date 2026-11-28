@@ -91,8 +91,8 @@ export function prepareHarbor(grid){
   return {world,mesher,images,load,dispose(){lighting.dispose();}};
 }
 
-export function harborView(engine,signal,opening){
-  const textures=new BlockTextures({images:opening.images});
+export function harborView(bench,opening){
+  const {engine}=bench,textures=new BlockTextures({images:opening.images});
   const voxels=VoxelRenderer.attach(engine,{
     world:opening.world,textures,mesher:opening.mesher,daylight:.65,maxQuadBytes:4194304
   });
@@ -103,19 +103,11 @@ export function harborView(engine,signal,opening){
   const rim=piece(tray(35.3,35.3,.42,2.6),'#91a7a1',[16,-.45,16],.42);
   const collar=piece(tray(34.7,34.7,.58,2.4),'#20373e',[16,-1.02,16],.50);
   const pedestal=piece(tray(33.6,33.6,1.25,2.15),'#344a51',[16,-2.25,16]);
-  const casters=[rim,collar,pedestal];
+  // The bench's sun map: the voxel chunks are a shadow source of their own, the tray pieces plain casters.
+  bench.shadows?.add(voxels,{static:true});
+  for(const caster of [rim,collar,pedestal])bench.add(caster);
   for(const [x,z] of [[3,3],[29,3],[3,29],[29,29]]){
-    casters.push(piece(box(.61,.9,.61),'#9e8271',[x,-2.5,z],.51));
-  }
-  let fullLighting;
-  function installShadows(){
-    fullLighting??=import('@margoengine/shadows').then(({Shadows})=>{
-      signal.throwIfAborted();
-      const shadows=Shadows.attach(engine,{resolution:1024,cascades:1,distance:105,filter:'pcf'});
-      shadows.add(voxels,{static:true});
-      for(const caster of casters)shadows.add(caster);
-    });
-    return fullLighting;
+    bench.add(piece(box(.61,.9,.61),'#9e8271',[x,-2.5,z],.51));
   }
   const edges=Array.from({length:12},()=>piece(unit,'#ffcc8d',[0,-180,0],.5));
   function selection(from,to){
@@ -138,6 +130,6 @@ export function harborView(engine,signal,opening){
   }
   return {
     get stats(){return voxels.stats;},
-    load:opening.load,selection,installShadows,dispose:opening.dispose
+    load:opening.load,selection,dispose:opening.dispose
   };
 }

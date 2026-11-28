@@ -1,8 +1,7 @@
-import {autoEngine} from '@margoengine/webgl2-compat/auto';
+import {openBench} from '@margoengine/studio/bench';
 
 const requested=document.querySelector('#view');
 const life=new AbortController(),{signal}=life;
-const force=new URLSearchParams(location.search).get('backend')==='webgl2';
 const loaded=import('./scene.js').then(module=>{
   signal.throwIfAborted();
   const opening=module.prepare();
@@ -11,7 +10,7 @@ const loaded=import('./scene.js').then(module=>{
   return {module,opening};
 });
 loaded.catch(()=>{});
-let engine,app;
+let app,resized=()=>{};
 
 function fail(error){
   if(signal.aborted)return;
@@ -24,25 +23,24 @@ function fail(error){
   console.error(error);
 }
 
-async function compatibility(){
-  const {install}=await import('@margoengine/webgl2-compat');
-  return {install:()=>install({force:true,signal})};
-}
 async function start(){
-  if(force||!navigator.gpu)await (await compatibility()).install();
-  await autoEngine(requested,async target=>{
-    if(!target.gpu)throw Error('The voxel studio requires WebGPU or full WebGL2 compatibility.');
-    engine=target;engine.onError=fail;
-    performance.mark('margo-device-open');
-    const {module,opening}=await loaded;
-    app=await module.connect(engine,engine.canvas,signal,fail,opening);
-  },{loadCompat:compatibility,signal,capacity:32,exactSize:true,antialias:false,
-    camera:{fov:41,near:.8,far:197,position:[55,40.6,59.1],target:[15.6,9.8,15.6]}});
+  // The bench opens WebGPU or the WebGL2 layer (?backend=webgl2 forces it), sizes the backbuffer, carries the harbor's
+  // light and its single PCF cascade, and disposes on pagehide.
+  const bench=await openBench(requested,{
+    signal,pixelRatio:2,capacity:32,antialias:false,
+    camera:{fov:41,near:.8,far:197,position:[55,40.6,59.1],target:[15.6,9.8,15.6]},
+    background:'#516c70',backdrop:false,contact:false,environment:false,
+    light:{direction:[-3,6,4],intensity:2.3,color:[1,.889,.752],ambient:.94,ambientColor:[.68,.83,.91]},
+    shadows:{resolution:1024,cascades:1,distance:105,filter:'pcf'},
+    onError:fail,onResize:()=>resized(),
+  });
+  performance.mark('margo-device-open');
+  const {module,opening}=await loaded;
+  app=await module.connect(bench,signal,fail,opening,hook=>{resized=hook;});
 }
 start().catch(fail);
 addEventListener('pagehide',event=>{
   if(event.persisted)return;
   life.abort();
   app?.dispose();
-  engine?.dispose();
 });

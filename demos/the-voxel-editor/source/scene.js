@@ -26,29 +26,21 @@ export function prepare(){
   return {stock, world:prepareHarbor(stock)};
 }
 
-export async function connect(engine,canvas,signal,fail,opening){
-  const root=document.body.dataset;
+export async function connect(bench,signal,fail,opening,onResize){
+  const {engine,canvas}=bench,root=document.body.dataset;
   const stamp=byId('stamp'),status=byId('status'),tools=[...document.querySelectorAll('[data-tool]')];
   const selection=byId('selection'),undo=byId('undo'),redo=byId('redo'),radius=byId('radius');
   const {stock}=opening,history=new VoxelHistory(stock,{maxBytes:1024*1024});
   const beacon=sampleBeacon();
   const callbacks={signal};
   let mode='orbit',color=9,grid=history.current,revision=0,busy=false;
-  let a=null,b=null,gesture=null,cursor=[13,22,17],frame=0,shadowTimer=0,resize,shadowsStarting=false;
+  let a=null,b=null,gesture=null,cursor=[13,22,17],frame=0;
   let latestCount=summarize(grid).cells;
-  engine.scene.background='#516c70';
-  engine.lighting.direction.set([-3,6,4,2.3]);
-  engine.lighting.radiance.set([1,.889,.752,.94]);
-  engine.lighting.ambient.set([.68,.83,.91]);
-  const view=harborView(engine,signal,opening.world);
+  const view=harborView(bench,opening.world);
   const orbit=new OrbitControls(engine.camera,canvas);
   orbit.enablePan=false;
   orbit.minDistance=36; orbit.maxDistance=125; orbit.maxPolarAngle=1.5;
   function render(){
-    const dpr=Math.min(devicePixelRatio,2);
-    const width=Math.round(canvas.clientWidth*dpr),height=Math.round(canvas.clientHeight*dpr);
-    if(canvas.width!==width)canvas.width=width;
-    if(canvas.height!==height)canvas.height=height;
     if(orbit.enabled)orbit.update(0);
     engine.render({delta:0});
   }
@@ -84,20 +76,9 @@ export async function connect(engine,canvas,signal,fail,opening){
     byId('count').value=cells.toLocaleString('en-US');
     undo.disabled=!history.canUndo||busy;redo.disabled=!history.canRedo||busy;
   }
-  async function finishLighting(){
-    if(shadowsStarting||signal.aborted)return;
-    shadowsStarting=true;
-    try{
-      await view.installShadows();
-      await settle();
-      root.lighting='complete';
-    }catch(error){if(!signal.aborted)fail(error);}
-  }
   function controlReceipt(trusted){
     if(!trusted||performance.getEntriesByName('margo-first-input-rendered').length)return;
     performance.mark('margo-first-input-rendered');
-    clearTimeout(shadowTimer);
-    shadowTimer=setTimeout(finishLighting,120);
   }
   async function apply(next,message,trusted){
     const edits=view.load(grid,next);
@@ -278,27 +259,24 @@ export async function connect(engine,canvas,signal,fail,opening){
   },callbacks);
   orbit.addEventListener('change',schedule);
   canvas.addEventListener('wheel',schedule,{...callbacks,passive:true});
-  root.renderer=engine.gpu.adapterInfo?.vendor==='margo-webgl2'?'webgl2':'webgpu';
+  root.renderer=bench.renderer==='compatibility'?'webgl2':'webgpu';
   root.openingCells=String(latestCount);
   root.openingModel=summarize(grid).key;
   root.stampReady='true';
   info();
   performance.mark('voxel-editor-display-ready');
   const stats=await settle();
-  resize=new ResizeObserver(schedule);
-  resize.observe(canvas);
+  onResize(schedule);
   changeColor(color);
   corners(null,null);
   root.quads=String(stats.quads);
+  root.lighting='complete';
   root.ready='true';
   performance.mark('margo-first-usable-frame');
   byId('loading').hidden=true;
   byId('editor-tools').inert=false;
-  if(!shadowsStarting&&!shadowTimer)shadowTimer=setTimeout(finishLighting,1700);
   return {dispose(){
     cancelAnimationFrame(frame);
-    clearTimeout(shadowTimer);
-    resize.disconnect();
     orbit.dispose();
     view.dispose();
   }};
