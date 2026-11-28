@@ -6328,13 +6328,17 @@ The default epoch is J2000, with TT and TDB seconds zero and UT1 seconds −63.8
 
 For high-precision or historical work, pass `ephemeris: new SpkEphemeris(bytes)` with a complete JPL planetary/lunar SPK kernel such as DE440s. The input can be an `ArrayBuffer` or `Uint8Array`. The reader copies the bytes and supports IEEE little- and big-endian J2000 type 2 and type 3 data. The default analytic mode uses JPL's fitted 1800–2050 orbit elements and the Meeus lunar series. SPK solar and lunar directions include light time and geocentric stellar aberration. Insolation is a geometric direct-beam estimate above the horizon. Clouds, atmospheric extinction and ocean response are supplied by their own solvers.
 
+Use `CelestialSolver.load({ threads: 1 })` to run the eight Standish orbit rows with optional Rust/Wasm SIMD. It defaults to one native participant. Choose two or four for shared world memory in Node or an isolated browser worker. The synchronous constructor retains the JavaScript evaluation, and a supplied SPK uses its own reader. `readNativeWork()` reports the planet rows, SIMD pairs and Kepler iterations from the latest accepted analytic epoch. Stop advancing the world before disposing the solver. Load accepts an optional `AbortSignal`.
+
+Both publications carry the solver's signed world cell and six f64 values in the memory named by the port. The values are Earth-fixed astronomical vectors. Sample them at an absolute WGS 84 site or Earth-fixed point in metres across world-origin shifts. An unsupported epoch or malformed request raises a coded error with the remedy at [celestial errors](https://margoengine.com/errors#celestial).
+
 `trackSolarRow` takes an east–north–up direction and returns the requested rotation, physical angle and adjacent-row shading. It defaults to a north–south horizontal axis, zero cross slope and calibration offset, a width-to-spacing ratio of 0.4, ±90° travel, backtracking enabled and a horizontal night-stow angle. To stow in wind, pass `windSpeed` (default zero) and `stowAt`, both in m/s. See `TrackerOptions` for axis, cross-slope, travel and calibration options.
 
 ```ts
-import {CelestialSolver, trackSolarRow} from 'margoengine/physics/celestial';
-import {PhysicsWorld} from 'margoengine/physics/world';
+import {CelestialSolver, trackSolarRow} from '@margoengine/physics/celestial';
+import {PhysicsWorld} from '@margoengine/physics/world';
 
-const celestial = new CelestialSolver();
+using celestial = await CelestialSolver.load();
 const world = new PhysicsWorld({rate: {num: 24, den: 1}}).add(celestial, {});
 world.advance(24);
 

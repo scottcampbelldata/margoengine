@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22152512,
+  "total": 22156267,
   "history": [
     {
       "date": "2026-10-24",
@@ -16056,6 +16056,12 @@
       "commit": "bio-04-ageing-native-columns",
       "reason": "BIO-04 @margoengine/physics/ageing 4128 to 8069 B gzip, ceiling 4384 to 8325 B. The ageing entry stages independent material and exposure rows with optional SIMD workers. Splitting the native path from the entry would duplicate the patch layout, clock and accepted readout. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "space-02-celestial-native-orbits",
+      "reason": "SPACE-02 @margoengine/physics/celestial 9486 to 13117 B gzip, ceiling 9756 to 13511 B. The celestial entry stages independent planetary orbit rows with optional SIMD workers. Splitting the native evaluation would duplicate the analytic clock, ephemeris dispatch and signed field publication. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16927,7 +16933,7 @@
     "@margoengine/physics/boundary-layer": 5681,
     "@margoengine/physics/breakable": 19997,
     "@margoengine/physics/bubbles": 3289,
-    "@margoengine/physics/celestial": 9756,
+    "@margoengine/physics/celestial": 13511,
     "@margoengine/physics/clouds": 11687,
     "@margoengine/physics/crater": 4862,
     "@margoengine/physics/crush": 25099,

@@ -2,6 +2,7 @@ import type { Vec3 } from '@margoengine/core';
 import { cos, sin } from '@margoengine/math/pinned';
 
 import { atan2, magnitude } from './angles.js';
+import { celestialError } from './errors.js';
 
 /** Options for a row of parallel single-axis trackers. All angles are radians. */
 export interface TrackerOptions {
@@ -9,7 +10,7 @@ export interface TrackerOptions {
   readonly axisAzimuth?: number;
   /** Shaft tilt down toward its azimuth, per the NREL convention. Defaults to horizontal. */
   readonly axisTilt?: number;
-  /** Cross-axis grade in the tracker frame, positive toward the positive tracker x axis. Defaults to zero. */
+  /** Right-hand cross-axis rotation about the shaft. For a horizontal north-pointing shaft, positive slopes down toward east. Defaults to zero. */
   readonly crossAxisSlope?: number;
   /** Collector width divided by horizontal axis-to-axis spacing. Defaults to 0.4. */
   readonly groundCoverageRatio?: number;
@@ -74,7 +75,7 @@ export function trackSolarRow(sun: Vec3, options: TrackerOptions = {}): TrackerS
     Math.abs(axisTilt) >= Math.PI / 2 ||
     Math.abs(crossAxisSlope) >= Math.PI / 2
   )
-    throw new RangeError(
+    throw celestialError(
       'Pass a finite solar direction and valid tracker limits, slopes, row spacing and wind speeds.',
     );
 

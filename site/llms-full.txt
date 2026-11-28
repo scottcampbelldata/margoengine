@@ -14115,7 +14115,13 @@ allowance includes the reported 0.2 mm replicate spread and figure reading.
 
 The built-in analytic orbital elements are fitted to 1800–2050. For other dates or higher accuracy, provide a complete NASA/JPL SPK planetary/lunar kernel with J2000-frame type 2 or type 3 coverage, including the Sun's retarded epoch. The reader supports both IEEE byte orders. With SPK, the solar/lunar angles include geocentric stellar aberration and light time. Site rotation uses the ellipsoid and geometric horizon, with uniform discs for eclipse flux and the Danjon lunar-shadow enlargement. Atmosphere, solar limb darkening, observer-motion aberration and lunar limb relief are outside this geometric model. Tide values are direct astronomical forcing in Earth-fixed coordinates. Bathymetry, ocean response and solid-Earth compliance are supplied by their own models. Tracker shading is for adjacent parallel rows with equal widths and a shared rotation, and accepts the local row's slope and rotation offset.
 
-The optional physics/celestial entry ships independently of the physics and sky roots. The built optional entry measures 9,841 B gzip with a 10,137 B budget. Core and stage remain at 24,820 B gzip on the workstation.
+The optional physics/celestial entry ships independently of the physics and sky roots. With the native orbit route it measures 13,117 B gzip against a 13,511 B ceiling. Each lazily fetched Wasm variant is 6,846 B raw and 2,755 B gzip. This change adds zero bytes to core and stage.
+
+Native work at each accepted analytic epoch is eight planet rows, eight SIMD-paired lanes and 48 Newton updates. Four participants each run two rows. The fixed native tables take 768 B, the trial result 192 B, and the job 24 B plus 24 B per participant for its work receipt. Stack storage is 65,544 B per participant plus the shared pool control block. The optional native path evaluates the Standish elements only. The lunar series, Earth rotation, SPK polynomial lookup, and local site and tide calculations run in JavaScript.
+
+### SPACE-02 measured eclipse contacts near the edge of totality
+
+The circular-disc analytic mode uses the reported sites, independently measured Earth orientation and 0.25 s scan brackets. Cape Range Site 1 in 2023 yielded 65.75 s in the model and 18.1 s in the observer's GPS-clock flash-spectrum record. Contact errors were +41.225 s and +88.875 s. Stephenville in 2024 yielded 168 s in the model and 13.7 s in the GPS-clock record. Camera frames independently bounded that totality to 9.9–15.9 s. Both modeled contacts miss their respective camera windows. Shifting the site by 0.001° or 50 m gives 167.5–168.5 s. At Gunter, photographs show beads through maximum while the model gives 162 s of totality. These cases quantify the limits of the analytic ephemeris and smooth-limb model at grazing sites. The comparison does not determine how much error comes from each. Eclipse contact accuracy remains open. [2023 observations](https://iota-es.de/JOA/JOA2023_4.pdf) [2024 observations](https://iota-es.de/JOA/JOA2024_4.pdf)
 
 ## Physics solver settings and speed caps (own solver)
 
@@ -24326,6 +24332,10 @@ power. EARTH-10 can connect using the layouts requested in the [work queue](phys
 ### Fixed 2026-11-25: missing time-varying celestial forcing and tracker backtracking (SPACE-02)
 
 Fixed the missing clock-driven celestial fields used by the sea, boundary layer and tracker calculations. The optional physics/celestial solver now publishes Earth-fixed tidal forcing and insolation and locates solar and lunar eclipses. Regression tests reproduce uniform tracking and adjacent shading from SOLARFIELD-2 and SOLARFIELD-3 and verify slope-aware backtracking, per-row tolerance and wind stow. See [physics-solvers.md](physics-solvers.md) and the [package README](../packages/physics/README.md#celestial-ephemeris-tides-and-insolation-margoenginephysicscelestial).
+
+### Open 2026-11-28: analytic grazing eclipse contact errors (SPACE-02)
+
+Run `node packages/physics/scripts/space02-celestial-measured.mjs`. The default analytic orbit plus circular-disc model produces 168 s of totality in Stephenville against a 9.9–15.9 s span from the published camera frames. The lunar apparent limb and higher-precision contact calculation remain open. [Measured contacts](limits.md#space-02-measured-eclipse-contacts-near-the-edge-of-totality)
 
 ### Fixed 2026-11-26: a WgslMaterial could not read a borrowed 32-bit float texture, so the depth-texture demo drew black (KB-DEPTHTEX-BLACK1, materials)
 

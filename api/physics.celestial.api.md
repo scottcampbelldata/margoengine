@@ -15,6 +15,23 @@ export interface CelestialEpoch {
     readonly tdbSeconds?: number;
 }
 
+export interface CelestialLoadOptions {
+    readonly id?: string;
+    readonly threads?: 1 | 2 | 4;
+    readonly signal?: AbortSignal;
+}
+
+export interface CelestialOrbitWorkCounts extends CelestialOrbitWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly CelestialOrbitWorkerWork[];
+}
+
+export interface CelestialOrbitWorkerWork {
+    readonly planets: number;
+    readonly pairedPlanets: number;
+    readonly keplerIterations: number;
+}
+
 export interface CelestialParams {
     readonly epoch?: CelestialEpoch;
     readonly timeScale?: number;
@@ -30,6 +47,9 @@ export interface CelestialPole {
 
 export class CelestialSolver implements Solver<CelestialParams> {
     constructor(id?: string);
+    static load(options?: CelestialLoadOptions): Promise<CelestialSolver>;
+    [Symbol.dispose](): void;
+    readNativeWork(): CelestialOrbitWorkCounts | undefined;
     describe(): SolverDescription;
     init(host: SolverHost, params?: CelestialParams): void;
     step(context: StepContext, _dt: number): void;

@@ -172,6 +172,11 @@ type NativePhaseSolver =
       readonly phase: 'material exposure patches';
     }
   | {
+      readonly subject: 'Celestial ephemeris';
+      readonly phaseExport: 'celestial_thread_phase';
+      readonly phase: 'analytic planetary orbits';
+    }
+  | {
       readonly subject: 'Seismic';
       readonly phaseExport: 'seismic_thread_phase';
       readonly phase: 'velocity and stress stencil';

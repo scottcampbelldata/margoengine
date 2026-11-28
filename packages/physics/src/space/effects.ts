@@ -1,6 +1,7 @@
 import { cos, sin } from '@margoengine/math/pinned';
 import type { Vec3 } from '@margoengine/core';
 import { add, dot, scale, sub } from '@margoengine/math/vec3';
+import { celestialError } from './errors.js';
 
 import { angularRadius, atan2, magnitude, separation } from './angles.js';
 
@@ -43,7 +44,7 @@ export function localHorizon(site: GeodeticSite): LocalHorizon {
     !Number.isFinite(height) ||
     height <= -EARTH_EQUATOR * (1 - FLATTENING)
   )
-    throw new RangeError(
+    throw celestialError(
       'Pass finite WGS 84 coordinates with latitude in [-π/2, π/2] and a site above the Earth center.',
     );
 
@@ -122,7 +123,7 @@ export function sampleInsolation(sun: Vec3, moon: Vec3, site: GeodeticSite): Ins
     !Number.isFinite(sunRange) ||
     !Number.isFinite(moonRange)
   )
-    throw new RangeError('Pass finite Earth-fixed Sun and Moon positions outside the observer and both bodies.');
+    throw celestialError('Pass finite Earth-fixed Sun and Moon positions outside the observer and both bodies.');
 
   const ray: Vec3 = [toSun[0] / sunRange, toSun[1] / sunRange, toSun[2] / sunRange];
   const direction: Vec3 = [dot(ray, frame.east), dot(ray, frame.north), dot(ray, frame.up)];
@@ -172,7 +173,7 @@ export function lunarEclipse(sun: Vec3, moon: Vec3): LunarEclipse {
     !Number.isFinite(sunRange) ||
     !Number.isFinite(moonRange)
   )
-    throw new RangeError('Pass finite geocentric Sun and Moon vectors outside the corresponding physical radii.');
+    throw celestialError('Pass finite geocentric Sun and Moon vectors outside the corresponding physical radii.');
   // Espenak and Meeus (2009), Danjon shadow enlargement, equations 1-5 and 1-6.
   const earthRadius = EARTH_EQUATOR * (1 - FLATTENING / 2);
   const parallax = 1.01 * angularRadius(earthRadius, moonRange) + angularRadius(earthRadius, sunRange);
@@ -195,7 +196,7 @@ export interface TidalDrive {
 function pointTide(body: Vec3, gm: number, position: Vec3): TidalDrive {
   const radius = magnitude(body);
   if (!(radius > 0) || !Number.isFinite(radius))
-    throw new RangeError('Pass a finite geocentric body position separated from the Earth center.');
+    throw celestialError('Pass a finite geocentric body position separated from the Earth center.');
 
   const n = scale(body, 1 / radius);
   const u = scale(position, 1 / radius);
@@ -204,7 +205,7 @@ function pointTide(body: Vec3, gm: number, position: Vec3): TidalDrive {
   const delta = squared - 2 * projection;
   const separationRatio = magnitude(sub(n, u));
   if (!(separationRatio > 0) || !Number.isFinite(separationRatio))
-    throw new RangeError('Pass a finite Earth-fixed sampling point separated from the celestial body.');
+    throw celestialError('Pass a finite Earth-fixed sampling point separated from the celestial body.');
   const k = separationRatio;
   // Rationalized Newton potential with its degree-zero and degree-one terms removed. The form below retains
   // the quadratic signal at small offsets and avoids subtracting almost equal absolute accelerations.

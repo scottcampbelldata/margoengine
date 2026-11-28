@@ -3,6 +3,7 @@ import { cos, sin } from '@margoengine/math/pinned';
 import { scale, sub } from '@margoengine/math/vec3';
 
 import { ASTRONOMICAL_UNIT } from './effects.js';
+import { celestialError } from './errors.js';
 import { meeusLunarPosition } from '../../../shared/meeus-lunar.js';
 import { STANDISH_ORBITS } from '../../../shared/standish-orbits.js';
 import { CENTURY_SECONDS, DAY_SECONDS, meanEclipticToJ2000 } from './orientation.js';
@@ -52,9 +53,12 @@ export interface AnalyticPositions {
   planet(id: number): Vec3;
 }
 
-export function analyticPositions(tdbSeconds: number): AnalyticPositions {
+export function analyticPositions(
+  tdbSeconds: number,
+  evaluateOrbits?: (centuries: number) => readonly Vec3[],
+): AnalyticPositions {
   if (!(tdbSeconds >= ANALYTIC_START && tdbSeconds <= ANALYTIC_END))
-    throw new RangeError('Use a JPL SPK file for epochs outside the 1800–2050 range of the bundled orbit elements.');
+    throw celestialError('Use a JPL SPK file for epochs outside the 1800–2050 range of the bundled orbit elements.');
   const t = tdbSeconds / CENTURY_SECONDS;
   const { latitude, longitude, distance } = meeusLunarPosition(t, sinDegrees, cosDegrees);
   const l = RAD * (longitude % 360);
@@ -62,6 +66,8 @@ export function analyticPositions(tdbSeconds: number): AnalyticPositions {
   const radius = 1000 * distance;
   const projected = radius * cos(b);
   const moon = meanEclipticToJ2000(t, [projected * cos(l), projected * sin(l), radius * sin(b)]);
-  const earth = sub(heliocentric(3, t), scale(moon, LUNAR_MASS_SHARE));
-  return { sun: scale(earth, -1), moon, planet: (id) => sub(heliocentric(id, t), earth) };
+  const rows = evaluateOrbits?.(t);
+  const position = (id: number) => (rows ? meanEclipticToJ2000(0, rows[id - 1]!) : heliocentric(id, t));
+  const earth = sub(position(3), scale(moon, LUNAR_MASS_SHARE));
+  return { sun: scale(earth, -1), moon, planet: (id) => sub(position(id), earth) };
 }

@@ -150,6 +150,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'celestial',
+    title: '@margoengine/physics/celestial orbit, Earth orientation and astronomical fields',
+    kind: 'family',
+    messages: [],
+    cause: 'An ephemeris, clock, observer, Earth orientation or published field cannot produce a usable celestial sample.',
+    fix: 'Select a supported epoch and kernel. Pass finite SI positions, seconds and angles in radians. Publish aligned f64 positions in the memory that owns the port. Stop the world before disposing its celestial solver.',
+  },
+  {
     id: 'ageing',
     title: '@margoengine/physics/ageing climate exposure, substrate and retained coatings',
     kind: 'family',

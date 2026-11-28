@@ -7228,3 +7228,7 @@ A signed exposure port reads aligned rows from its actual memory. Rejected clima
 the previous substrate, coating, fouling and elapsed state. A fixed-camera case drives PBR from accepted
 layers after real shallow-water wetting and drainage. Its comparisons establish renderer replay and physical
 charge balance under prescribed current. Independent field measurements quantify limits on loss prediction.
+
+### SPACE-02 planetary rows and measured limits of grazing eclipses
+
+Native and JavaScript planetary positions repeat exactly across 100 tested epochs and the one-, two- and four-participant native layouts. The signed insolation and tide publications remain Earth-fixed when the world shifts. A rejected epoch preserves the previously accepted positions, clock, fields and work receipt. The solar tracker witness reads registered insolation and verifies shadow geometry in the same fixed-camera setup on WebGPU and WebGL2. Independently timed grazing contacts show the analytic mode misses observational accuracy at the edge of totality. [Measured limits](../limits.md#space-02-measured-eclipse-contacts-near-the-edge-of-totality)

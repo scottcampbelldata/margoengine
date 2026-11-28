@@ -30,6 +30,7 @@ packages/physics/surf-force-kernel/target/
 packages/physics/surge-potential-kernel/target/
 packages/physics/vortex-water-kernel/target/
 packages/physics/ageing-kernel/target/
+packages/physics/celestial-kernel/target/
 packages/physics/ice-thermal-kernel/target/
 packages/physics2d/kernel/target/
 packages/physics2d/kernel/wasm-check/target/

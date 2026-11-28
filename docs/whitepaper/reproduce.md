@@ -5500,3 +5500,9 @@ Burton et al. provide the original lab geometry and an orientation trace. The tr
 - Run `npm run test:gpu:ageing-workers -w @margoengine/physics` and
   `npm run test:gpu:ageing-film -w @margoengine/physics` for packaged helper and dual-renderer replay.
 - Run `node packages/physics/scripts/bio04-ageing-measured.mjs` to compare the outdoor coupon losses.
+
+### SPACE-02 native planetary rows, solar tracker and eclipse limits
+
+- Build Physics with `node packages/physics/scripts/build.js`. Run `node --test packages/physics/tests/celestial.test.js packages/physics/tests/coupling/celestial.test.js packages/physics/tests/coupling/celestial-workers.test.js packages/physics/tests/coupling/surge.test.js`.
+- Run `npm run test:gpu:celestial-workers -w @margoengine/physics` for packaged Chromium native participants and `npm run test:gpu:celestial-film -w @margoengine/physics` for the fixed-camera technical witness.
+- Run `node packages/physics/scripts/space02-celestial-measured.mjs` for independent eclipse contact and location sensitivity receipts.

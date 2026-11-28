@@ -7325,6 +7325,10 @@ power. EARTH-10 can connect using the layouts requested in the [work queue](phys
 
 Fixed the missing clock-driven celestial fields used by the sea, boundary layer and tracker calculations. The optional physics/celestial solver now publishes Earth-fixed tidal forcing and insolation and locates solar and lunar eclipses. Regression tests reproduce uniform tracking and adjacent shading from SOLARFIELD-2 and SOLARFIELD-3 and verify slope-aware backtracking, per-row tolerance and wind stow. See [physics-solvers.md](physics-solvers.md) and the [package README](../packages/physics/README.md#celestial-ephemeris-tides-and-insolation-margoenginephysicscelestial).
 
+### Open 2026-11-28: analytic grazing eclipse contact errors (SPACE-02)
+
+Run `node packages/physics/scripts/space02-celestial-measured.mjs`. The default analytic orbit plus circular-disc model produces 168 s of totality in Stephenville against a 9.9–15.9 s span from the published camera frames. The lunar apparent limb and higher-precision contact calculation remain open. [Measured contacts](limits.md#space-02-measured-eclipse-contacts-near-the-edge-of-totality)
+
 ### Fixed 2026-11-26: a WgslMaterial could not read a borrowed 32-bit float texture, so the depth-texture demo drew black (KB-DEPTHTEX-BLACK1, materials)
 
 - **Repro:** `npm run visual:update` on a186f625f0 (RTX A6000, Edge 158.0.4370.33): `depth-texture-high` and `-phone`

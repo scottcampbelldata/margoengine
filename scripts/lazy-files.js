@@ -47,6 +47,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/celestial-kernel.wasm',
+    label: 'celestial-kernel.wasm',
+    kind: 'Rust SIMD analytic planetary orbits',
+    measure: 'file',
+    when: 'CelestialSolver.load() from the optional /celestial entry with plain world memory',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/celestial-kernel-shared.wasm',
+    label: 'celestial-kernel-shared.wasm',
+    kind: 'Rust SIMD analytic planetary orbits, shared world memory',
+    measure: 'file',
+    when: 'CelestialSolver.load() from the optional /celestial entry with shared world memory',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/ageing-kernel.wasm',
     label: 'ageing-kernel.wasm',
     kind: 'Rust SIMD material ageing',

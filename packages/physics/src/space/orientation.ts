@@ -1,6 +1,7 @@
 import { cos, sin } from '@margoengine/math/pinned';
 import type { Vec3 } from '@margoengine/core';
 import { dot } from '@margoengine/math/vec3';
+import { celestialError } from './errors.js';
 
 export const DAY_SECONDS = 86400;
 export const CENTURY_SECONDS = 36525 * DAY_SECONDS;
@@ -31,7 +32,7 @@ export interface EarthOrientation {
 
 /** The IAU Earth rotation angle in [0, 2π), given UT1 seconds from Julian Date 2451545.0. */
 export function earthRotationAngle(ut1Seconds: number): number {
-  if (!Number.isFinite(ut1Seconds)) throw new RangeError('Pass finite UT1 seconds from Julian Date 2451545.0.');
+  if (!Number.isFinite(ut1Seconds)) throw celestialError('Pass finite UT1 seconds from Julian Date 2451545.0.');
   const days = ut1Seconds / DAY_SECONDS;
   // IERS equation 5.15 separates the UT1 day fraction to retain precision far from J2000.
   const turns = (days % 1) + 0.779057273264 + 0.00273781191135448 * days;
@@ -99,7 +100,7 @@ export interface EarthFrame {
  * @param orientation Optional measured celestial and terrestrial pole terms for this epoch.
  */
 export function earthFrame(ttSeconds: number, ut1Seconds: number, orientation: EarthOrientation = {}): EarthFrame {
-  if (!Number.isFinite(ttSeconds)) throw new RangeError('Pass finite TT seconds from Julian Date 2451545.0.');
+  if (!Number.isFinite(ttSeconds)) throw celestialError('Pass finite TT seconds from Julian Date 2451545.0.');
   const rotation = earthRotationAngle(ut1Seconds);
   const t = ttSeconds / CENTURY_SECONDS;
   const { x, y, cio } = orientation.celestialPole ?? modeledCelestialPole(t);
@@ -114,7 +115,7 @@ export function earthFrame(ttSeconds: number, ut1Seconds: number, orientation: E
     !Number.isFinite(yp) ||
     !Number.isFinite(tio)
   )
-    throw new RangeError('Pass finite IERS orientation values with a celestial pole in the northern unit hemisphere.');
+    throw celestialError('Pass finite IERS orientation values with a celestial pole in the northern unit hemisphere.');
 
   // Wallace and Capitaine equation 9, followed by R3(ERA) of the IERS convention for CIRS to TIRS.
   const z = Math.sqrt(1 - radiusSquared);

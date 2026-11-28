@@ -485,6 +485,8 @@ What it shows: a single-axis solar tracker farm in a desert valley, from a motor
 Handled acceptably: foundations sit on the ground and follow the terrain. The posts do not float or sink. Panels turn about one shared axis, and the motor housing stays upright while panels tilt, which is correct. Panel shadows on the ground move with the tilt.
 Not in the catalog: tracker control (sun-following control law with backtracking and stow). SPACE-02 gives the sun position but there is no solver for the control and no solar mechanical load solver.
 
+SPACE-02 now has a separate fixed-camera solar field witness driven by accepted native celestial insolation. At 14.20° Sun elevation the same −5° cross slope yields 75.58° true tracking and 3.64° backtracking. Independent rays and GPU shadow pixels confirm 69.00% of the next true-tracking aperture is blocked and the backtracking aperture is clear. Both renderers replay exact snapshot bytes and RGBA through rewind. This technical witness leaves the original SOLARFIELD-2 and SOLARFIELD-3 shot review open. [Browser test](../packages/physics/tests/celestial-film.browser.mjs)
+
 ### The Voxel Night Shop (the-voxel-night-shop)
 What it shows: a lit voxel repair shop at night with camera moves around it and a cutaway of the workbench.
 | ID | Time | What is wrong (observed) | What real physics does | Solver | Solver state | Needed for AAA | Status |

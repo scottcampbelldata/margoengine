@@ -15690,8 +15690,8 @@
         "gzip": 53191
       },
       "./celestial": {
-        "raw": 20227,
-        "gzip": 9486
+        "raw": 29974,
+        "gzip": 13117
       },
       "./life": {
         "raw": 26328,
@@ -20383,6 +20383,16 @@
       "raw": 6058,
       "gzip": 2782,
       "brotli": 2616
+    },
+    "packages/physics/dist/celestial-kernel.wasm": {
+      "raw": 6846,
+      "gzip": 2755,
+      "brotli": 2591
+    },
+    "packages/physics/dist/celestial-kernel-shared.wasm": {
+      "raw": 6846,
+      "gzip": 2755,
+      "brotli": 2591
     }
   },
   "splits": {

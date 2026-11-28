@@ -92,6 +92,8 @@
 <tr><th scope="row"><code>wind-traction-kernel-shared.wasm</code></th><td>Shared Rust SIMD wind traction and torque</td><td class="num">2,507</td><td class="num">1,165</td><td class="num">1,034</td><td>WindForce.create() with multiple threads; independent native wrench probes</td></tr>
 <tr><th scope="row"><code>drainage-fog-kernel.wasm</code></th><td>Rust SIMD radiation fog and cold-air drainage</td><td class="num">13,174</td><td class="num">5,419</td><td class="num">4,801</td><td>DrainageFog.load() from the optional /drainage-fog entry</td></tr>
 <tr><th scope="row"><code>drainage-fog-kernel-shared.wasm</code></th><td>Rust SIMD radiation fog and cold-air drainage, shared world memory</td><td class="num">13,174</td><td class="num">5,419</td><td class="num">4,822</td><td>DrainageFog.load() with shared world memory support</td></tr>
+<tr><th scope="row"><code>celestial-kernel.wasm</code></th><td>Rust SIMD analytic planetary orbits</td><td class="num">6,846</td><td class="num">2,755</td><td class="num">2,591</td><td>CelestialSolver.load() from the optional /celestial entry with plain world memory</td></tr>
+<tr><th scope="row"><code>celestial-kernel-shared.wasm</code></th><td>Rust SIMD analytic planetary orbits, shared world memory</td><td class="num">6,846</td><td class="num">2,755</td><td class="num">2,591</td><td>CelestialSolver.load() from the optional /celestial entry with shared world memory</td></tr>
 <tr><th scope="row"><code>ageing-kernel.wasm</code></th><td>Rust SIMD material ageing</td><td class="num">6,058</td><td class="num">2,782</td><td class="num">2,616</td><td>MaterialAgeingSolver.load() from the optional /ageing entry with plain world memory</td></tr>
 <tr><th scope="row"><code>ageing-kernel-shared.wasm</code></th><td>Rust SIMD material ageing, shared world memory</td><td class="num">6,058</td><td class="num">2,782</td><td class="num">2,616</td><td>MaterialAgeingSolver.load() from the optional /ageing entry with shared world memory</td></tr>
 <tr><th scope="row"><code>ice-thermal-kernel.wasm</code></th><td>Rust SIMD ice phase-energy balance</td><td class="num">1,300</td><td class="num">803</td><td class="num">741</td><td>IceSolver.load() from the optional /ice entry with plain world memory</td></tr>
@@ -5028,7 +5030,7 @@
 <tr><td><code>./flip</code></td><td class="num">38,669</td><td class="num">13,878</td></tr>
 <tr><td><code>./sea</code></td><td class="num">36,863</td><td class="num">14,183</td></tr>
 <tr><td><code>./seakeeping</code></td><td class="num">146,484</td><td class="num">53,191</td></tr>
-<tr><td><code>./celestial</code></td><td class="num">20,227</td><td class="num">9,486</td></tr>
+<tr><td><code>./celestial</code></td><td class="num">29,974</td><td class="num">13,117</td></tr>
 <tr><td><code>./life</code></td><td class="num">26,328</td><td class="num">10,317</td></tr>
 <tr><td><code>./crush</code></td><td class="num">69,020</td><td class="num">24,368</td></tr>
 <tr><td><code>./legged</code></td><td class="num">36,145</td><td class="num">13,307</td></tr>

@@ -23,6 +23,7 @@ export {
 export {
   type CelestialBody,
   type CelestialEpoch,
+  type CelestialLoadOptions,
   type CelestialParams,
   CelestialSolver,
   INSOLATION_FIELD,
@@ -30,5 +31,6 @@ export {
   insolationFromPort,
   tideFromPort,
 } from './solver.js';
+export { type CelestialOrbitWorkerWork, type CelestialOrbitWorkCounts } from './kernel.js';
 export { type EphemerisState, SpkEphemeris } from './spk.js';
 export { type TrackerOptions, type TrackerSample, trackSolarRow } from './tracker.js';

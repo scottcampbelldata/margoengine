@@ -20849,3 +20849,13 @@ and F. Bolzoni, [*Atmospheric Corrosion of Different Steel Types in Urban and Ma
 supply a second, bare carbon-steel regime. The ten-month comparison uses independently reported
 first-year meteorology as a proxy and the ISO 9223 concentration-to-deposition conversion for SO₂.
 The script records extraction precision and climate sensitivity separately from measurement uncertainty.
+
+### SPACE-02 native Table 1 evaluation and eclipse observations
+
+The optional celestial kernel evaluates the same JPL Table 1 elements, Newton iteration count and angular projection order as the existing Margo analytic path. SIMD evaluates pairs of planet rows. The independent partition never reduces across rows, and each participant writes its own work receipt. Pinned trigonometry and the existing Earth–Moon barycentre adjustment preserve the JavaScript result. See [E. M. Standish, Approximate Positions of the Planets, JPL Solar System Dynamics](https://ssd.jpl.nasa.gov/planets/approx_pos.html) and [P. T. Wallace and N. Capitaine, A&A 459 (2006)](https://syrte.obspm.fr/iau2006/aa06_459.IAU06prec.pdf).
+
+The [measured eclipse diagnostic](../packages/physics/scripts/space02-celestial-measured.mjs) transcribes site coordinates, observed times and camera brackets from observations published after the analytic parameters were established. No timing offset or model parameter is fitted. Earth rotation uses the independent Bulletin B entries for MJD 60054–60055 and 60408–60409. Earth orientation and marked geographic coordinates are model inputs. The flash-spectrum and camera records are the references.
+
+- L. Quaglia, J. Irwin, A. Pessi, L. Kafka and K. Emmanouilidis, [ATSE2023: Using Photodiode Loggers to Estimate the Eclipse Solar Radius, Journal for Occultation Astronomy 2023-4, pp. 16–22](https://iota-es.de/JOA/JOA2023_4.pdf). Cape Range Site 1 was independently surveyed and timed.
+- L. Quaglia, J. Irwin and A. Pessi, [Experimentally Assessing the Accuracy of Eclipse Path Maps, Journal for Occultation Astronomy 2024-4, pp. 3–12](https://iota-es.de/JOA/JOA2024_4.pdf), with [observer site map](https://www.besselianelements.com/eclipse-maps-accuracy/). The Stephenville and Gunter comparisons use the observers' GPS and camera findings.
+- USNO/IERS, [finals2000A.all Bulletin B Earth orientation data](https://maia.usno.navy.mil/ser7/finals2000A.all). These orientation observations are independent of the eclipse contact reports.

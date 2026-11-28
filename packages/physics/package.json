@@ -40,6 +40,8 @@
     "test:gpu:underwater-surface": "cd ../.. && node packages/physics/tests/underwater-surface.browser.mjs && node packages/physics/tests/underwater-surface.browser.mjs --compat",
     "test:gpu:underwater-threads": "cd ../.. && node packages/physics/tests/underwater-threads.browser.mjs",
     "test:gpu:orbit-surface": "cd ../.. && node packages/physics/tests/orbit-surface.browser.mjs && node packages/physics/tests/orbit-surface.browser.mjs --compat",
+    "test:gpu:celestial-workers": "cd ../.. && node packages/physics/tests/celestial-workers.browser.mjs",
+    "test:gpu:celestial-film": "cd ../.. && node packages/physics/tests/celestial-film.browser.mjs && node packages/physics/tests/celestial-film.browser.mjs --compat",
     "test:gpu:orbit-threads": "cd ../.. && node packages/physics/tests/orbit-threads.browser.mjs",
     "test:gpu:sediment-surface": "cd ../.. && node packages/physics/tests/sediment-surface.browser.mjs && node packages/physics/tests/sediment-surface.browser.mjs --compat",
     "test:gpu:sediment-threads": "cd ../.. && node packages/physics/tests/sediment-threads.browser.mjs",

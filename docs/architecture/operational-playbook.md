@@ -12459,3 +12459,8 @@ A private trial stores substrate, coating, decay, fouling and elapsed fields unt
 Borrowed signed exposure is checked in its owning memory. The accepted readout continues to drive
 the existing diffuse-film material API. A technical witness ties shallow-water immersion to visible
 coatings and exact frame replay. Outdoor coupon losses quantify limits of the reduced columns.
+
+
+### SPACE-02 accepted celestial fields and optional native planet evaluation
+
+The celestial arena publishes the live signed world cell along with Earth-fixed coordinates. Borrowed field reads validate layout and bounds against the owning memory. Trial epochs calculate finite positions, rotated fields and clock privately, then publish the whole accepted state. The optional native path evaluates disjoint pairs of Table 1 planetary rows and leaves the frame and lunar series to the analytic layer. Exact scalar, native worker and renderer replay exercise the public entry. Independently observed grazing contacts quantify error in the bundled analytic model.

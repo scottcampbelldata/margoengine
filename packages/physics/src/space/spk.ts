@@ -1,5 +1,5 @@
 // Clean-room implementation of NAIF's DAF and SPK format specifications. See docs/clean-room.md, SPACE-02.
-import { MargoError } from '@margoengine/math/errors';
+import { celestialError } from './errors.js';
 
 const RECORD_BYTES = 1024;
 const WORD_BYTES = 8;
@@ -35,7 +35,7 @@ interface Directory {
 }
 
 function invalidKernel(reason: string): never {
-  throw new MargoError('failed', reason + '; use an unmodified IEEE DAF/SPK astronomy kernel.');
+  throw celestialError(reason + '. Use an unmodified IEEE DAF/SPK astronomy kernel.', 'failed');
 }
 
 function readSummary(view: DataView, offset: number, littleEndian: boolean): Segment {
@@ -104,9 +104,9 @@ function readSegments(view: DataView, littleEndian: boolean): ReadonlyMap<number
 
 function readDirectory(view: DataView, segment: Segment, littleEndian: boolean): Directory {
   if (segment.frame !== J2000_FRAME || (segment.type !== 2 && segment.type !== 3))
-    throw new MargoError(
-      'unsupported',
+    throw celestialError(
       'Use a kernel with J2000-frame type 2 or type 3 segments for the requested bodies.',
+      'unsupported',
     );
   const words = segment.lastWord - segment.firstWord + 1;
   if (words <= 4) invalidKernel('The SPK segment lacks a polynomial directory');
@@ -255,7 +255,7 @@ export class SpkEphemeris {
    */
   state(target: number, observer: number, tdbSeconds: number): EphemerisState {
     if (!Number.isInteger(target) || !Number.isInteger(observer) || !Number.isFinite(tdbSeconds))
-      throw new RangeError('Pass integer NAIF body IDs and a finite epoch in TDB seconds since J2000.');
+      throw celestialError('Pass integer NAIF body IDs and a finite epoch in TDB seconds since J2000.');
 
     const position: Vector = [0, 0, 0];
     const velocity: Vector = [0, 0, 0];
@@ -266,7 +266,7 @@ export class SpkEphemeris {
     for (const segment of observerPath.links) commonCenter = segment.center;
     const targetLinks = targetPath.centers.get(commonCenter);
     if (targetLinks === undefined)
-      throw new RangeError('Use a kernel and epoch with connected coverage for both requested NAIF body IDs.');
+      throw celestialError('Use a kernel and epoch with connected coverage for both requested NAIF body IDs.');
 
     const view = new DataView(this.#bytes);
     for (let i = 0; i < targetLinks; i++)

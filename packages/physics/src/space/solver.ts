@@ -1,5 +1,4 @@
 import type { Vec3 } from '@margoengine/core';
-import { MargoError } from '@margoengine/math/errors';
 import { add, dot, scale, sub } from '@margoengine/math/vec3';
 
 import { regionWords } from '../world/memory.js';
@@ -25,6 +24,14 @@ import {
   sampleInsolation,
   tidalDrive,
 } from './effects.js';
+import { celestialError } from './errors.js';
+import {
+  type CelestialKernelBuilds,
+  type CelestialOrbitKernel,
+  type CelestialOrbitWorkCounts,
+  bindCelestialOrbits,
+  loadCelestialKernels,
+} from './kernel.js';
 import { type EarthOrientation, earthFrame, toEarthFixed } from './orientation.js';
 import type { EphemerisState, SpkEphemeris } from './spk.js';
 
@@ -87,6 +94,15 @@ export interface CelestialParams {
   readonly orientation?: EarthOrientation;
 }
 
+/** Options for the optional Standish planetary orbit kernel. */
+export interface CelestialLoadOptions {
+  /** Defaults to 'celestial'. */
+  readonly id?: string;
+  /** Maximum native participants, including the caller. Defaults to 1. */
+  readonly threads?: 1 | 2 | 4;
+  readonly signal?: AbortSignal;
+}
+
 interface Settings {
   readonly ttSeconds: number;
   readonly ut1Seconds: number;
@@ -110,14 +126,18 @@ function vector(words: Float64Array, offset: number): Vec3 {
 }
 
 function pairFromPort(memory: WebAssembly.Memory, port: Port, field: FieldDescriptor): readonly [Vec3, Vec3] {
+  const region = port.region;
+  if (port.field !== field.name || region.layout !== 1 || region.type !== 'f64' || region.byteLength !== 6 * WORD)
+    throw celestialError('Use the matching celestial field port with layout 1 and six f64 words.', 'version');
+  const owner = region.memory ?? memory;
   if (
-    port.field !== field.name ||
-    port.region.layout !== 1 ||
-    port.region.type !== 'f64' ||
-    port.region.byteLength !== 6 * WORD
+    !Number.isSafeInteger(region.byteOffset) ||
+    region.byteOffset < 0 ||
+    region.byteOffset % WORD !== 0 ||
+    region.byteOffset > owner.buffer.byteLength - region.byteLength
   )
-    throw new MargoError('version', 'Use the matching celestial field port with layout 1 and six f64 words.');
-  const words = regionWords(memory, port.region) as Float64Array;
+    throw celestialError('Publish the six f64 words at an aligned offset within the memory that owns this field.');
+  const words = new Float64Array(owner.buffer, region.byteOffset, 6);
   return [vector(words, 0), vector(words, 3)];
 }
 
@@ -152,7 +172,10 @@ function apparent(k: SpkEphemeris, body: number, tdb: number, observer: Ephemeri
 /** Deterministic celestial ephemeris with one-way insolation and tidal potential outputs. */
 export class CelestialSolver implements Solver<CelestialParams> {
   readonly #id: string;
-  #memory: WebAssembly.Memory | undefined;
+  #host: SolverHost | undefined;
+  #builds: CelestialKernelBuilds | undefined;
+  #kernel: CelestialOrbitKernel | undefined;
+  #disposed = false;
   #settings!: Settings;
   #celestial!: Region;
   #light!: Region;
@@ -162,6 +185,26 @@ export class CelestialSolver implements Solver<CelestialParams> {
   /** @param id Solver ID in the physics world. Defaults to 'celestial'. */
   constructor(id = 'celestial') {
     this.#id = id;
+  }
+
+  /** Compile the optional native planetary orbit kernel before adding this solver to a world. */
+  static async load(options: CelestialLoadOptions = {}): Promise<CelestialSolver> {
+    const solver = new CelestialSolver(options.id);
+    solver.#builds = await loadCelestialKernels(options.signal, options.threads ?? 1);
+    return solver;
+  }
+
+  /** Release this solver's native helpers after its world has stopped stepping. */
+  [Symbol.dispose](): void {
+    this.#disposed = true;
+    this.#builds?.[Symbol.dispose]();
+    this.#builds = undefined;
+    this.#kernel = undefined;
+  }
+
+  /** Native planetary work for the latest accepted epoch, when the optional analytic kernel ran. */
+  readNativeWork(): CelestialOrbitWorkCounts | undefined {
+    return this.#kernel?.workCounts();
   }
 
   describe(): SolverDescription {
@@ -180,17 +223,18 @@ export class CelestialSolver implements Solver<CelestialParams> {
   }
 
   init(host: SolverHost, params: CelestialParams = {}): void {
-    if (this.#memory)
-      throw new MargoError(
-        'attached',
+    if (this.#disposed) throw celestialError('Create a new celestial solver after disposing its helpers.', 'disposed');
+    if (this.#host)
+      throw celestialError(
         'The celestial solver is already attached. Create a new solver for the next world.',
+        'attached',
       );
     const { epoch, ephemeris, orientation, timeScale = 1 } = params;
     const ttSeconds = epoch?.ttSeconds ?? 0;
     const ut1Seconds = epoch?.ut1Seconds ?? -63.86;
     const tdbSeconds = epoch?.tdbSeconds ?? ttSeconds;
     if (![ttSeconds, ut1Seconds, tdbSeconds, timeScale].every(Number.isFinite))
-      throw new RangeError('Pass finite TT, UT1 and TDB epoch offsets and a finite celestial time scale.');
+      throw celestialError('Pass finite TT, UT1 and TDB epoch offsets and a finite celestial time scale.');
     this.#settings = {
       ttSeconds,
       ut1Seconds,
@@ -202,20 +246,24 @@ export class CelestialSolver implements Solver<CelestialParams> {
         celestialPole: orientation.celestialPole && { ...orientation.celestialPole },
       },
     };
-    const state = this.#calculate(0);
+    const kernel = this.#builds && !ephemeris ? bindCelestialOrbits(host, this.#builds) : undefined;
+    const state = this.#calculate(0, kernel);
     this.#celestial = host.allocate('celestialPositions', 3 * BODY_NAMES.length * WORD, 'f64', 1);
     this.#light = host.allocate(INSOLATION_FIELD.name, 6 * WORD, 'f64', 1);
     this.#tide = host.allocate(TIDAL_POTENTIAL_FIELD.name, 6 * WORD, 'f64', 1);
     this.#time = host.allocate('celestialClock', 4 * WORD, 'f64', 1);
-    this.#memory = host.memory;
+    this.#host = host;
+    this.#kernel = kernel;
     this.#write(state);
   }
 
-  #calculate(elapsed: number): CelestialState {
+  #calculate(elapsed: number, kernel: CelestialOrbitKernel | undefined): CelestialState {
     const { ttSeconds, ut1Seconds, tdbSeconds, ephemeris, orientation } = this.#settings;
     const tt = ttSeconds + elapsed;
     const ut1 = ut1Seconds + elapsed;
     const tdb = tdbSeconds + elapsed;
+    if (![tt, ut1, tdb].every(Number.isFinite))
+      throw celestialError('Reduce the celestial time scale or seek to an epoch within the ephemeris range.');
     let positions: Vec3[];
     let lightSun: Vec3;
     let lightMoon: Vec3;
@@ -225,7 +273,7 @@ export class CelestialSolver implements Solver<CelestialParams> {
       lightSun = apparent(ephemeris, BODY_IDS.sun, tdb, observer, positions[0]!);
       lightMoon = apparent(ephemeris, BODY_IDS.moon, tdb, observer, positions[1]!);
     } else {
-      const analytic = analyticPositions(tdb);
+      const analytic = analyticPositions(tdb, kernel && ((centuries) => kernel.run(centuries)));
       positions = [
         analytic.sun,
         analytic.moon,
@@ -237,21 +285,28 @@ export class CelestialSolver implements Solver<CelestialParams> {
       lightMoon = analytic.moon;
     }
     const frame = earthFrame(tt, ut1, orientation);
-    return {
+    const candidate = {
       positions,
       light: [...toEarthFixed(frame, lightSun), ...toEarthFixed(frame, lightMoon)],
       tide: [...toEarthFixed(frame, positions[0]!), ...toEarthFixed(frame, positions[1]!)],
       time: [tt, ut1, tdb, frame.rotation],
     };
+    if (
+      !candidate.positions.every((position) => position.length === 3 && position.every(Number.isFinite)) ||
+      !candidate.light.every(Number.isFinite) ||
+      !candidate.tide.every(Number.isFinite) ||
+      !candidate.time.every(Number.isFinite)
+    )
+      throw celestialError(
+        'Use an ephemeris and Earth orientation that produce finite positions and time at this epoch.',
+      );
+    return candidate;
   }
 
   #words(region: Region): Float64Array {
-    if (!this.#memory)
-      throw new MargoError(
-        'state',
-        'The celestial solver has no world. Add it with world.add(solver, params) before sampling.',
-      );
-    return regionWords(this.#memory, region) as Float64Array;
+    if (!this.#host)
+      throw celestialError('The celestial solver has no world. Add it with world.add(solver, params) before sampling.');
+    return regionWords(this.#host.memory, region) as Float64Array;
   }
 
   #write(state: CelestialState): void {
@@ -260,18 +315,22 @@ export class CelestialSolver implements Solver<CelestialParams> {
     this.#words(this.#light).set(state.light);
     this.#words(this.#tide).set(state.tide);
     this.#words(this.#time).set(state.time);
+    this.#kernel?.accept();
   }
 
   step(context: StepContext, _dt: number): void {
+    if (this.#disposed)
+      throw celestialError('Use a live celestial solver and dispose it after the world stops stepping.', 'disposed');
+    if (!this.#host) throw celestialError('Add the celestial solver to a world before stepping it.');
     // Absolute integer world ticks avoid accumulating a rounded astronomical dt over a long film.
     const elapsed = ((context.tick + 1) / rateOf(context.level)) * this.#settings.timeScale;
-    this.#write(this.#calculate(elapsed));
+    this.#write(this.#calculate(elapsed, this.#kernel));
   }
 
   exportPorts(tick: number): readonly Port[] {
     return [
-      { field: INSOLATION_FIELD.name, region: this.#light, tick, cell: ORIGIN },
-      { field: TIDAL_POTENTIAL_FIELD.name, region: this.#tide, tick, cell: ORIGIN },
+      { field: INSOLATION_FIELD.name, region: this.#light, tick, cell: this.#host?.cell ?? ORIGIN },
+      { field: TIDAL_POTENTIAL_FIELD.name, region: this.#tide, tick, cell: this.#host?.cell ?? ORIGIN },
     ];
   }
 
@@ -299,7 +358,7 @@ export class CelestialSolver implements Solver<CelestialParams> {
   /** Simultaneous geometric geocentric position in J2000 axes, in metres. */
   position(body: CelestialBody): Vec3 {
     const index = BODY_NAMES.indexOf(body);
-    if (index < 0) throw new RangeError('Pass one of the named bodies from the celestial ephemeris.');
+    if (index < 0) throw celestialError('Pass one of the named bodies from the celestial ephemeris.');
     return vector(this.#words(this.#celestial), 3 * index);
   }
 

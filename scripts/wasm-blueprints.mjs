@@ -64,6 +64,20 @@ export const BLUEPRINTS = [
     deflated: true,
   },
   {
+    name: 'celestial-kernel',
+    crate: 'packages/physics/celestial-kernel',
+    blueprint: 'packages/physics/src/space/celestial-kernel.wasm',
+    script: 'packages/physics/scripts/build-celestial-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'celestial-kernel-shared',
+    crate: 'packages/physics/celestial-kernel',
+    blueprint: 'packages/physics/src/space/celestial-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-celestial-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'ageing-kernel',
     crate: 'packages/physics/ageing-kernel',
     blueprint: 'packages/physics/src/ageing/ageing-kernel.wasm',
