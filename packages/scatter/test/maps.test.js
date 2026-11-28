@@ -49,3 +49,21 @@ test('a textured scatter uploads 32-byte vertices with uvs and a full mip chain 
   // Level 1 is 4 x 4 texels of alpha 64 each: a plain average drops every one under 0.5; the scaled one keeps them.
   for (const level of baseLevels.slice(1)) assert.ok(share(level) >= 0.25, `coverage kept: ${share(level)}`);
 });
+
+// Film look 2026-11-28: "Above the Treeline" shades its boulders with terrain's RockSurface, whose patch of core's lit
+// fragment opens a block with `var i` copies and writes `i.color`. The textured scatter (the film's firs) then renamed
+// every `i.color` to its maps' `let surfColor`, so the patch's write became an assignment to a let and the pipeline
+// failed to compile ("cannot assign to 'let surfColor'"). The maps' colour, roughness and metalness are vars now.
+test('texturedFragment keeps a mesh patch that writes i.color compiling: the maps declare vars', async () => {
+  const { texturedFragment } = await import('../src/maps.ts');
+  const normal = 'let n=normalize(i.normal)*select(-1.0,1.0,facing);';
+  const code =
+    '@fragment fn fragment(i:Input,@builtin(front_facing) facing:bool)->@location(0) vec4f {\n' +
+    ` ${normal}let terrainSource=i;let terrainNormal=n;{var i=terrainSource;var n=terrainNormal;` +
+    'i.color=i.color*0.5;i.material.x=0.9;return vec4f(i.color*i.material.x,1.0);}}\n';
+  const out = texturedFragment(code, 0, normal);
+  assert.match(out, /var surfColor=surfBase\.rgb\*i\.color;var surfRough=[^;]+;var surfMetal=[^;]+;/);
+  assert.doesNotMatch(out, /let surf(Color|Rough|Metal)=/);
+  // The patch's writes land on the maps' values, which the lighting then reads.
+  assert.match(out, /surfColor=surfColor\*0\.5;surfRough=0\.9;return vec4f\(surfColor\*surfRough,1\.0\);/);
+});

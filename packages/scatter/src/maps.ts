@@ -283,7 +283,7 @@ export function texturedFragment(code: string, cut: number, normalLine: string):
     'let surfMap=textureSample(scatterNormal,scatterSampler,i.uv).xyz*2.0-1.0;' +
     'let sdp1=dpdx(i.position);let sdp2=dpdy(i.position);let suv1=dpdx(i.uv);let suv2=dpdy(i.uv);' +
     (cut > 0 ? `if(surfBase.a<${cut.toFixed(6)}){discard;}` : '') +
-    'let surfColor=surfBase.rgb*i.color;let surfRough=clamp(surfOrm.g*i.material.x,0.02,1.0);let surfMetal=surfOrm.b*i.material.y;';
+    'var surfColor=surfBase.rgb*i.color;var surfRough=clamp(surfOrm.g*i.material.x,0.02,1.0);var surfMetal=surfOrm.b*i.material.y;';
   let rest = body
     .slice(open)
     .replaceAll('i.color', 'surfColor')
