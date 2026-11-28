@@ -621,6 +621,12 @@ forest's `rootCohesionField` for feedback. These grids must share dimensions, ex
 `exposure` and publish one `[burn severity, fuel moisture]` pair per cell when you have a weather/fire producer.
 The forest publishes cell-centred crown cover, root cohesion in Pa, live canopy fuel in kg/m², and moisture in
 kg/kg dry fuel. Fuel and root strength require site/species measurements and default to zero.
+Published fields follow the signed world origin. Borrowed grids are checked in their owning memory.
+A failed sample or annual transition preserves the earlier exposure, stand and published fields.
+
+Set `threads` to 2 or 4 in `ForestEcosystemSolver.load()` for a shared world and Node or an isolated browser worker.
+The default is one participant. `forest.readNativeWork()` returns tree queries, candidate visits and overlap
+counts for the most recent successful annual transition. Dispose the solver after the last use of its world.
 
 ## Live plant growth and morphogenesis
 

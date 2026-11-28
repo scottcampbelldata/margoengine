@@ -11,6 +11,7 @@ export interface ForestEcosystemOptions {
     readonly flooding?: boolean;
     readonly exposure?: boolean;
     readonly erosionField?: FieldDescriptor;
+    readonly threads?: 1 | 2 | 4;
     readonly signal?: AbortSignal;
 }
 
@@ -38,6 +39,8 @@ export class ForestEcosystemSolver implements Solver<ForestEcosystemParams> {
     readonly moistureField: FieldDescriptor;
     private constructor();
     static load(options?: ForestEcosystemOptions): Promise<ForestEcosystemSolver>;
+    [Symbol.dispose](): void;
+    readNativeWork(): ForestShadeWorkCounts | undefined;
     describe(): SolverDescription;
     init(host: SolverHost, params: ForestEcosystemParams): void;
     step(context: StepContext, dt: number): void;
@@ -53,6 +56,19 @@ export class ForestEcosystemSolver implements Solver<ForestEcosystemParams> {
     importPorts(): void;
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
+}
+
+export interface ForestShadeWorkCounts extends ForestShadeWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly ForestShadeWorkerWork[];
+}
+
+export interface ForestShadeWorkerWork {
+    readonly trees: number;
+    readonly liveQueries: number;
+    readonly candidateVisits: number;
+    readonly overlaps: number;
+    readonly pairedOverlaps: number;
 }
 
 export interface ForestSpecies extends EcoSpecies {

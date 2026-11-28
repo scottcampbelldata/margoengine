@@ -24874,3 +24874,11 @@ comparison. Above 20% full light the two-year axial extension is identical acros
 internode reaches its configured maximum. Sustained multi-internode production, branch shedding, plastic
 deformation of existing wood and explicit root and leaf physiology remain open.
 [Shade comparison and sensitivity](limits.md#bio-02-red-maple-growth-under-field-shade).
+
+### Open: BIO-03 competition and survival calibration
+
+BIO-03 uses reduced Q16 crown overlap, growth and mortality with authored site and species settings.
+The independent Douglas-fir spacing diagnostic misses three of four reported final survival intervals
+and is sensitive to the initial crown radius. Explicit layered light extinction, measured growth-dependent
+mortality, crown allometry and full stand succession calibration remain open.
+[Measured limits](limits.md#bio-03-douglas-fir-survival-in-the-wind-river-spacing-trial).

@@ -20794,3 +20794,29 @@ the measured fraction of full light to the solver's sky exposure, uses the gener
 before the claim and compares retained height as a separate output. It repeats at a second voxel
 size and a prescribed lower water supply. Seasonal species-specific photosynthesis and realized root
 water remain outside the diagnostic's input data.
+
+### BIO-03 native shade partitions and retained forest state
+
+Botkin, Janak and Wallis, [*Some Ecological Consequences of a Computer Model of Forest Growth* (1972)](https://www.jstor.org/stable/2258570)
+motivate annual cohorts and individual turnover. S. W. Pacala et al.,
+[*Forest Models Defined by Field Measurements: Estimation, Error Analysis and Dynamics* (1996)](https://doi.org/10.2307/2963479),
+establish the distinction between measured species traits and local competition. P. Köhler and A. Huth,
+[*The effects of tree species grouping in tropical rain forest modelling* (1998)](https://doi.org/10.1016/S0304-3800(98)00066-0),
+use explicit light-dependent growth and carbon. The engine continues to approximate crown overlap with ordered
+integer rows. One participant prepares the spatial table, and a shared native pass queries disjoint candidate rows.
+Capping each nonnegative overlap contribution at the total Q16 cover limit preserves saturation and prevents
+two broad crowns from overflowing signed accumulation before complete cover is recognized.
+
+R. A. Slesak, M. C. Agne, C. A. Harrington and M. D. Powers,
+[*Long-term effects of tree spacing during reforestation on survival and growth of three important
+tree species in the Pacific Northwest, USA* (2025)](https://doi.org/10.1016/j.foreco.2025.122724),
+report measured Douglas-fir survival after 16–40 years. R. O. Curtis, S. Bansal and C. A. Harrington,
+[*Relation of Initial Spacing and Relative Stand Density Indices to Stand Characteristics in a Douglas-Fir
+Plantation Spacing Trial* (2016)](https://pubs.usgs.gov/publication/70173842), give the stock age and spacing layout.
+The simulation uses the published treatments and the pre-claim generic fir ceiling and compares observed
+survival separately. The two initial crown radii form an unfitted sensitivity comparison.
+
+F. Brüchert and B. Gardiner, [*The effect of wind exposure on the tree aerial architecture and biomechanics
+of Sitka spruce* (2006)](https://doi.org/10.3732/ajb.93.10.1512), measured crown dimensions along windward
+and leeward axes. The renderer witness uses the existing growth-area weighting and a civil exposure field,
+with authored tree geometry and no calibration of lean to that study.

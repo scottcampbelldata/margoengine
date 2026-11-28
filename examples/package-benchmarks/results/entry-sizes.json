@@ -440,12 +440,12 @@
         "gzip": 2402
       },
       "./growth": {
-        "raw": 21056,
-        "gzip": 8686
+        "raw": 21090,
+        "gzip": 8689
       },
       "./forest": {
-        "raw": 16719,
-        "gzip": 7254
+        "raw": 25246,
+        "gzip": 10378
       },
       "dist/workers/biomes-erosion.js": {
         "raw": 5351,
@@ -20180,14 +20180,14 @@
       "brotli": 1119
     },
     "packages/biomes/dist/forest-kernel.wasm": {
-      "raw": 1276,
-      "gzip": 739,
-      "brotli": 679
+      "raw": 3337,
+      "gzip": 1757,
+      "brotli": 1511
     },
     "packages/biomes/dist/forest-kernel-shared.wasm": {
-      "raw": 1276,
-      "gzip": 739,
-      "brotli": 671
+      "raw": 3337,
+      "gzip": 1757,
+      "brotli": 1511
     },
     "packages/biomes/dist/workers/biomes-splines.js": {
       "raw": 9911,
@@ -20371,8 +20371,8 @@
     },
     "packages/biomes/dist/workers/growth-shadow.js": {
       "raw": 1118,
-      "gzip": 585,
-      "brotli": 491
+      "gzip": 601,
+      "brotli": 505
     }
   },
   "splits": {

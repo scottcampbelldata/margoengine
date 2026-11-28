@@ -12442,3 +12442,12 @@ to local seed points. A candidate branch graph and seasonal soil history are sta
 season succeeds. The native penumbra computes disjoint output rows with fixed source order and contiguous
 SIMD x-cell writes. The camera witness reads live HYDRO-02 and turns the accepted graph into Procedural
 geometry. Held-out red maple shade-tent measurements quantify the generic default's height error.
+
+### BIO-03 staged annual forest ecology and native crown queries
+
+Forest prepares competition indices in the original insertion order and runs disjoint crown queries
+through the optional SIMD Wasm helper. The whole exposure sample and year remain private through
+disturbance, growth, recruitment and output aggregation. Signed field leases are read in their owning
+memory and only the accepted patch fields are published. A fixed-camera wind witness exercises
+permanent leeward orientation on the two renderers. Measured Douglas-fir survival bounds the
+unfitted reduced stand closure.

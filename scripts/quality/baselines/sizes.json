@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22145331,
+  "total": 22148571,
   "history": [
     {
       "date": "2026-10-24",
@@ -16044,6 +16044,12 @@
       "reason": "BIO-02 @margoengine/biomes/growth 5728 to 8686 B gzip, ceiling 5730 to 8947 B. The growth entry stages signed developmental state and native SIMD shadow rows. A standalone worker keeps the helper out of the root entry, while splitting growth would duplicate the branch and root-zone contract. The lazy worker measures 585 B gzip, with a 841 B ceiling. Core and stage receive zero bytes.",
       "grew": 1,
       "added": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "bio-03-forest-native-competition",
+      "reason": "BIO-03 forest 7254 to 10378 B gzip, cap 7450 to 10690 B, growth 8686 to 8689 B gzip, cap 8947 to 8947 B, shared optional worker 585 to 601 B gzip, cap 841 to 841 B. The forest entry stages the annual ecology and joins disjoint native query blocks. It shares the existing isolated Biomes worker. Splitting the transitions would duplicate the stand and publication contract. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16136,7 +16142,7 @@
     "@margoengine/biomes/erosion-wasm": 2649,
     "@margoengine/biomes/far": 4587,
     "@margoengine/biomes/farmland": 5853,
-    "@margoengine/biomes/forest": 7450,
+    "@margoengine/biomes/forest": 10690,
     "@margoengine/biomes/fuel": 3860,
     "@margoengine/biomes/gpu": 21566,
     "@margoengine/biomes/graph": 4246,

@@ -150,6 +150,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'forest',
+    title: '@margoengine/biomes/forest competition, crown fields and site exposure',
+    kind: 'family',
+    messages: [],
+    cause: 'A forest site, signed field, trial exposure or native competition run lies outside its usable range.',
+    fix: 'Match the patch bank dimensions and signed origin, publish aligned values in the memory that owns them, and return finite site suitability or wind samples. Use shared world memory for the optional native helpers.',
+  },
+  {
     id: 'plant-growth',
     title: '@margoengine/biomes/growth crown, soil and branch fields',
     kind: 'family',

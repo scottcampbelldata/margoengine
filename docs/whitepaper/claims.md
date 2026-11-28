@@ -7212,3 +7212,11 @@ coordinates in its signed cell. Crown shadows sum in the same source order with 
 participants. A fixed-camera planting witness tests live HYDRO-02 and Procedural branch geometry together.
 The shade-tent field observations quantify the limits of the generic growth parameters.
 [Measured limits](../limits.md#bio-02-red-maple-growth-under-field-shade).
+
+### BIO-03 accepted annual forest replay
+
+The optional forest solver keeps accepted exposure, annual population, roots, cover and fuel through a
+late invalid patch or rejected recruitment callback. Native work is accepted only after the whole year.
+One, two and four participants agree on retained stand state. A fixed-camera ridge witness exercises
+permanent leeward growth opposite an upright sheltered control. Reported survival from Wind River
+bounds the generic stand model. [Measured limits](../limits.md#bio-03-douglas-fir-survival-in-the-wind-river-spacing-trial).

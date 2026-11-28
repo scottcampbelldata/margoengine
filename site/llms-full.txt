@@ -15109,17 +15109,23 @@ with the field reader, with an 8,001 B ceiling. Core plus stage remains 24,820 B
 
 ### Live forest ecosystem (BIO-03)
 
-The forest entry is 7,194 B gzip and each optional Wasm variant is 1,276 B raw. The shared annual implementation
-raises the offline ecosystem entry from 3,210 B to 3,652 B gzip. Core and stage stay at 24,820 B gzip.
+The optional forest entry measures 10,378 B gzip. Each lazy Wasm variant is 3,337 B raw and 1,757 B gzip.
+The shared Biomes native helper measures 601 B gzip and starts for multiple participants only.
 
 The optional `@margoengine/biomes/forest` advances individual crowns with millimetre radii, centimetre positions
 within 100 km of the origin and Q16 competition. Default capacity is 16,384 trees including snags. Set capacity for
 a plot with `limit`, up to the offline model's one million trees. The annual transition uses one grid of crown
 neighbours sized to twice capacity or the next power of two. Native workspace bytes scale as four times
 `(capacity + 3 * tableSize)`, with a further four per capacity row for shade output. Native scratch is rebuilt
-each year and shared between releases only through the world's arena. World state holds 44 bytes per tree slot for
-population and permanent lean. The annual grid holds four f64 channels per patch plus one duration per distinct
-species flood depth. Match extent and origin with water, landscape and snow readers.
+each year. One participant builds the table in the established order. The optional workers query disjoint range
+rows with SIMD pairs for overlap distances. Work records use 32 bytes for the job and 40 bytes per participant,
+with a 64 KiB stack plus alignment for each participant and control words for shared jobs.
+
+Population and permanent lean hold 44 bytes per reserved tree in each of two banks. Clock metadata uses
+64 bytes per bank. Each bank also holds four f64 annual channels and one duration per distinct species
+flood depth per patch, plus four accepted patch fields. The registry mirrors those four publications.
+The patch banks change together after valid input or a completed annual transition. Match extent and signed
+origin with water, landscape and snow readers.
 
 The patch placement approximation bins an entire crown at its stem. Cover is the sum of projected crown shares
 limited to unity. Fuel sums individual crown mass so overlapping live crowns still carry fuel. The wind rule
@@ -15127,6 +15133,25 @@ updates the crown axis in proportion to new projected area. It represents long-t
 axis rather than tracking individual branches or modelling physiological dormancy, burial or ice damage. Flood
 tolerance represents measured depth and duration for one species and life stage. The burn and fuel-moisture input
 is an explicit versioned port. Cover, roots and canopy fuel update at annual boundaries.
+
+The offline and native stand models share a geometric crown-overlap approximation, a logistic crown-radius
+increment and authored age and shade mortality. Vertical gap light, photosynthetic carbon balance, measured
+species-specific mortality and allometry remain outside this model.
+
+#### BIO-03 Douglas-fir survival in the Wind River spacing trial
+
+The production diagnostic models the planted cohort in 0.4 ha plots, using the published 1–6 m spacings
+and two-year-old stock. It uses ideal lattices, eight fixed seeds, a generic fir and no simulated recruitment or
+replacement. Year-40 survival increases with spacing in both the model and the trial. At 3, 4, 5 and 6 m the
+modeled survival fractions are 0.586, 0.830, 0.955 and 0.962, against 0.68, 0.81, 0.83 and 0.90 measured.
+Three of the four modeled means lie outside the reported 95% intervals. The largest error is 17.81 percentage
+points at 1 m spacing after 16 years, where the solver gives 0.978 versus approximately 0.80 measured.
+At 2 m after 32 years, changing the unmeasured initial crown radius from 5 to 10 cm moves modeled survival
+by more than 24 percentage points. Figure reading contributes an estimated ±0.025 to graph-only values.
+The field trial included early replacements, ingrowth and disturbance beyond the modeled cohort.
+[Slesak et al. (2025), §3.1 and Fig. 1c](https://doi.org/10.1016/j.foreco.2025.122724).
+[Curtis et al. (2016), installed layout](https://pubs.usgs.gov/publication/70173842).
+[Diagnostic](../packages/biomes/scripts/bio03-forest-measured.mjs).
 
 ### Grounded biped and quadruped gait (LIFE-01)
 
@@ -15426,7 +15451,7 @@ Each bank has a 16-byte header. Both branch registry mirrors are additional. Sha
 use the same scratch grid and retain obstacle-then-internode addition order. Source records reserve
 24 bytes each, with a 40-byte batch and 32 bytes of counters per participant. Each participant has
 a 64 KiB stack plus alignment. Shared jobs have an additional control block. The optional entry measures
-8,686 B gzip. Each lazy Wasm build is 2,016 B raw and 1,215 B gzip, and the optional worker is 585 B gzip.
+8,689 B gzip. Each lazy Wasm build is 2,016 B raw and 1,215 B gzip, and the shared Biomes helper is 601 B gzip.
 
 ### BIO-02 red maple growth under field shade
 
@@ -41829,6 +41854,14 @@ comparison. Above 20% full light the two-year axial extension is identical acros
 internode reaches its configured maximum. Sustained multi-internode production, branch shedding, plastic
 deformation of existing wood and explicit root and leaf physiology remain open.
 [Shade comparison and sensitivity](limits.md#bio-02-red-maple-growth-under-field-shade).
+
+### Open: BIO-03 competition and survival calibration
+
+BIO-03 uses reduced Q16 crown overlap, growth and mortality with authored site and species settings.
+The independent Douglas-fir spacing diagnostic misses three of four reported final survival intervals
+and is sensitive to the initial crown radius. Explicit layered light extinction, measured growth-dependent
+mortality, crown allometry and full stand succession calibration remain open.
+[Measured limits](limits.md#bio-03-douglas-fir-survival-in-the-wind-river-spacing-trial).
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

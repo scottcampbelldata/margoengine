@@ -2,15 +2,16 @@ import { growthControl as slots, type GrowthWorkerJob } from './growth-shadow-pr
 
 type Phase = (job: number, part: number, parts: number) => number;
 
-function run({ module, memory, job, control: address, stackTop, part, parts }: GrowthWorkerJob): void {
+function run({ module, memory, job, control: address, stackTop, part, parts, phaseExport }: GrowthWorkerJob): void {
   const control = new Int32Array(memory.buffer, address, slots.status + parts - 1);
   try {
     const { exports } = new WebAssembly.Instance(module, { env: { memory } });
-    const { __stack_pointer: pointer, growth_shadow_phase } = exports;
-    if (!(pointer instanceof WebAssembly.Global) || typeof growth_shadow_phase !== 'function')
-      throw new Error('Rebuild the plant growth helper with its shadow phase export.');
+    const pointer = exports.__stack_pointer;
+    const stage = exports[phaseExport];
+    if (!(pointer instanceof WebAssembly.Global) || typeof stage !== 'function')
+      throw new Error('Rebuild the Biomes helper with its selected native phase export.');
     pointer.value = stackTop;
-    const phase = growth_shadow_phase as Phase;
+    const phase = stage as Phase;
     let generation = Atomics.load(control, slots.generation);
     Atomics.add(control, slots.ready, 1);
     Atomics.notify(control, slots.ready);

@@ -762,3 +762,12 @@ black cherry, and red maple seedlings. I. Height, diameter, and root/shoot ratio
 USDA Forest Service research presented at the Fifth Central Hardwood Forest Conference.
 The diagnostic includes only the reported treatment light fractions and sparse red maple height means from
 Tables 2 and 4.
+
+### BIO-03 measured Douglas-fir survival
+
+Robert A. Slesak, Michelle C. Agne, Constance A. Harrington and Matthew D. Powers (2025),
+[*Long-term effects of tree spacing during reforestation on survival and growth of three important tree species
+in the Pacific Northwest, USA*](https://doi.org/10.1016/j.foreco.2025.122724), §3.1 and Fig. 1c.
+The diagnostic transcribes sparse survival means and reported intervals. Independent plot layout facts are
+from Robert O. Curtis, Sheel Bansal and Constance A. Harrington (2016),
+[USDA Forest Service PNW-RP-607](https://pubs.usgs.gov/publication/70173842).

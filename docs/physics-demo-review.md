@@ -316,7 +316,7 @@ What it shows: a slow fly-through of an alpine slope, from meadow grass and firs
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | TREE-1 | 0:00-0:15 (meadow, strips at 4 fps) | The caption says "wind runs across the meadow" (0:15-0:18) but I see no gust front crossing the grass; blades look the same pose frame to frame after allowing for the camera move. Uncertain from stills. | Grass leans in a gust that travels across the slope with a visible front and speed. | BIO-01, ATMO-02 | Weather gust plus BIO-01 in a fixed-camera technical meadow. WebGPU and WebGL2 show a half-second delay at each pair of clumps and exact replay. | Install and check the live fields in the original shot. | OPEN |
 | TREE-2 | 0:12-0:14 | A young fir in the foreground shows a bright white trunk with scattered glints for one frame and is gone in the next. It looks like a pop in the geometry or level of detail, not a motion. Related to wind: the firs show no visible sway. | A tree sways at its natural frequency with branches lagging the trunk. | BIO-01 | stand-in (PA-30) | Per-species stiffness and mass, trunk and branch modes. | OPEN |
-| TREE-3 | 0:20-1:15 (distant forest and exposed slope) | Trees on the exposed side show no lean or flagging from the wind that the video says shapes the treeline; they are upright in every frame. | Krummholz and flagged trees lean away from the wind. | BIO-01, BIO-03 | BIO-03 checks a windward crown that keeps a leeward axis after the wind stops, beside an upright sheltered crown. | Apply the solved growth axis to the distant stand and review the filmed shot. | OPEN |
+| TREE-3 | 0:20-1:15 (distant forest and exposed slope) | Trees on the exposed side show no lean or flagging from the wind that the video says shapes the treeline; they are upright in every frame. | Krummholz and flagged trees lean away from the wind. | BIO-01, BIO-03 | BIO-03 supplies a fixed-camera witness with three live leeward crowns after a full calm year and matched upright controls. [Witness](#bio-03-live-wind-shaped-forest-witness). | Apply the solved growth axis to the distant stand and review the filmed shot. | OPEN |
 | TREE-4 | 0:40-1:20 (clouds) | The cloud layer drifts at a steady slow speed with little change in shape. Uncertain: this is more look than physics. | Clouds evolve and move with the wind at height. | ATMO-03 | none (PA-34) | Cloud advection from the shared wind field. | OPEN |
 | TREE-5 | 0:30-1:00 (snow patches near the ridge) | A thin white line of snow on the ridge appears and stays the same; no snow blows off the ridge. | Wind lifts and carries snow off exposed crests. | ATMO-06, EARTH-07 | EARTH-07 fixes PA-63. PA-61 remains open. | `blown-sand-check.mjs` drives the stationary `TerrainBed` through a live travelling gust. At peak capture 2.207 kg is aloft, the crest loses 0.244 mm, and the lee gains 0.154 mm as the gust subsides. WebGPU and WebGL2 each reproduce the exact held and replayed frame. The filmed shot awaits integration. | OPEN |
 Handled acceptably: the fly-through camera is smooth; the treeline gradient (trees thinning with height) is steady from shot to shot; no scree or rock moves wrongly.
@@ -657,3 +657,14 @@ uses Procedural tubes from accepted branches and display foliage attached to the
 Both renderers independently match complete accepted snapshots and RGBA at held frames, two restores,
 re-advance and rewind. Each modeled season is one edit second. This is a generic technical planting.
 [Browser test](../packages/biomes/tests/growth-film.browser.mjs).
+
+### BIO-03 live wind-shaped forest witness
+
+Three exposed and three sheltered tree proxies start pair-matched by age and radius. The exposed grove
+receives 18 m/s wind for three modeled years, and both stands are calm for the fourth. The solver's
+accepted orientations leave exposed crowns at 12.48–12.73 degrees of leeward lean and their tips
+1.57–1.75 m downwind. The matched sheltered trees stay upright. Drawing the same accepted crowns
+upright changes 16,285 exposed pixels and zero sheltered pixels. Both renderers match complete
+snapshots and pixels through held frames, two checkpoint restores, re-advance and rewind. The scene
+uses authored tree geometry and compresses each modeled year to one edit second. The original TREE-3
+shot remains open. [Browser test](../packages/biomes/tests/forest-film.browser.mjs).

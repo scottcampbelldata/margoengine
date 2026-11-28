@@ -194,7 +194,7 @@ function bind(
     const stackTops = Array.from({ length: threads - 1 }, (_, i) =>
       stackTop(host.allocate(`plant-growth-helper-stack-${i}`, stackSize, 'u8', 1)),
     );
-    pool.bind({ memory: host.memory, module, job, control }, stackTops);
+    pool.bind({ memory: host.memory, module, job, control, phaseExport: 'growth_shadow_phase' }, stackTops);
   }
 
   const accepted = new Float64Array(WORK_WORDS * threads);

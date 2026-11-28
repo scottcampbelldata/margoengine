@@ -167,6 +167,98 @@ test('TREE-3: the windward tree grows a permanent leeward axis and the sheltered
   assert.ok(topX > 0, 'the rendered +Y crown axis leans downwind');
 });
 
+test('borrowed exposure and a late invalid patch preserve forest history and replay in the signed cell', async () => {
+  const cell = [-12, 5, 3];
+  const forest = await ForestEcosystemSolver.load({ exposure: true });
+  const world = new PhysicsWorld({ rate }).add(
+    forest,
+    {
+      ...stand,
+      cells: [2, 1],
+      plants: [plant, { ...plant, x: 7.5 }],
+      ticksPerYear: 2,
+    },
+    cell,
+  );
+  const memory = new WebAssembly.Memory({ initial: 1 });
+  const depth = new Float64Array(memory.buffer, 32, 4);
+  depth.set([0.25, 0.2, 0.5, 0.4]);
+  const field = forest.exposureField.name;
+  const port = {
+    field,
+    tick: 0,
+    cell,
+    region: { name: 'borrowed-exposure', layout: 1, type: 'f64', byteOffset: 32, byteLength: 32, memory },
+  };
+  const sample = (tick, origin, input) =>
+    forest.step({ tick, level: 0, seed: 17, cell: origin, inputs: new Map([[field, input]]) }, 1 / 60);
+  const humidity = () => {
+    const { region } = forest.exportPorts(0).find((p) => p.field === forest.moistureField.name);
+    return [...regionWords(world.memory, region)];
+  };
+  sample(0, cell, port);
+  assert.deepEqual(humidity(), [0.2, 0.4]);
+  const before = world.takeSnapshot();
+  assert.equal(forest.readNativeWork(), undefined);
+  depth.set([0.6, 0.7, 0.8, Number.NaN]);
+  assert.throws(() => sample(1, cell, port), {
+    code: 'state',
+    message: /fuel moisture.*errors#forest/,
+  });
+  assert.throws(() => sample(1, cell, { ...port, region: { ...port.region, byteOffset: 33 } }), {
+    code: 'state',
+    message: /owning memory.*errors#forest/,
+  });
+  assert.deepEqual(world.takeSnapshot().bytes, before.bytes);
+  assert.deepEqual(humidity(), [0.2, 0.4]);
+  assert.equal(forest.readNativeWork(), undefined);
+  depth[3] = 0.8;
+  const delta = [2, -3, 1];
+  const shifted = [-14, 8, 2];
+  world.shiftOrigin(delta);
+  sample(1, shifted, { ...port, tick: 1, cell: shifted });
+  assert.deepEqual(humidity(), [0.7, 0.8]);
+  assert.deepEqual(
+    forest.exportPorts(1).map((p) => p.cell),
+    Array(4).fill(shifted),
+  );
+  assert.equal(forest.year.year, 1);
+  const accepted = world.takeSnapshot();
+  world.restoreSnapshot(before.bytes);
+  world.shiftOrigin(delta);
+  sample(1, shifted, { ...port, tick: 1, cell: shifted });
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+});
+
+test('a rejected recruitment callback retains accepted trees and receipts after native shade work', async () => {
+  let samples = 0;
+  let reject = true;
+  const forest = await ForestEcosystemSolver.load();
+  const world = new PhysicsWorld({ rate, seed: 8 }).add(forest, {
+    ...stand,
+    ticksPerYear: 1,
+    species: [{ ...fir, seeds: 64, maturity: 0, dispersal: 0.5 }],
+    plants: [{ ...plant, x: 5, radius: 2.5 }],
+    where() {
+      if (++samples === 2 && reject) throw new Error('invalid site sampling');
+      return 1;
+    },
+  });
+  const before = world.takeSnapshot();
+  const step = () => forest.step({ tick: 0, level: 0, seed: 8, cell: [0, 0, 0], inputs: new Map() }, 1 / 60);
+  assert.throws(step, { code: 'failed', message: /site suitability.*errors#forest/ });
+  assert.equal(samples, 2);
+  assert.equal(forest.trees().length, 1);
+  assert.equal(forest.trees()[0].radius, 2.5);
+  assert.equal(forest.readNativeWork(), undefined);
+  assert.deepEqual(world.takeSnapshot().bytes, before.bytes);
+  reject = false;
+  step();
+  assert.ok(forest.trees().length > 2);
+  assert.equal(forest.year.year, 1);
+  assert.equal(forest.readNativeWork().trees, 1);
+});
+
 test('annual exposure and birth identities replay from a partial year at different frame rates', async () => {
   const solvers = await Promise.all(Array.from({ length: 5 }, () => ForestEcosystemSolver.load()));
   const make = (frameRate = frame24) =>

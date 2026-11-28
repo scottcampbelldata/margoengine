@@ -5483,3 +5483,12 @@ Burton et al. provide the original lab geometry and an orientation trace. The tr
   `npm run test:gpu:growth-film -w @margoengine/biomes` for the paired planting on both renderers.
 - Run `node packages/biomes/scripts/bio02-growth-measured.mjs` for the field means and light, voxel
   and water-response sensitivity.
+
+### BIO-03 crown queries, signed replay and Douglas-fir observations
+
+- Build Biomes with `npm run build -w @margoengine/biomes`. Run
+  `node --test packages/biomes/tests/forest.test.js packages/biomes/tests/coupling/forest.test.js packages/biomes/tests/coupling/forest-workers.test.js`.
+- Run `npm run test:gpu:forest-workers -w @margoengine/biomes` for native helper coverage and
+  `npm run test:gpu:forest-film -w @margoengine/biomes` for the locked-camera view on both renderers.
+- Run `node packages/biomes/scripts/bio03-forest-measured.mjs` for independent survival comparisons
+  and the initial-crown sensitivity.

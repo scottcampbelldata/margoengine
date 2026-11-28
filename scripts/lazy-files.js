@@ -1598,9 +1598,9 @@ export const LAZY_FILES = [
     package: '@margoengine/biomes',
     file: 'packages/biomes/dist/workers/growth-shadow.js',
     label: 'growth-shadow.js',
-    kind: 'Plant growth native shadow helper',
+    kind: 'Biomes native crown shadow and shade helper',
     measure: 'file',
-    when: 'PlantGrowth.load() with threads: 2 or 4 from the optional /growth entry',
+    when: 'PlantGrowth.load() or ForestEcosystemSolver.load() with threads: 2 or 4 from /growth or /forest',
   },
   {
     package: '@margoengine/biomes',

@@ -342,10 +342,10 @@
 <tr><th scope="row"><code>workers/biomes.js</code></th><td>Worker</td><td class="num">109,166</td><td class="num">41,177</td><td class="num">36,452</td><td>First tile, placement or view job of a <code>BiomeWorld</code> with workers (the default in browsers): up to <code>workers</code> workers, each a replica of the world, reused until <code>dispose()</code></td></tr>
 <tr><th scope="row"><code>erosion.wasm</code></th><td>Rust SIMD ordered erosion</td><td class="num">31,905</td><td class="num">13,044</td><td class="num">11,152</td><td>createErosionKernel(), only from biomes/erosion-wasm; no renderer or worker required</td></tr>
 <tr><th scope="row"><code>growth-kernel.wasm</code></th><td>Rust SIMD growth penumbra</td><td class="num">2,016</td><td class="num">1,215</td><td class="num">1,119</td><td>PlantGrowth.load() compiles the plain build for an arena without shared memory</td></tr>
-<tr><th scope="row"><code>growth-shadow.js</code></th><td>Plant growth native shadow helper</td><td class="num">1,118</td><td class="num">585</td><td class="num">491</td><td>PlantGrowth.load() with threads: 2 or 4 from the optional /growth entry</td></tr>
+<tr><th scope="row"><code>growth-shadow.js</code></th><td>Biomes native crown shadow and shade helper</td><td class="num">1,118</td><td class="num">601</td><td class="num">505</td><td>PlantGrowth.load() or ForestEcosystemSolver.load() with threads: 2 or 4 from /growth or /forest</td></tr>
 <tr><th scope="row"><code>growth-kernel-shared.wasm</code></th><td>Rust SIMD growth penumbra, shared world memory</td><td class="num">2,016</td><td class="num">1,215</td><td class="num">1,119</td><td>PlantGrowth.load() also compiles this build when the host supports shared memory</td></tr>
-<tr><th scope="row"><code>forest-kernel.wasm</code></th><td>Rust SIMD forest crown competition</td><td class="num">1,276</td><td class="num">739</td><td class="num">679</td><td>ForestEcosystemSolver.load() from the optional /forest entry</td></tr>
-<tr><th scope="row"><code>forest-kernel-shared.wasm</code></th><td>Rust SIMD forest crown competition, shared world memory</td><td class="num">1,276</td><td class="num">739</td><td class="num">671</td><td>ForestEcosystemSolver.load() from the optional /forest entry with shared memory support</td></tr>
+<tr><th scope="row"><code>forest-kernel.wasm</code></th><td>Rust SIMD forest crown competition</td><td class="num">3,337</td><td class="num">1,757</td><td class="num">1,511</td><td>ForestEcosystemSolver.load() from the optional /forest entry</td></tr>
+<tr><th scope="row"><code>forest-kernel-shared.wasm</code></th><td>Rust SIMD forest crown competition, shared world memory</td><td class="num">3,337</td><td class="num">1,757</td><td class="num">1,511</td><td>ForestEcosystemSolver.load() from the optional /forest entry with shared memory support</td></tr>
 <tr><th scope="row"><code>workers/biomes-splines.js</code></th><td>Worker part</td><td class="num">9,911</td><td class="num">4,362</td><td class="num">3,955</td><td>Each biome worker of a world with carved paths (<code>height: { carve }</code>), once, by <code>importScripts</code> (a world without it never loads the file)</td></tr>
 <tr><th scope="row"><code>workers/biomes-erosion.js</code></th><td>Worker part</td><td class="num">5,363</td><td class="num">2,666</td><td class="num">2,396</td><td>Each biome worker of a relief world with <code>erosion</code>, once, by <code>importScripts</code> (a world without it never loads the file)</td></tr>
 <tr><th scope="row"><code>workers/biomes-valley.js</code></th><td>Worker part</td><td class="num">8,317</td><td class="num">3,949</td><td class="num">3,544</td><td>Each biome worker of a relief world with <code>mountainValley</code>, once, by <code>importScripts</code> (a world without it never loads the file)</td></tr>
@@ -4431,8 +4431,8 @@
 <tr><td><code>./treeline</code></td><td class="num">11,139</td><td class="num">4,407</td></tr>
 <tr><td><code>./ecosystem</code></td><td class="num">8,057</td><td class="num">3,652</td></tr>
 <tr><td><code>./erosion-wasm</code></td><td class="num">4,954</td><td class="num">2,402</td></tr>
-<tr><td><code>./growth</code></td><td class="num">21,056</td><td class="num">8,686</td></tr>
-<tr><td><code>./forest</code></td><td class="num">16,719</td><td class="num">7,254</td></tr>
+<tr><td><code>./growth</code></td><td class="num">21,090</td><td class="num">8,689</td></tr>
+<tr><td><code>./forest</code></td><td class="num">25,246</td><td class="num">10,378</td></tr>
 <tr><td><code>dist/workers/biomes-erosion.js (worker)</code></td><td class="num">5,351</td><td class="num">2,669</td></tr>
 <tr><td><code>dist/workers/biomes-graph.js (worker)</code></td><td class="num">7,127</td><td class="num">2,988</td></tr>
 <tr><td><code>dist/workers/biomes-multinoise.js (worker)</code></td><td class="num">5,114</td><td class="num">2,135</td></tr>

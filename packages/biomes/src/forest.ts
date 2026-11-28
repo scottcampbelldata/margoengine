@@ -1,5 +1,4 @@
 import type { Wind } from '@margoengine/math/fields';
-import { MargoError } from '@margoengine/math/errors';
 import { SURFACE_WATER_FIELD, SURFACE_WATER_LAYOUT } from '@margoengine/physics/hydro';
 import type {
   Cell,
@@ -12,11 +11,20 @@ import type {
   SolverHost,
   StepContext,
 } from '@margoengine/physics/world';
-import { loadPhysicsWorld, world } from './physics-world.js';
+import { world } from './physics-world.js';
 import type { EcoPlant, EcoSpecies, EcosystemOptions } from './ecosystem.js';
 import { type ForestPopulation, ecosystemConfig, ecosystemYear, plantAdder, seedForest } from './ecosystem-model.js';
 import { divFloor, imod } from './fixed.js';
+import { forestError } from './forest-errors.js';
+import {
+  bindForestShade,
+  loadForestKernels,
+  type ForestKernelBuilds,
+  type ForestShadeWorkCounts,
+} from './forest-kernel.js';
 import { hash4 } from './hash.js';
+
+export type { ForestShadeWorkCounts, ForestShadeWorkerWork } from './forest-kernel.js';
 
 const LAYOUT = 1;
 const ZERO: Cell = [0, 0, 0];
@@ -49,7 +57,9 @@ export interface ForestEcosystemOptions {
   readonly exposure?: boolean;
   /** Read cell- or vertex-centred gross vertical incision in m/s, for example LandscapeEvolution.incisionField. */
   readonly erosionField?: FieldDescriptor;
-  /** Cancels loading the optional Wasm assets. */
+  /** Native shade participants, including the caller. Default 1. More participants require a shared world. */
+  readonly threads?: 1 | 2 | 4;
+  /** Cancels loading the optional Wasm and worker assets. */
   readonly signal?: AbortSignal;
 }
 
@@ -68,7 +78,7 @@ export interface ForestEcosystemParams extends Omit<EcosystemOptions, 'species' 
   readonly windReferenceSpeed?: number;
   /** Maximum horizontal/vertical growth slope, in [0, 1]. Default 0.5. */
   readonly maxGrowthLean?: number;
-  /** Origin cell that bounds and grid positions refer to. Default [0, 0, 0]. */
+  /** Initial origin cell for bounds and patch positions. Defaults to this solver's world.add cell. */
   readonly cell?: Cell;
   /** Cell width of the large world, m. Required when sampling Wind in a different cell. */
   readonly cellSize?: number;
@@ -91,42 +101,13 @@ export interface ForestTree extends EcoPlant {
 
 /** Quaternion rotating +Y to this tree's permanent growth axis. */
 export function forestOrientation(tree: Pick<ForestTree, 'lean'>): readonly [number, number, number, number] {
+  if (tree?.lean?.length !== 2) throw forestError('Supply a tree with two finite lean components.');
   const [x, z] = tree.lean;
-  if (!Number.isFinite(x * x + z * z)) throw new MargoError('state', 'Provide a tree with a finite lean direction.');
+  if (!Number.isFinite(x * x + z * z)) throw forestError('Provide a tree with a finite lean direction.');
   const inverseLength = 1 / Math.sqrt(1 + x * x + z * z); // float division: normalized direction
   const w = Math.sqrt((1 + inverseLength) * 0.5);
   const scale = inverseLength / (2 * w); // float division: normalized quaternion
   return [z * scale, 0, -x * scale, w];
-}
-
-interface ForestKernel extends WebAssembly.Exports {
-  __stack_pointer: WebAssembly.Global;
-  forest_shade(
-    population: number,
-    shade: number,
-    scratch: number,
-    capacity: number,
-    n: number,
-    tableSize: number,
-    cell: number,
-  ): void;
-}
-
-async function loadForestKernel(url: URL, signal?: AbortSignal): Promise<WebAssembly.Module> {
-  signal?.throwIfAborted();
-  if (url.protocol === 'file:') {
-    const moduleName = 'node:fs/promises';
-    const { readFile } = await import(/* @vite-ignore */ /* webpackIgnore: true */ moduleName);
-    url.search = '';
-    return WebAssembly.compile(await readFile(url, { signal }));
-  }
-  const response = await fetch(url, { signal });
-  if (!response.ok)
-    throw new MargoError(
-      'failed',
-      `Forest kernel HTTP ${response.status}; serve the forest Wasm assets with this package.`,
-    );
-  return WebAssembly.compile(await response.arrayBuffer());
 }
 
 interface SpeciesResponse {
@@ -138,8 +119,7 @@ interface SpeciesResponse {
   fuel: number;
 }
 
-interface ForestData {
-  host: SolverHost;
+interface ForestBanks {
   population: Region;
   lean: Region;
   clock: Region;
@@ -148,10 +128,14 @@ interface ForestData {
   cover: Region;
   fuel: Region;
   moisture: Region;
+}
+
+interface ForestData extends ForestBanks {
+  host: SolverHost;
+  trial: ForestBanks;
   config: ReturnType<typeof ecosystemConfig>;
   customSeed: boolean;
   responses: readonly SpeciesResponse[];
-  cell: Cell;
   columns: number;
   rows: number;
   dx: number;
@@ -162,10 +146,7 @@ interface ForestData {
   windReference: number;
   windHeight: number;
   maxLean: number;
-  kernel: ForestKernel;
-  shade: Region;
-  scratch: Region;
-  tableSize: number;
+  shade: ReturnType<typeof bindForestShade>;
 }
 
 function field(name: string, quantity: string, unit: string): FieldDescriptor {
@@ -174,13 +155,12 @@ function field(name: string, quantity: string, unit: string): FieldDescriptor {
 
 function finite(value: number, label: string, min: number, max = Number.MAX_VALUE): number {
   if (!(Number.isFinite(value) && value >= min && value <= max))
-    throw new MargoError('state', `Choose forest ${label} in [${min}, ${max}].`);
+    throw forestError(`Choose forest ${label} in [${min}, ${max}].`);
   return value;
 }
 
 function count(value: number, label: string): number {
-  if (!Number.isSafeInteger(value) || value < 1)
-    throw new MargoError('state', `Choose forest ${label} as a positive integer.`);
+  if (!Number.isSafeInteger(value) || value < 1) throw forestError(`Choose forest ${label} as a positive integer.`);
   return value;
 }
 
@@ -188,8 +168,8 @@ function floats(data: ForestData, region: Region): Float64Array {
   return world().regionWords(data.host.memory, region) as Float64Array;
 }
 
-function population(data: ForestData, clock: Float64Array): ForestPopulation {
-  const words = world().regionWords(data.host.memory, data.population) as Int32Array;
+function population(data: ForestData, clock: Float64Array, bank: Region = data.population): ForestPopulation {
+  const words = world().regionWords(data.host.memory, bank) as Int32Array;
   const n = data.config.limit;
   return {
     length: clock[1]!,
@@ -207,6 +187,33 @@ function population(data: ForestData, clock: Float64Array): ForestPopulation {
   };
 }
 
+function copyBank(data: ForestData, target: Region, source: Region): void {
+  const buffer = data.host.memory.buffer;
+  new Uint8Array(buffer, target.byteOffset, target.byteLength).set(
+    new Uint8Array(buffer, source.byteOffset, source.byteLength),
+  );
+}
+
+function acceptBanks(data: ForestData, banks: readonly (keyof ForestBanks)[]): void {
+  for (const name of banks) copyBank(data, data[name], data.trial[name]);
+}
+
+function sampleWind(data: ForestData, wind: Wind, x: number, z: number, time: number, out: ReturnType<Wind['sample']>) {
+  try {
+    const velocity = wind.sample(
+      data.config.x0 / 100 + (x + 0.5) * data.dx + data.windOffset[0],
+      data.windHeight + data.windOffset[1],
+      data.config.z0 / 100 + (z + 0.5) * data.dz + data.windOffset[2],
+      time,
+      out,
+    ).velocity;
+    if (velocity?.length === 3) return velocity;
+  } catch (cause) {
+    throw forestError('Provide a Wind sampler that returns a finite velocity at every forest patch.', 'failed', cause);
+  }
+  throw forestError('Provide three velocity components in every Wind sample.');
+}
+
 function cellAt(data: ForestData, xCm: number, zCm: number): number {
   const { config, columns, rows } = data;
   const x = Math.floor((xCm - config.x0) / (100 * data.dx)); // float division: metres to grid coordinate
@@ -217,19 +224,31 @@ function cellAt(data: ForestData, xCm: number, zCm: number): number {
 function readGrid(
   data: ForestData,
   port: Port | undefined,
+  fieldName: string,
   length: number,
   layout = LAYOUT,
 ): Float32Array | Float64Array | undefined {
   if (!port) return;
   const { region } = port;
+  const { byteOffset, byteLength, type } = region;
+  const stride = type === 'f32' ? BYTES_I32 : BYTES_F64;
+  const owner = region.memory ?? data.host.memory;
   if (
+    port.field !== fieldName ||
     region.layout !== layout ||
-    (region.type !== 'f32' && region.type !== 'f64') ||
-    region.byteLength !== length * (region.type === 'f32' ? 4 : 8) ||
-    !port.cell.every((coordinate, axis) => coordinate === data.cell[axis])
+    (type !== 'f32' && type !== 'f64') ||
+    byteLength !== length * stride ||
+    !Number.isSafeInteger(byteOffset) ||
+    byteOffset < 0 ||
+    byteOffset % stride !== 0 ||
+    byteOffset + byteLength > owner.buffer.byteLength ||
+    port.cell.length !== 3 ||
+    !port.cell.every((coordinate, axis) => coordinate === data.host.cell[axis])
   )
-    throw new MargoError('state', `Publish ${port.field} on the forest grid. Use its dimensions and origin cell.`);
-  return world().regionWords(data.host.memory, region) as Float32Array | Float64Array;
+    throw forestError(
+      `Publish ${fieldName} as an aligned f32 or f64 bank in its owning memory. Match the forest grid dimensions and signed cell.`,
+    );
+  return world().regionWords(owner, region) as Float32Array | Float64Array;
 }
 
 // The exposure fields are reduced every preceding tick. Per-species flood duration uses a block for each distinct
@@ -240,10 +259,10 @@ const LOAD_Z = 1;
 const BURN = 2;
 const INCISION = 3;
 
-function publish(data: ForestData, stand: ForestPopulation): void {
-  const roots = floats(data, data.roots);
-  const cover = floats(data, data.cover);
-  const fuel = floats(data, data.fuel);
+function publish(data: ForestData, stand: ForestPopulation, bank: ForestBanks = data): void {
+  const roots = floats(data, bank.roots);
+  const cover = floats(data, bank.cover);
+  const fuel = floats(data, bank.fuel);
   const { columns: plants } = stand;
   const factor = Math.PI / (1000000 * data.dx * data.dz); // float division: cover per squared mm
   roots.fill(0);
@@ -282,17 +301,18 @@ export class ForestEcosystemSolver implements Solver<ForestEcosystemParams> {
   readonly moistureField: FieldDescriptor;
   readonly #options: ForestEcosystemOptions;
   #data?: ForestData;
+  #disposed = false;
 
   private constructor(
-    private readonly plain: WebAssembly.Module,
-    private readonly shared: WebAssembly.Module | undefined,
+    private readonly builds: ForestKernelBuilds,
     options: ForestEcosystemOptions,
   ) {
     this.id = options.id ?? 'forest';
-    if (!this.id) throw new MargoError('state', 'Choose a nonempty forest solver ID.');
+    if (typeof this.id !== 'string' || !this.id.trim() || this.id !== this.id.trim())
+      throw forestError('Choose a nonempty forest solver ID without outer whitespace.');
     const erosionField = options.erosionField && { ...options.erosionField };
     if (erosionField && (erosionField.unit !== 'm/s' || !['cell', 'vertex'].includes(erosionField.centring)))
-      throw new MargoError('state', 'Provide the forest erosion rate as cell or vertex scalars in m/s.');
+      throw forestError('Provide the forest erosion rate as cell or vertex scalars in m/s.');
     this.#options = { exposure: options.exposure, flooding: options.flooding, erosionField };
     this.exposureField = field(`${this.id}:exposure`, 'forestExposure', '1, kg/kg');
     this.rootCohesionField = field(`${this.id}:roots`, 'rootCohesion', 'Pa');
@@ -303,16 +323,25 @@ export class ForestEcosystemSolver implements Solver<ForestEcosystemParams> {
 
   /** Load the optional native competition kernel before adding this solver to a world. */
   static async load(options: ForestEcosystemOptions = {}): Promise<ForestEcosystemSolver> {
-    const { signal } = options;
-    const { canShareMemory } = await loadPhysicsWorld();
-    const [plain, shared] = await Promise.all([
-      loadForestKernel(new URL(/* @vite-ignore */ './forest-kernel.wasm?no-inline', import.meta.url), signal),
-      canShareMemory()
-        ? loadForestKernel(new URL(/* @vite-ignore */ './forest-kernel-shared.wasm?no-inline', import.meta.url), signal)
-        : undefined,
-    ]);
-    signal?.throwIfAborted();
-    return new ForestEcosystemSolver(plain, shared, options);
+    const builds = await loadForestKernels(options?.signal, options?.threads);
+    try {
+      return new ForestEcosystemSolver(builds, options ?? {});
+    } catch (cause) {
+      builds[Symbol.dispose]();
+      throw cause;
+    }
+  }
+
+  /** Release the native shade helpers after the last use of the forest. */
+  [Symbol.dispose](): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    this.builds[Symbol.dispose]();
+  }
+
+  /** Crown-competition work for the most recent successful annual transition. */
+  readNativeWork(): ForestShadeWorkCounts | undefined {
+    return this.#live().shade.workCounts();
   }
 
   describe(): SolverDescription {
@@ -327,27 +356,53 @@ export class ForestEcosystemSolver implements Solver<ForestEcosystemParams> {
   }
 
   init(host: SolverHost, params: ForestEcosystemParams): void {
-    if (this.#data) throw new MargoError('attached', 'Create a new ForestEcosystemSolver for another world.');
-    if (!params) throw new MargoError('state', 'Provide forest bounds, species and optional founders.');
-    const config = ecosystemConfig({ ...params, limit: params.limit ?? 16384 });
+    if (this.#disposed) throw forestError('Load a new forest after disposal.', 'disposed');
+    if (this.#data) throw forestError('Create a new ForestEcosystemSolver for another world.', 'attached');
+    if (!params) throw forestError('Provide forest bounds, species and optional founders.');
+    const parsed = ecosystemConfig({ ...params, limit: params.limit ?? 16384 });
+    const where = parsed.where;
+    const config = where
+      ? {
+          ...parsed,
+          where(x: number, z: number, species: string): number {
+            let suitability: number;
+            try {
+              suitability = where(x, z, species);
+            } catch (cause) {
+              throw forestError(
+                'Provide a site suitability callback that can sample every candidate.',
+                'failed',
+                cause,
+              );
+            }
+            return finite(suitability, 'site suitability', 0, 1);
+          },
+        }
+      : parsed;
     if ((params.plants?.length ?? 0) > config.limit)
-      throw new MargoError('state', 'Increase forest capacity to hold every founder.');
+      throw forestError('Increase forest capacity to hold every founder.');
     const ticksPerYear = count(params.ticksPerYear ?? 60, 'ticksPerYear');
+    if (params.cells !== undefined && params.cells?.length !== 2)
+      throw forestError('Supply two positive patch dimensions for the forest grid.');
     const columns = count(params.cells?.[0] ?? 1, 'columns');
     const rows = count(params.cells?.[1] ?? 1, 'rows');
     const n = columns * rows;
     const dx = (config.x1 - config.x0) / (100 * columns); // float division: metres per cell
     const dz = (config.z1 - config.z0) / (100 * rows); // float division: metres per cell
     if (!(dx >= 0.01 && dz >= 0.01) || !Number.isSafeInteger(n))
-      throw new MargoError('state', 'Use forest cells at least one centimetre wide and deep.');
+      throw forestError('Use forest cells at least one centimetre wide and deep.');
     const winds = params.wind;
-    const cell = [...(params.cell ?? ZERO)] as unknown as Cell;
+    const cell = params.cell ?? host.cell;
+    if (cell.length !== 3 || !cell.every((axis, i) => Number.isSafeInteger(axis) && axis === host.cell[i]))
+      throw forestError('Match the initial forest origin to its world.add cell.');
     if (
-      cell.length !== 3 ||
-      !cell.every(Number.isSafeInteger) ||
-      (winds && (winds.medium !== 'air' || !winds.cell.every(Number.isSafeInteger)))
+      winds &&
+      (winds.medium !== 'air' ||
+        typeof winds.sample !== 'function' ||
+        winds.cell?.length !== 3 ||
+        !winds.cell.every(Number.isSafeInteger))
     )
-      throw new MargoError('state', 'Provide a valid Wind and whole-number forest and Wind origin cells.');
+      throw forestError('Provide a valid Wind sample function and three signed integer origin coordinates.');
     const separateCell = winds?.cell.some((coordinate, i) => coordinate !== cell[i]);
     const cellSize = finite(params.cellSize ?? (separateCell ? NaN : 1), 'cellSize', Number.MIN_VALUE, 1e12);
     const windOffset = (winds ? cell.map((coordinate, i) => (coordinate - winds.cell[i]!) * cellSize) : ZERO) as Cell;
@@ -375,22 +430,32 @@ export class ForestEcosystemSolver implements Solver<ForestEcosystemParams> {
         fuel: finite(species.canopyFuel ?? 0, 'canopy fuel', 0, 1e6),
       };
     });
-    const module = world().isShared(host.memory) ? this.shared : this.plain;
-    if (!module) throw new MargoError('unsupported', 'Use a plain world or enable shared forest Wasm support.');
-    const kernel = new WebAssembly.Instance(module, { env: { memory: host.memory } }).exports as ForestKernel;
-    const stack = host.allocate('forest-kernel-stack', world().STACK_BYTES + 8, 'u8', LAYOUT);
-    kernel.__stack_pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
     let tableSize = 2;
     while (tableSize < 2 * config.limit) tableSize *= 2;
-    const shade = host.allocate('forest-crown-shade', BYTES_I32 * config.limit, 'i32', LAYOUT);
-    const scratch = host.allocate('forest-neighbour-table', BYTES_I32 * (config.limit + 3 * tableSize), 'i32', LAYOUT);
+    const maxBytes =
+      2 * (44 * config.limit + 64 + BYTES_F64 * n * (ANNUAL + depths.size + 4)) +
+      BYTES_I32 * (2 * config.limit + 3 * tableSize) +
+      8 * n * BYTES_F64;
+    if (!Number.isSafeInteger(maxBytes) || maxBytes >= 0x1_0000_0000)
+      throw forestError('Reduce tree capacity, patch count or flood thresholds until forest state fits Wasm memory.');
     const allocate = (name: string, length: number) => host.allocate(name, length * BYTES_F64, 'f64', LAYOUT);
+    const banks = (prefix: string): ForestBanks => ({
+      population: host.allocate(prefix + 'population', config.limit * WORDS * BYTES_I32, 'i32', LAYOUT),
+      lean: allocate(prefix + 'lean', 2 * config.limit),
+      clock: allocate(prefix + 'clock', 8),
+      annual: allocate(prefix + 'exposure', n * (ANNUAL + depths.size)),
+      roots: allocate(prefix + 'roots', n),
+      cover: allocate(prefix + 'cover', n),
+      fuel: allocate(prefix + 'fuel', n),
+      moisture: allocate(prefix + 'moisture', n),
+    });
     const data: ForestData = {
       host,
+      ...banks('forest-'),
+      trial: banks('forest-trial-'),
       config,
       customSeed: params.seed !== undefined,
       responses,
-      cell,
       columns,
       rows,
       dx,
@@ -401,18 +466,7 @@ export class ForestEcosystemSolver implements Solver<ForestEcosystemParams> {
       windReference,
       windHeight,
       maxLean,
-      kernel,
-      tableSize,
-      shade,
-      scratch,
-      population: host.allocate('forest-population', config.limit * WORDS * BYTES_I32, 'i32', LAYOUT),
-      lean: allocate('forest-lean', 2 * config.limit),
-      clock: allocate('forest-clock', 8),
-      annual: allocate('forest-exposure', n * (ANNUAL + depths.size)),
-      roots: allocate('forest-roots', n),
-      cover: allocate('forest-cover', n),
-      fuel: allocate('forest-fuel', n),
-      moisture: allocate('forest-moisture', n),
+      shade: bindForestShade(host, this.builds, config.limit, tableSize),
     };
     const clock = floats(data, data.clock);
     const initial = population(data, clock);
@@ -434,18 +488,31 @@ export class ForestEcosystemSolver implements Solver<ForestEcosystemParams> {
     const data = this.#live();
     const { columns, rows, wind, ticksPerYear } = data;
     const { config } = data;
-    if (!context.cell.every((coordinate, i) => coordinate === data.cell[i]))
-      throw new MargoError('state', 'Use the same forest origin cell in world.add and the forest parameters.');
+    if (context.level !== 0 || 60 * dt !== 1) throw forestError('Advance the forest at its declared 60 Hz world rate.');
     const n = columns * rows;
     const options = this.#options;
-    const annual = floats(data, data.annual);
-    const moisture = floats(data, data.moisture);
-    const water = readGrid(data, context.inputs.get(SURFACE_WATER_FIELD.name), 3 * n, SURFACE_WATER_LAYOUT);
-    const exposure = readGrid(data, context.inputs.get(this.exposureField.name), 2 * n);
+    const trial = data.trial;
+    const annual = floats(data, trial.annual);
+    const moisture = floats(data, trial.moisture);
+    annual.set(floats(data, data.annual));
+    moisture.set(floats(data, data.moisture));
+    const water = readGrid(
+      data,
+      context.inputs.get(SURFACE_WATER_FIELD.name),
+      SURFACE_WATER_FIELD.name,
+      3 * n,
+      SURFACE_WATER_LAYOUT,
+    );
+    const exposure = readGrid(data, context.inputs.get(this.exposureField.name), this.exposureField.name, 2 * n);
     const vertices = options.erosionField?.centring === 'vertex';
     const incision =
       options.erosionField &&
-      readGrid(data, context.inputs.get(options.erosionField.name), vertices ? (rows + 1) * (columns + 1) : n);
+      readGrid(
+        data,
+        context.inputs.get(options.erosionField.name),
+        options.erosionField.name,
+        vertices ? (rows + 1) * (columns + 1) : n,
+      );
     const sample: ReturnType<Wind['sample']> = { velocity: [0, 0, 0], density: 0, temperature: 0 };
     if (water || exposure || incision || wind)
       for (let i = 0; i < n; i++) {
@@ -469,25 +536,30 @@ export class ForestEcosystemSolver implements Solver<ForestEcosystemParams> {
           annual[a + INCISION]! += dt * finite(rate, 'incision rate', 0, 1e12);
         }
         if (wind) {
-          const [wx, , wz] = wind.sample(
-            config.x0 / 100 + (x + 0.5) * data.dx + data.windOffset[0],
-            data.windHeight + data.windOffset[1],
-            config.z0 / 100 + (z + 0.5) * data.dz + data.windOffset[2],
-            (context.tick + 0.5) * dt,
-            sample,
-          ).velocity;
+          const velocity = sampleWind(data, wind, x, z, (context.tick + 0.5) * dt, sample);
+          const wx = velocity[0],
+            wz = velocity[2];
           finite(wx, 'wind velocity', -1e6, 1e6);
+          finite(velocity[1], 'wind velocity', -1e6, 1e6);
           finite(wz, 'wind velocity', -1e6, 1e6);
           const speed = Math.sqrt(wx * wx + wz * wz);
           annual[a + LOAD_X]! += wx * speed;
           annual[a + LOAD_Z]! += wz * speed;
         }
       }
-    const clock = floats(data, data.clock);
-    if (++clock[7]! < ticksPerYear) return;
-    const lean = floats(data, data.lean);
-    const stand = population(data, clock);
+    const clock = floats(data, trial.clock);
+    clock.set(floats(data, data.clock));
+    if (++clock[7]! < ticksPerYear) {
+      acceptBanks(data, ['annual', 'moisture', 'clock']);
+      return;
+    }
+    copyBank(data, trial.population, data.population);
+    const lean = floats(data, trial.lean);
+    lean.set(floats(data, data.lean));
+    const stand = population(data, clock, trial.population);
     const year = clock[0]! + 1;
+    if (year > 0x7fff_ffff - 100000)
+      throw forestError('The forest age counter would overflow. Start a new stand from surveyed founders.');
     const flooded = (patch: number, species: number) => {
       const j = this.#floodIndices[species]!;
       return j >= 0 && annual[ANNUAL * n + patch * this.#depths.length + j]! >= data.responses[species]!.floodTicks;
@@ -534,23 +606,13 @@ export class ForestEcosystemSolver implements Solver<ForestEcosystemParams> {
           lean[2 * to + 1] = lean[2 * from + 1]!;
         },
       },
-      (stand, cell) => {
-        const { kernel, shade, scratch, tableSize } = data;
-        kernel.forest_shade(
-          data.population.byteOffset,
-          shade.byteOffset,
-          scratch.byteOffset,
-          config.limit,
-          stand.length,
-          tableSize,
-          cell,
-        );
-        return world().regionWords(data.host.memory, shade) as Int32Array;
-      },
+      (stand, cell) => data.shade.run(trial.population, stand.length, cell),
     );
     annual.fill(0);
     clock.set([year, stand.length, stand.births, stand.crowded, results.alive, results.born, results.died, 0]);
-    publish(data, stand);
+    publish(data, stand, trial);
+    acceptBanks(data, ['population', 'lean', 'clock', 'annual', 'roots', 'cover', 'fuel', 'moisture']);
+    data.shade.accept();
   }
 
   /** Most recently completed ecological year and its turnover. */
@@ -591,11 +653,12 @@ export class ForestEcosystemSolver implements Solver<ForestEcosystemParams> {
 
   exportPorts(tick: number): readonly Port[] {
     const d = this.#live();
+    const cell = d.host.cell;
     return [
-      { tick, cell: d.cell, field: this.rootCohesionField.name, region: d.roots },
-      { tick, cell: d.cell, field: this.coverField.name, region: d.cover },
-      { tick, cell: d.cell, field: this.fuelField.name, region: d.fuel },
-      { tick, cell: d.cell, field: this.moistureField.name, region: d.moisture },
+      { tick, cell, field: this.rootCohesionField.name, region: d.roots },
+      { tick, cell, field: this.coverField.name, region: d.cover },
+      { tick, cell, field: this.fuelField.name, region: d.fuel },
+      { tick, cell, field: this.moistureField.name, region: d.moisture },
     ];
   }
 
@@ -611,7 +674,8 @@ export class ForestEcosystemSolver implements Solver<ForestEcosystemParams> {
   }
 
   #live(): ForestData {
-    if (!this.#data) throw new MargoError('state', 'Add the forest solver to a PhysicsWorld before reading it.');
+    if (this.#disposed) throw forestError('Load a new forest after disposal.', 'disposed');
+    if (!this.#data) throw forestError('Add the forest solver to a PhysicsWorld before reading it.');
     return this.#data;
   }
 }
