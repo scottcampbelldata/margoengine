@@ -2020,11 +2020,11 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Margo, 2026-11-28:** that compile cut in part, with the same output bit for bit (30 images of eight cases on
   WebGPU and on the layer over Direct3D 11): the camera ray takes its sines and cosines from two reductions instead
   of six (`preciseSinCos`), and the voxel walk records its hit in one `found()` instead of ten. Paired offline fxc
-  compiles on a loaded machine: start 5.40 to 4.16 s and hit 7.11 to 5.84 s, but shadow 5.27 to 5.89 s and the last
-  loop program 6.45 to 6.94 s, about 6 percent off the five measured programs in all (operational playbook, section
-  5, KB-COMPAT-LOSTWHY1). Still open: why fxc takes longer on shadow and the last loop program, quiet-machine
-  seconds, and a rerun of the WebKit matrix row, so whether every wait now stays under 15 s is not shown; the
-  upstream report waits on Scott.
+  compiles on a loaded machine: start 5.40 to 4.16 s and hit 7.11 to 5.84 s. The shadow and last loop programs hold
+  neither function and their HLSL is the same byte for byte, so their paired times (5.27 against 5.89 s, 6.45 against
+  6.94 s) show only the load (operational playbook, section 5, KB-COMPAT-LOSTWHY1). Still open: those two programs'
+  own 5 to 7 s compiles, quiet-machine seconds, and a rerun of the WebKit matrix row, so whether every wait now stays
+  under 15 s is not shown; the upstream report waits on Scott.
 
 ### Open (below Margo) 2026-11-27: on WebKit's Windows build the WebGL2 layer copies unpremultiplied ImageBitmaps wrong (KB-WEBKIT-BITMAPALPHA1, browser; webgl2-compat)
 
