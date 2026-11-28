@@ -2635,6 +2635,10 @@
       "types": "./dist/machinery/mechanisms.d.ts",
       "import": "./dist/machinery/mechanisms.js"
     },
+    "./machinery/rigs": {
+      "types": "./dist/machinery/rigs.d.ts",
+      "import": "./dist/machinery/rigs.js"
+    },
     "./machinery/surface": {
       "types": "./dist/machinery/surface.d.ts",
       "import": "./dist/machinery/surface.js"

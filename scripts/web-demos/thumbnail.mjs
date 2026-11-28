@@ -3,7 +3,8 @@
 //
 // Serves demos/ locally, opens each page in Chrome with WebGPU, waits until the exhibit is marked ready
 // (`data-ready` or `data-state="ready"`) plus a settle time, then crops the rendered scene (the largest visible
-// canvas) to the gallery's 900 x 579 card with cover fit, and writes demos/thumbs/<demo>.jpg.
+// canvas, with any control laid over it hidden) to the gallery's 900 x 579 card with cover fit, and writes
+// demos/thumbs/<demo>.jpg.
 // Options: --settle=<ms> (default 2500), --timeout=<ms> per page (default 60000), --url-suffix=<query> (e.g. ?view=x).
 // A page that fails to become ready or shows an error keeps its old thumbnail and the run exits 1.
 import fs from 'node:fs';
@@ -101,9 +102,20 @@ async function capture() {
               r.width * r.height > (best ? best.width * best.height : 0) &&
               getComputedStyle(c).visibility !== 'hidden'
             )
-              best = { x: r.x, y: r.y + scrollY, width: r.width, height: r.height };
+              best = { canvas: c, x: r.x, y: r.y + scrollY, width: r.width, height: r.height };
           }
-          return best;
+          if (!best) return null;
+          // Controls laid over the scene (a view button, a toolbar) are page chrome, not the picture: hide each one, or the
+          // highest box holding it that does not hold the canvas, where it overlaps the canvas.
+          const { canvas, ...rect } = best, area = canvas.getBoundingClientRect();
+          const overlaps = (r) => r.right > area.left && r.left < area.right && r.bottom > area.top && r.top < area.bottom;
+          for (const control of document.querySelectorAll('button, input, select, textarea, a, label, [role=button], [role=switch], [role=tab], [role=toolbar]')) {
+            if (control.contains(canvas)) continue;
+            let el = control;
+            while (el.parentElement && !el.parentElement.contains(canvas)) el = el.parentElement;
+            if (overlaps(el.getBoundingClientRect())) el.style.visibility = 'hidden';
+          }
+          return rect;
         });
         if (!box || box.width < 200) throw new Error('no rendered canvas on the page');
         const shot = await page.screenshot({ clip: box, fullPage: true });

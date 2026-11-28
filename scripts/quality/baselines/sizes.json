@@ -15295,6 +15295,11 @@
     },
     {
       "date": "2026-11-27",
+      "commit": "machinery-rigs",
+      "reason": "New entry @margoengine/machinery/rigs: the Scotch yoke, Geneva, Oldham and epicyclic mechanisms as stepped @margoengine/physics worlds checked against the closed forms; the solver is a lazy import() in loadRigs, so the entry pulls no heavy entry statically. @margoengine/machinery/rigs 2980 B gzip (ceiling 0 to 3236 B); margoengine/machinery/rigs is a re-export (ceiling 0 to 323 B)."
+    },
+    {
+      "date": "2026-11-27",
       "commit": "atmo-07-threaded-poisson",
       "reason": "ATMO-07 physics/lightning grows from 6341 to 8807 B gzip, ceiling 6597 to 9072 B, for optional worker execution of SIMD rows, deterministic convergence and actual sweep receipts. A separate solver entry would duplicate initialization, memory and accepted channel contracts. Each lazy native asset grows from 1200 to 1648 B. The two solvers share the 767 B worker file. SEA-06 stays under 9006 B at 8883 B and Sky lightning-bolt stays under 6300 B at 6103 B. Core and Stage are unchanged.",
       "grew": 1
@@ -15993,6 +15998,7 @@
     "@margoengine/machinery/kinematics": 3801,
     "@margoengine/machinery/materials": 648,
     "@margoengine/machinery/mechanisms": 4120,
+    "@margoengine/machinery/rigs": 3236,
     "@margoengine/machinery/metrology": 2911,
     "@margoengine/machinery/overlays": 2296,
     "@margoengine/machinery/react": 4713,
@@ -17321,6 +17327,7 @@
     "margoengine": 308,
     "margoengine/game": 946,
     "margoengine/machinery/mechanisms": 323,
+    "margoengine/machinery/rigs": 323,
     "margoengine/viz": 800,
     "margoengine/web": 577
   }

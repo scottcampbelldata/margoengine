@@ -46,6 +46,10 @@
       "types": "./dist/mechanisms.d.ts",
       "import": "./dist/mechanisms.js"
     },
+    "./rigs": {
+      "types": "./dist/rigs.d.ts",
+      "import": "./dist/rigs.js"
+    },
     "./surface": {
       "types": "./dist/surface.d.ts",
       "import": "./dist/surface.js"
@@ -121,6 +125,7 @@
     "@margoengine/geometry": "^1.0.0",
     "@margoengine/lines": "^1.0.0",
     "@margoengine/math": "^1.0.0",
+    "@margoengine/physics": "^1.0.0",
     "@margoengine/text": "^1.0.0"
   }
 }

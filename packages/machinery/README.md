@@ -206,6 +206,37 @@ console.log(integrator.outputTurns); // 0.1 / 0.046
 
 Every input is checked: a bad count or length throws a `RangeError` naming it. `flexsplinePoint` is a drawing aid (where a flexspline point sits as its teeth hand over between the two pitches), not an elastic solution of the flexspline.
 
+### Mechanism rigs on physics
+
+`margoengine/machinery/rigs` builds the mechanisms above as stepped `@margoengine/physics` worlds: the input shaft is a body driven by position (a servo that reaches its angle each fixed step), the followers are dynamic bodies held by the solver's joints, and after every step the bodies the solver moved are compared with the closed form. `drive(angle)` turns the input there in steps of at most 2 degrees, the shortest way round unless the second argument is `false`, and returns the pose read from the bodies; `check` holds the largest gap (in metres or radians) over the last drive and since the rig was made, and `describeCheck` writes it for a readout.
+
+```ts
+import { loadRigs, scotchYokeRig, genevaRig, oldhamRig, epicyclicRig, describeCheck } from 'margoengine/machinery/rigs';
+
+await loadRigs(); // the solver's Wasm, once
+
+using yoke = scotchYokeRig(0.142); // a slider and a pin in its slot (a generic joint with two free axes)
+console.log(yoke.drive(Math.PI / 3).slide, describeCheck(yoke.check)); // about 0.071, within a few micrometres
+
+using geneva = genevaRig({ slots: 4, centerDistance: 0.32 }); // the pin joint is made as the pin enters a slot
+console.log(geneva.drive(4 * Math.PI, false).wheel); // two crank turns: the wheel indexed two slot pitches
+
+using coupling = oldhamRig(0.104); // two crossed sliders carry the input angle to the offset shaft
+console.log(coupling.drive(1).output);
+
+using train = epicyclicRig({ sun: 21, planet: 18, ring: 57 }, { held: 'carrier' }); // a gear joint at Willis's ratio
+console.log(train.drive(1).ring, train.check.ever);
+```
+
+| Rig | Joints | Gap at 60 Hz, 2 degree steps |
+| --- | --- | --- |
+| `scotchYokeRig` | slider (prismatic), pin in the yoke's slot (generic, two free axes) | 1.4 µm over two turns |
+| `genevaRig` | wheel hinge, pin in the slot (generic, made and removed at the slot mouth); the wheel is fixed while the locking disc holds it | 0.004 degrees over three turns |
+| `oldhamRig` | output hinge, two crossed slides (generic) | 2 µm over two turns |
+| `epicyclicRig` | driven member hinge, gear joint at Willis's ratio; `held` picks the still member | 0.0003 degrees over two turns |
+
+The joints are rows of the solver's sequential-impulse solve (Catto 2005; Baraff 1996); the closed forms are Reuleaux (1876) and Willis (1841). Without gravity, friction or load the rigs are kinematic chains solved by the dynamics: they show the solver holds each mechanism to its exact pose.
+
 ### Attaching from a second scene
 
 `SurfacePhysics.attach` and `TelemetryChannel.attach` remember the scene that is active when you call them, before their first await, and join that scene when they finish. Start it inside a second scene's plugin `setup` and the plugin belongs to that scene; start it anywhere else and it belongs to the default scene. An abort or a failure leaves nothing in either scene.
