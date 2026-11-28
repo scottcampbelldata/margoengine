@@ -1,6 +1,6 @@
 import { EngineKernel } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
-import { drivePose } from './kinematics.js';
+import { drivePose } from './mechanism.js';
 import { prepareDrive } from './model.js';
 
 const canvas=document.querySelector('#scene');

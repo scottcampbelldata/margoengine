@@ -1,7 +1,7 @@
 import { applyMatrix4, latheGeometry, mergeGeometries, sphereGeometry } from '@margoengine/geometry';
 import { roundedBoxGeometry } from '@margoengine/geometry/extras';
 import { Material, createMesh } from '@margoengine/materials';
-import { apertureRadius, armLength, datumRadius, families } from './kinematics.js';
+import { apertureRadius, armLength, datumRadius, families } from './mechanism.js';
 
 const up=[0,1,0], front=[0,0,1], right=[1,0,0];
 const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];

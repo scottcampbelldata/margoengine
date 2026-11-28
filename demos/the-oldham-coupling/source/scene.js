@@ -1,6 +1,6 @@
 import { EngineKernel } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
-import { couplingPose } from './kinematics.js';
+import { couplingPose } from './mechanism.js';
 import { prepareCoupling } from './model.js';
 
 const canvas=document.querySelector('#scene');

@@ -1,6 +1,6 @@
 import { EngineKernel } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
-import { limits, positionAt } from './kinematics.js';
+import { limits, positionAt } from './mechanism.js';
 import { prepareSarrus } from './model.js';
 
 const canvas=document.querySelector('#scene');

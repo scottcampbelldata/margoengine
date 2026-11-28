@@ -1,7 +1,7 @@
 import { applyMatrix4, cylinderGeometry, latheGeometry, mergeGeometries, sphereGeometry, torusGeometry } from '@margoengine/geometry';
 import { roundedBoxGeometry } from '@margoengine/geometry/extras';
 import { Material, createMesh } from '@margoengine/materials';
-import { grooveHalfWidth, hubRadius, tongueHalfLength, tongueHalfWidth } from './kinematics.js';
+import { grooveHalfWidth, hubRadius, tongueHalfLength, tongueHalfWidth } from './mechanism.js';
 
 const tau=Math.PI*2;
 const up=[0,1,0],right=[1,0,0],front=[0,0,1];

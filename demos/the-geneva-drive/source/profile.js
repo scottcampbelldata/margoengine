@@ -1,4 +1,4 @@
-import { centerDistance, crankRadius, rollerRadius } from './kinematics.js';
+import { centerDistance, crankRadius, rollerRadius } from './mechanism.js';
 
 const tau=Math.PI*2;
 const quarter=Math.PI/2;

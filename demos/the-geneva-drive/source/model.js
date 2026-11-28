@@ -1,7 +1,7 @@
 import { applyMatrix4, cylinderGeometry, extrudeGeometry, mergeGeometries, Shape, torusGeometry } from '@margoengine/geometry';
 import { roundedBoxGeometry } from '@margoengine/geometry/extras';
 import { createMesh, Material } from '@margoengine/materials';
-import { centerDistance, crankRadius, rollerRadius } from './kinematics.js';
+import { centerDistance, crankRadius, rollerRadius } from './mechanism.js';
 import { camOutline, wheelOutline } from './profile.js';
 
 const tau=Math.PI*2;
