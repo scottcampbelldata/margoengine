@@ -1,7 +1,8 @@
 // Floating bodies (SEA-12, parity bar P12): two crates, a capsule, an octagonal buoy (a convex hull) and a glTF boom box
 // float on a Water swell with pointer ripples on top, each from its own colliders through one `floating()` call. The
-// ripples are stepped on the CPU too (`cpu: true`), so `seaSurface(ripples)` is the surface the camera sees and the
-// bodies ride the ripples a click makes this frame; each body leaves its own wake (`trackBody`). The debug view draws
+// ripples are stepped on the CPU too (`cpu: true`), so `seaSurface(ripples)` is the surface the camera sees; each body
+// makes ripples by the water it pushes aside (`trackBody` with `volume`) and is a wall to them, so a click's ripples
+// reflect off it. The debug view draws
 // `LoadSolver.debugRender()`: the edges below the water, the waterline, the centre of buoyancy and the load arrows.
 import { cylinderGeometry, capsuleGeometry } from '@margoengine/geometry';
 import { loadGLTF } from '@margoengine/gltf/pbr';
@@ -132,7 +133,6 @@ try {
   const bodies: { name: string; body: PhysicsBody }[] = [];
   const add = (name: string, body: PhysicsBody) => {
     bodies.push({ name, body });
-    ripples.trackBody(body, { radius: 0.7, strength: 0.05 });
   };
   add(
     'crate',
@@ -197,7 +197,9 @@ try {
       ),
     })
     .couple(['loads', 'rigid'], 'staggered');
-  // `floating` gives one entry a collider (a compound, one a part): these bodies have one each, in this order.
+  // `floating` gives one entry a collider (a compound, one a part): these bodies have one each, in this order. Each makes
+  // ripples by the water it pushes aside: the ripples gain the change in its submerged volume each frame.
+  bodies.forEach(({ body }, i) => ripples.trackBody(body, { radius: 0.7, volume: () => loads.bodyLoad(i).submerged }));
   world.advance(0);
   const start = world.takeSnapshot(),
     rippleStart = ripples.snapshot();

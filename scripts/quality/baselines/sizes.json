@@ -15217,6 +15217,12 @@
       "commit": "d0ab6b740c",
       "reason": "Gap row 19 (lane C): procedural/building-rules 27,023 ceiling, 27,742 B measured (curtains kept off stairs, a stair hall for the second stair, the unmet codes, the stair to a flat roof with its house and guard), so procedural/building-plans 37,498 -> 38,072 B and procedural/city 40,705 -> 41,000 B, which bundle it; a separate roof entry would make every flat western block of four storeys, whose code asks for the stair, load it in a second call. New entry materials/interior-mapping 31,075 B, most of it the shared Material and WgslMaterial code, which loads gltf/pbr-model and gltf/extended-materials as materials/portal does and every materials mesh already does",
       "grew": 6
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "sea12-ripple-volume",
+      "reason": "@margoengine/water/ripples 9,951 to 10,515 B gzip (both measured on this tree), ceiling 9,951 to 10,831 B: bodies make ripples by the water they displace (trackBody volume, displace, RippleField.volume), the displaced-volume ring in the WGSL step and its CPU twin. Every tracked floating body needs it beside the splash and wake it replaces, so a split entry would add a second import to each floating scene for about 0.5 KB. Core and Stage are unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16898,7 +16904,7 @@
     "@margoengine/water/query": 4677,
     "@margoengine/water/rain": 2757,
     "@margoengine/water/reflector": 3988,
-    "@margoengine/water/ripples": 9951,
+    "@margoengine/water/ripples": 10831,
     "@margoengine/water/rivers": 4402,
     "@margoengine/water/scatter": 2320,
     "@margoengine/water/sea-state": 1694,

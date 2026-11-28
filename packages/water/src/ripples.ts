@@ -7,7 +7,9 @@ import { fault } from '../../shared/errors.js';
 import { WATER_FLOW_TICKS_PER_FRAME } from './film.js';
 import {
   cloneObstacle,
+  displacedHeight,
   finite,
+  RIPPLE_DISPLACED,
   insideObstacle,
   MAX_RIPPLE_OBSTACLES,
   packObstacleList,
@@ -63,8 +65,17 @@ export interface RippleTrackOptions {
   splashStrength?: number;
   /** Minimum horizontal displacement in metres per update to emit a wake, 0..100. Default 0.02. */
   minSpeed?: number;
-  /** Reflect ripples off this body as a moving solid obstacle while it intersects the surface. Default false. */
+  /** Reflect ripples off this body as a moving solid obstacle while it intersects the surface. Default false (true with `volume`). */
   obstacle?: boolean;
+  /**
+   * The body's volume under the water now, m^3 (`() => loads.bodyLoad(i).submerged`). With it the body makes ripples
+   * by the water it pushes aside: each update a ring from `radius` out to twice that takes back the volume it held where
+   * it was and gives the volume it holds now where it is, so the field's water grows by exactly the change in the
+   * body's displacement (a body sinking in raises a ring, one moving along pushes a bow wave and leaves a trough) and the
+   * speed-rated splash and wake are off. Give `radius` the body's waterline half width. The body is then also an
+   * `obstacle` by default, so the ring it makes reflects off it instead of focusing back under it. Default none.
+   */
+  volume?: () => number;
 }
 /** Debug visualization channel for {@link Ripples.setDebug}. */
 export type RippleDebugMode = 'height' | 'velocity' | 'obstacles';
@@ -134,6 +145,8 @@ interface TrackedState {
   prevY: number;
   prevZ: number;
   wasInWater: boolean;
+  volume: (() => number) | undefined;
+  prevVolume: number;
 }
 
 const DEBUG_MODE_INDEX: Record<RippleDebugMode, number> = { height: 0, velocity: 1, obstacles: 2 };
@@ -186,17 +199,28 @@ fn isObstacle(world:vec2f)->bool {
  let decay=exp(-(u.step.z+12.0*(1.0-smoothstep(0.0,8.0,edge)))*u.step.x);
  let velocity=(v.y+lap*u.step.y*u.step.x/(c*c))*decay;
  var h=v.x+velocity*u.step.x;
- // Drops and swept wakes born this step: the zero-mean profile (1-q)^2 (1-4q) around each event's segment.
+ // Drops and swept wakes born this step: the zero-mean profile (1-q)^2 (1-4q) around each event's segment; a body's
+ // displaced water (kind b.z = 1) is a ring from b.w out to b.x, its height (1-s^2)^2 across it, none under the body.
  for(var i=0u;i<u32(u.step.w);i++){
   let a=u.hits[i*2u];let b=u.hits[i*2u+1u];let d=a.zw-a.xy;
   let t=clamp(dot(world-a.xy,d)/max(dot(d,d),0.000001),0.0,1.0);
   let q=dot(world-a.xy-t*d,world-a.xy-t*d)/(b.x*b.x);
-  if(q<1.0){h+=b.y*(1.0-q)*(1.0-q)*(1.0-4.0*q);}
+  if(b.z>0.5){
+   let w=(b.x-b.w)*0.5;let s=(sqrt(q)*b.x-(b.x+b.w)*0.5)/w;
+   if(s*s<1.0){h+=b.y*(1.0-s*s)*(1.0-s*s);}
+  }else if(q<1.0){h+=b.y*(1.0-q)*(1.0-q)*(1.0-4.0*q);}
  }
  outputField[id.y*n+id.x]=vec2f(h,velocity);
 }`;
 
 let sequence = 0;
+/** A tracked body's submerged volume now, m^3, checked. */
+function submerged(volume: () => number): number {
+  const v = volume();
+  if (!(Number.isFinite(v) && v >= 0))
+    throw rippleError("Invalid tracked volume; the volume function must return the body's finite submerged m^3");
+  return v;
+}
 function readXYZ(pos: RipplePosition): [number, number, number] | null {
   if (!pos || typeof pos !== 'object') return null;
   if ('x' in pos && 'y' in pos && 'z' in pos) {
@@ -263,8 +287,7 @@ export class Ripples implements EnginePlugin {
     this.surface = options.surface;
     this.size = finite(options.size ?? 64, 1, 10000, 'size');
     this.resolution = finite(options.resolution ?? 128, 16, 512, 'resolution');
-    if (!Number.isInteger(this.resolution))
-      throw rippleError('Ripple resolution must be an integer; use 16..512');
+    if (!Number.isInteger(this.resolution)) throw rippleError('Ripple resolution must be an integer; use 16..512');
     this.speed = finite(options.speed ?? 3, 0.01, 100, 'speed');
     this.damping = finite(options.damping ?? 0.6, 0, 100, 'damping');
     this.follow = options.followCamera ?? true;
@@ -276,7 +299,13 @@ export class Ripples implements EnginePlugin {
     if (options.obstacles !== undefined) this.setObstacles(options.obstacles);
     const cpu = options.cpu ?? false;
     if (typeof cpu !== 'boolean') throw rippleError('Invalid ripple cpu; pass true or false');
-    if (cpu) this.mirror = new RippleField({ size: this.size, resolution: this.resolution, speed: this.speed, damping: this.damping });
+    if (cpu)
+      this.mirror = new RippleField({
+        size: this.size,
+        resolution: this.resolution,
+        speed: this.speed,
+        damping: this.damping,
+      });
   }
   /** Attach after the Water surface. */
   static attach(engine: EngineKernel, options: RippleOptions): Ripples {
@@ -305,8 +334,7 @@ export class Ripples implements EnginePlugin {
    */
   setObstacles(obstacles: readonly RippleObstacle[]): this {
     this.live();
-    if (!Array.isArray(obstacles))
-      throw rippleError('Invalid ripple obstacles; pass an array of obstacle descriptors');
+    if (!Array.isArray(obstacles)) throw rippleError('Invalid ripple obstacles; pass an array of obstacle descriptors');
     if (obstacles.length > MAX_RIPPLE_OBSTACLES)
       throw rippleError(`Too many ripple obstacles; pass at most ${MAX_RIPPLE_OBSTACLES} obstacles`);
     const validated = obstacles.map((obs) => cloneObstacle(obs));
@@ -338,9 +366,12 @@ export class Ripples implements EnginePlugin {
     const halfHeight = finite(options.halfHeight ?? radius, 1e-4, 1e5, 'track halfHeight');
     const splashStrength = finite(options.splashStrength ?? 2.5, 0, 10, 'track splashStrength');
     const minSpeed = finite(options.minSpeed ?? 0.02, 0, 100, 'track minSpeed');
-    const obstacle = options.obstacle ?? false;
-    if (typeof obstacle !== 'boolean')
-      throw rippleError('Invalid track obstacle flag; pass true or false');
+    const volume = options.volume;
+    if (volume !== undefined && typeof volume !== 'function')
+      throw rippleError("Invalid track volume; pass a function returning the body's submerged m^3");
+    // A displacing body is a wall to its own ripples: without it the ring it makes would focus back under it.
+    const obstacle = options.obstacle ?? volume !== undefined;
+    if (typeof obstacle !== 'boolean') throw rippleError('Invalid track obstacle flag; pass true or false');
     const existing = this.tracked.get(body);
     if (existing) {
       existing.radius = radius;
@@ -349,6 +380,7 @@ export class Ripples implements EnginePlugin {
       existing.splashStrength = splashStrength;
       existing.minSpeed = minSpeed;
       existing.obstacle = obstacle;
+      existing.volume = volume;
     } else {
       const p = readXYZ(body.position)!;
       const surfaceY = this.waterLevelAt(p[0], p[2]);
@@ -365,6 +397,8 @@ export class Ripples implements EnginePlugin {
         prevY: p[1],
         prevZ: p[2],
         wasInWater: inWater,
+        volume,
+        prevVolume: volume ? submerged(volume) : 0,
       });
     }
     this.dirty = true;
@@ -474,6 +508,25 @@ export class Ripples implements EnginePlugin {
       const dx = x - state.prevX,
         dy = y - state.prevY,
         dz = z - state.prevZ;
+      if (state.volume) {
+        // The water the body pushes aside: take back the ring it held where it was, give the one it holds now.
+        const now = submerged(state.volume);
+        if (this.pending.length > 64 * 8 - 16)
+          throw fault('state', 'Ripple event queue full; track at most 32 displacing bodies or render more often');
+        if (dx === 0 && dz === 0) {
+          if (now !== state.prevVolume) this.displace(x, z, state.radius, now - state.prevVolume);
+        } else {
+          if (state.prevVolume !== 0) this.displace(state.prevX, state.prevZ, state.radius, -state.prevVolume);
+          if (now !== 0) this.displace(x, z, state.radius, now);
+        }
+        emitted ||= now !== state.prevVolume || ((dx !== 0 || dz !== 0) && now !== 0);
+        state.prevVolume = now;
+        state.prevX = x;
+        state.prevY = y;
+        state.prevZ = z;
+        state.wasInWater = inWater;
+        continue;
+      }
       if ((entered || exited) && state.splashStrength > 0 && this.pending.length < 64 * 8) {
         const vy = Math.abs(dy) / safeDt;
         const speedFactor = Math.min(2, 0.4 + vy * 0.25);
@@ -558,11 +611,34 @@ export class Ripples implements EnginePlugin {
     for (const field of this.fields) device.queue.writeBuffer(field, 0, zeros);
     this.origin[0] = this.origin[1] = -this.size / 2;
     this.done = 0;
-    this.mirror?.restore({ origin: this.origin, resolution: this.resolution, ticks: 0, data: new Float32Array(this.resolution ** 2 * 2) });
+    this.mirror?.restore({
+      origin: this.origin,
+      resolution: this.resolution,
+      ticks: 0,
+      data: new Float32Array(this.resolution ** 2 * 2),
+    });
   }
   /** Queue a circular drop. Radius must cover at least one cell, strength is signed metres. */
   disturb(x: number, z: number, radius = 1, strength = 0.1): this {
     return this.wake([x, z], [x, z], radius, strength);
+  }
+  /**
+   * Queue the water a body pushed aside (negative: let back): a ring from `radius` (the body's footprint) out to twice
+   * that holding `volume` m^3, so the field's water grows by exactly that. `trackBody` with `volume` queues these itself.
+   */
+  displace(x: number, z: number, radius: number, volume: number): this {
+    this.live();
+    for (const v of [x, z]) finite(v, -1e7, 1e7, 'position');
+    finite(radius, this.cell / 2, this.size / 4, 'radius');
+    finite(volume, -1e9, 1e9, 'volume');
+    const height = displacedHeight(volume, radius, 2 * radius);
+    if (this.pending.length >= 64 * 8)
+      throw fault('state', 'Ripple event queue full; render before adding more than 64 events');
+    this.pending.push(x, z, x, z, 2 * radius, height, RIPPLE_DISPLACED, radius);
+    const clock = this.surface.options.clock;
+    this.due.push(clock ? clock.ticks(this.tickRate().rate) : -1);
+    this.dirty = true;
+    return this;
   }
   /** Queue a swept capsule from the object's previous XZ to current XZ. Up to 64 events per rendered update. */
   wake(from: readonly [number, number], to: readonly [number, number], radius = 1, strength = 0.1): this {
@@ -719,9 +795,14 @@ export class Ripples implements EnginePlugin {
       }
     if (this.mirror) {
       const none = new Float32Array(0),
-        shift: [number, number] = [Math.round((next[0] - this.origin[0]) / cell), Math.round((next[1] - this.origin[1]) / cell)];
+        shift: [number, number] = [
+          Math.round((next[0] - this.origin[0]) / cell),
+          Math.round((next[1] - this.origin[1]) / cell),
+        ];
       for (let s = 0; s < steps; s++) {
-        const events = Float32Array.from(born.filter(([at]) => at === s).flatMap(([, e]) => this.pending.slice(e * 8, e * 8 + 8)));
+        const events = Float32Array.from(
+          born.filter(([at]) => at === s).flatMap(([, e]) => this.pending.slice(e * 8, e * 8 + 8)),
+        );
         this.mirror.step({
           origin: next,
           cell,

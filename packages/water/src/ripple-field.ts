@@ -49,11 +49,7 @@ export interface RippleWallObstacle {
   readonly thickness?: number;
 }
 /** Solid obstacle in a {@link Ripples} field (sphere, cylinder, box, or wall segment). */
-export type RippleObstacle =
-  | RippleSphereObstacle
-  | RippleCylinderObstacle
-  | RippleBoxObstacle
-  | RippleWallObstacle;
+export type RippleObstacle = RippleSphereObstacle | RippleCylinderObstacle | RippleBoxObstacle | RippleWallObstacle;
 
 /** A refusal of bad ripple input: a MargoError `unsupported` whose message names the fix and links to errors#ripples. */
 export const rippleError = (message: string) => fault('unsupported', message, 'ripples');
@@ -119,7 +115,8 @@ export function cloneObstacle(obs: RippleObstacle): RippleObstacle {
       if (!Array.isArray(obs.from) || obs.from.length !== 2 || !Array.isArray(obs.to) || obs.to.length !== 2)
         throw rippleError('Invalid wall obstacle endpoints; pass from and to [x, z] pairs');
       for (const v of [...obs.from, ...obs.to]) finite(v, -1e7, 1e7, 'obstacle endpoint');
-      const thickness = obs.thickness === undefined ? undefined : finite(obs.thickness, 1e-4, 1e6, 'obstacle thickness');
+      const thickness =
+        obs.thickness === undefined ? undefined : finite(obs.thickness, 1e-4, 1e6, 'obstacle thickness');
       return Object.freeze({
         kind: 'wall' as const,
         from: Object.freeze([obs.from[0], obs.from[1]]) as readonly [number, number],
@@ -194,11 +191,34 @@ export interface RippleStep {
   obstacleCount: number;
 }
 
+/** Event kind word (float 6 of an event): a zero-mean drop or wake. */
+export const RIPPLE_DROP = 0;
+/**
+ * Event kind word: water displaced by a body, a ring around its footprint. The ring runs from `inner` (float 7) to the
+ * event's radius, its height (1 - s^2)^2 across it (s from -1 at the inner edge to 1 at the outer), so nothing rises
+ * under the body itself; it holds (32 / 15) pi w c of its peak height, w its half width and c its middle radius.
+ */
+export const RIPPLE_DISPLACED = 1;
+
+/**
+ * The peak height of a displaced-volume ring from `inner` to `outer` holding `volume` m^3 (signed).
+ * @throws MargoError `unsupported` (errors#ripples) for a ring past 100 m high: give the body a wider radius.
+ */
+export function displacedHeight(volume: number, inner: number, outer: number): number {
+  const w = (outer - inner) / 2,
+    c = (outer + inner) / 2,
+    height = (15 * volume) / (32 * Math.PI * w * c);
+  if (!(Math.abs(height) <= 100))
+    throw rippleError('Displaced volume too large for its radius (over 100 m of ring); pass a wider radius');
+  return height;
+}
+
 /**
  * Steps `source` (height and vertical velocity pairs, row-major, `n` by `n`) into `target`: symplectic Euler on
  * dh/dt = v, dv/dt = c^2 laplacian(h), velocity decaying by `damping` plus a 12 /s strip over the 8 cells at the edge,
- * obstacle cells held at rest and their faces mirrored (a Neumann wall), then each event's drop profile
- * (1 - q)^2 (1 - 4 q) added, q the squared distance to its swept segment over its radius squared.
+ * obstacle cells held at rest and their faces mirrored (a Neumann wall), then each event's profile added, q the squared
+ * distance to its swept segment over its radius squared: a drop's zero-mean (1 - q)^2 (1 - 4 q), or the ring of a
+ * body's displaced water (kind {@link RIPPLE_DISPLACED}), which adds exactly its volume up to the cells' quadrature.
  */
 export function stepRipples(source: Float32Array, target: Float32Array, n: number, s: RippleStep): void {
   const { cell: c, dt, obstacles, obstacleCount, events, eventCount } = s,
@@ -232,7 +252,8 @@ export function stepRipples(source: Float32Array, target: Float32Array, n: numbe
       }
       const edge = Math.min(x, z, n - 1 - x, n - 1 - z),
         e = Math.min(1, edge / 8),
-        velocity = (v + (hE + hW + hN + hS - 4 * h) * gain) * Math.exp(-(s.damping + 12 * (1 - e * e * (3 - 2 * e))) * dt);
+        velocity =
+          (v + (hE + hW + hN + hS - 4 * h) * gain) * Math.exp(-(s.damping + 12 * (1 - e * e * (3 - 2 * e))) * dt);
       let height = h + velocity * dt;
       for (let i = 0; i < eventCount; i++) {
         const o = i * RIPPLE_EVENT_FLOATS,
@@ -245,7 +266,12 @@ export function stepRipples(source: Float32Array, target: Float32Array, n: numbe
           qx = wx - ax - t * dx,
           qz = wz - az - t * dz,
           q = (qx * qx + qz * qz) / (r * r);
-        if (q < 1) height += events[o + 5]! * (1 - q) * (1 - q) * (1 - 4 * q);
+        if (events[o + 6]! > 0.5) {
+          const inner = events[o + 7]!,
+            w = (r - inner) / 2,
+            u = (Math.sqrt(q) * r - (r + inner) / 2) / w;
+          if (u * u < 1) height += events[o + 5]! * (1 - u * u) * (1 - u * u);
+        } else if (q < 1) height += events[o + 5]! * (1 - q) * (1 - q) * (1 - 4 * q);
       }
       target[out] = height;
       target[out + 1] = velocity;
@@ -456,6 +482,27 @@ export class RippleField {
     this.events.push(from[0], from[1], to[0], to[1], radius, strength, 0, 0);
     return this;
   }
+  /**
+   * Queues the water a body pushed aside (or, negative, let back) for the next step: a ring from `radius` (the body's
+   * footprint) out to twice that holding `volume` m^3, so the field's water grows by exactly that (to the cells'
+   * quadrature) and none of it rises under the body.
+   */
+  displace(x: number, z: number, radius: number, volume: number): this {
+    for (const v of [x, z]) finite(v, -1e7, 1e7, 'position');
+    finite(radius, this.cellSize / 2, this.size / 4, 'radius');
+    finite(volume, -1e9, 1e9, 'volume');
+    const height = displacedHeight(volume, radius, 2 * radius);
+    if (this.events.length >= 64 * RIPPLE_EVENT_FLOATS)
+      throw rippleError('Ripple event queue full; advance before adding more than 64 events');
+    this.events.push(x, z, x, z, 2 * radius, height, RIPPLE_DISPLACED, radius);
+    return this;
+  }
+  /** Water volume the field holds above its level, m^3: the heights summed over the cells. */
+  volume(): number {
+    let sum = 0;
+    for (let i = 0; i < this.state.length; i += 2) sum += this.state[i]!;
+    return sum * this.cellSize * this.cellSize;
+  }
   /** Advances the field `seconds` (0..3600) in equal stable substeps; queued events are born in the first. */
   advance(seconds: number): this {
     finite(seconds, 0, 3600, 'advance seconds');
@@ -509,7 +556,12 @@ export class RippleField {
   }
   /** A copy of the field's state, to restore later or to compare. */
   snapshot(): RippleSnapshot {
-    return Object.freeze({ origin: this.origin, resolution: this.resolution, ticks: this.ticks, data: this.state.slice() });
+    return Object.freeze({
+      origin: this.origin,
+      resolution: this.resolution,
+      ticks: this.ticks,
+      data: this.state.slice(),
+    });
   }
   /** Puts back a state taken from a field of this resolution; queued events are dropped. */
   restore(snapshot: RippleSnapshot): this {

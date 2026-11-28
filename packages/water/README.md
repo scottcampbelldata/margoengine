@@ -2262,6 +2262,15 @@ ripples.disturb(0, 0, 1.5, -0.2); engine.render({ delta: 1 / 60 }); console.log(
   anything with a `position` (`[x, y, z]` or `{x, y, z}`: a physics body, a mesh): it splashes as it crosses the surface
   and leaves a swept wake as it moves; `obstacle: true` also reflects waves off it. `disturbRay(origin, direction,
   radius?, strength?)` drops a ripple where a ray (a click) meets the water and returns the point, or `null`.
+- **Bodies that push water aside (`volume`):** `trackBody(body, {radius, volume: () => loads.bodyLoad(i).submerged})`
+  makes ripples by the water the body displaces instead of by its speed: each update a ring from `radius` (its
+  waterline half width) out to twice that takes back the volume it held where the body was and gives the volume it
+  holds now where it is, so the field gains exactly the change in the body's submerged volume (sinking in raises a ring,
+  moving along pushes a bow wave and leaves a trough). The body is then a wall (`obstacle`) to the ripples by default,
+  so its own ring reflects off it instead of focusing back under it, and the ripples under its footprint read still.
+  `displace(x, z, radius, volume)` (also on `RippleField`) lays one such ring; `RippleField.volume()` is the water the
+  field holds. The field is a height field: it carries no horizontal momentum, so water volume is what the coupling
+  conserves (`packages/water/test/ripple-displace.test.js`).
 - **Queries (`cpu: true`):** `sample(x, z)` is the surface drawn there this frame, `{height, normal, velocity}` (the
   Water's `sample` plus the ripples); `sampleRipples(x, z)` the ripples alone; `snapshot()`, `restore(snapshot)` and
   `stateHash()` save, put back (on the CPU and the GPU) and compare the field. Without `cpu` they throw a MargoError

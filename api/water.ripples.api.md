@@ -45,6 +45,8 @@ export class RippleField {
     setObstacles(obstacles: readonly RippleObstacle[]): this;
     disturb(x: number, z: number, radius?: number, strength?: number): this;
     wake(from: readonly [number, number], to: readonly [number, number], radius?: number, strength?: number): this;
+    displace(x: number, z: number, radius: number, volume: number): this;
+    volume(): number;
     advance(seconds: number): this;
     step(step: RippleStep): this;
     sample(x: number, z: number): RippleSample;
@@ -135,6 +137,7 @@ export interface RippleTrackOptions {
     splashStrength?: number;
     minSpeed?: number;
     obstacle?: boolean;
+    volume?: () => number;
 }
 
 export interface RippleTrackedBody {
@@ -163,6 +166,7 @@ export class Ripples implements EnginePlugin {
     setDebug(options: boolean | RippleDebugOptions): this;
     disturbRay(origin: readonly [number, number, number], direction: readonly [number, number, number], radius?: number, strength?: number): [number, number, number] | null;
     disturb(x: number, z: number, radius?: number, strength?: number): this;
+    displace(x: number, z: number, radius: number, volume: number): this;
     wake(from: readonly [number, number], to: readonly [number, number], radius?: number, strength?: number): this;
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;
