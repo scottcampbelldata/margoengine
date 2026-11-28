@@ -141,6 +141,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'snowpack',
+    title: '@margoengine/physics/snowpack heat, layers and weather fields',
+    kind: 'family',
+    messages: [],
+    cause: 'A snow layer, wind sample, heat port, grid or physical step exceeded its usable range.',
+    fix: 'Use matching same-cell layout-1 fields in their owning memories. Give finite SI heat, mass, velocity and density values, and lower the heat or time scale if a candidate step overflows. Use a separate field inside a callback. Choose a supported native participant count and a shared-memory world for helpers.',
+  },
+  {
     id: 'pack-ice',
     title: '@margoengine/physics/pack-ice floes, flow inputs and vessel contact',
     kind: 'family',

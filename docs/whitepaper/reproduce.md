@@ -5347,3 +5347,14 @@ node scripts/run-with-timeout.mjs --max=2 -- node packages/physics/scripts/ice04
 ```
 
 The production solver tows a live rigid capsule at fixed speed. The test uses three seeded 60 and 80 percent packs, equal-area model floes, the published geometry, and separately measured friction. The comparison subtracts the 60 percent tow resistance from the 80 percent resistance at each speed in both the model and the measurements. The model receives no measured force or fitted force parameters. Subtraction cancels the common open-water baseline. The repeat and instrument contributions are propagated separately. [Towing-tank measurements, CC BY 4.0](https://doi.org/10.1016/j.oceaneng.2023.116476)
+
+### ICE-01 native snow columns and Col de Porte
+
+```sh
+node scripts/run-with-timeout.mjs --max=2 -- node --test packages/physics/tests/coupling/snowpack.test.js packages/physics/tests/coupling/snowpack-workers.test.js
+node scripts/run-with-timeout.mjs --max=2 -- npm run test:gpu:snowpack-workers -w @margoengine/physics
+node scripts/run-with-timeout.mjs --max=3 -- npm run test:gpu:snowmelt-film -w @margoengine/weather
+node scripts/run-with-timeout.mjs --max=2 -- node packages/physics/scripts/ice01-col-de-porte-measured.mjs
+```
+
+The cold and warm six-day simulations use Col de Porte's measured air and downwelling radiation. Their only snow-state inputs are the start-depth reading and prior-day water equivalent and albedo. Later depth and water equivalent are held out. The diagnostic selects dry periods because the provider uses snow properties to partition precipitation into rain and snow. It fixes the initial albedo, uses a neutral sensible heat flux and tracks meltwater without a vapor mass exchange. It compares 150 and 300 second steps and a one-hour forcing-label shift. [Observations and methods](https://doi.org/10.5194/essd-4-13-2012) [Spatial uncertainty](https://doi.org/10.5194/essd-11-71-2019) [Surface flux context](https://doi.org/10.5194/gmd-5-773-2012)

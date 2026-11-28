@@ -1,7 +1,10 @@
 #![no_std]
 #![cfg(target_arch = "wasm32")]
 
-use core::arch::wasm32::{f64x2_extract_lane, f64x2_splat, f64x2_sqrt};
+use core::arch::wasm32::{
+    f64x2, f64x2_add, f64x2_div, f64x2_extract_lane, f64x2_gt, f64x2_lt, f64x2_mul, f64x2_splat,
+    f64x2_sqrt, f64x2_sub, v128, v128_bitselect,
+};
 use core::slice;
 
 #[panic_handler]
@@ -106,37 +109,124 @@ impl Pack {
     }
 }
 
-fn conduct(a: &mut Pack, b: &mut Pack, dt: f64) {
-    if a.mass == 0.0 || b.mass == 0.0 || a.depth == 0.0 || b.depth == 0.0 {
-        return;
-    }
-    let delta = a.temp() - b.temp();
-    if delta == 0.0 {
-        return;
-    }
-    let (hot, cold) = if delta > 0.0 { (a, b) } else { (b, a) };
-    let conductance = 2.0 / (hot.depth / hot.conductivity() + cold.depth / cold.conductivity());
-    let factor = conductance * dt;
-    // At equilibrium the temperatures agree. The backward-Euler root is bracketed by zero and the
-    // smaller of the explicit flux and the energy needed to pass across the freezing plateau.
-    let hot_heat = hot.heat;
-    let cold_heat = cold.heat;
-    let mut lo = 0.0;
-    let mut hi =
-        (factor * delta.abs()).min(hot_heat.abs() + cold_heat.abs() + LF * (hot.mass + cold.mass));
-    for _ in 0..54 {
-        let middle = lo + (hi - lo) * 0.5;
-        let target =
-            hot.with_heat(hot_heat - middle).temp() - cold.with_heat(cold_heat + middle).temp();
-        if middle < factor * target {
-            lo = middle;
+const BISECTION_STEPS: u32 = 54;
+
+struct Conduction {
+    hot: Pack,
+    cold: Pack,
+    hot_layer: usize,
+    cold_layer: usize,
+    factor: f64,
+    upper: f64,
+}
+
+impl Conduction {
+    fn between(pack: &[Pack], a: usize, b: usize, dt: f64) -> Option<Self> {
+        let top = *at(pack, a);
+        let bottom = *at(pack, b);
+        if top.mass == 0.0 || bottom.mass == 0.0 || top.depth == 0.0 || bottom.depth == 0.0 {
+            return None;
+        }
+        let delta = top.temp() - bottom.temp();
+        if delta == 0.0 {
+            return None;
+        }
+        let (hot, cold, hot_layer, cold_layer) = if delta > 0.0 {
+            (top, bottom, a, b)
         } else {
-            hi = middle;
+            (bottom, top, b, a)
+        };
+        let conductance = 2.0 / (hot.depth / hot.conductivity() + cold.depth / cold.conductivity());
+        let factor = conductance * dt;
+        // Bracket the backward-Euler root by the explicit flux and the freezing-plateau energy.
+        let upper = (factor * delta.abs())
+            .min(hot.heat.abs() + cold.heat.abs() + LF * (hot.mass + cold.mass));
+        Some(Self {
+            hot,
+            cold,
+            hot_layer,
+            cold_layer,
+            factor,
+            upper,
+        })
+    }
+
+    fn scalar(&self) -> f64 {
+        let mut lo = 0.0;
+        let mut hi = self.upper;
+        for _ in 0..BISECTION_STEPS {
+            let middle = lo + (hi - lo) * 0.5;
+            let target = self.hot.with_heat(self.hot.heat - middle).temp()
+                - self.cold.with_heat(self.cold.heat + middle).temp();
+            if middle < self.factor * target {
+                lo = middle;
+            } else {
+                hi = middle;
+            }
+        }
+        (lo + hi) * 0.5
+    }
+
+    fn accept(&self, pack: &mut [Pack], moved: f64) {
+        at_mut(pack, self.hot_layer).heat -= moved;
+        at_mut(pack, self.cold_layer).heat += moved;
+    }
+}
+
+struct ThermalLanes {
+    heat: v128,
+    latent: v128,
+    ice_capacity: v128,
+    water_capacity: v128,
+}
+
+impl ThermalLanes {
+    fn new(a: Pack, b: Pack) -> Self {
+        let mass = f64x2(a.mass, b.mass);
+        Self {
+            heat: f64x2(a.heat, b.heat),
+            latent: f64x2_mul(f64x2_splat(LF), mass),
+            ice_capacity: f64x2_mul(f64x2_splat(CI), mass),
+            water_capacity: f64x2_mul(f64x2_splat(CW), mass),
         }
     }
-    let moved = (lo + hi) * 0.5;
-    hot.heat -= moved;
-    cold.heat += moved;
+
+    fn temperature(&self, heat: v128) -> v128 {
+        let zero = f64x2_splat(0.0);
+        let excess = f64x2_sub(heat, self.latent);
+        let liquid_heat = v128_bitselect(excess, zero, f64x2_gt(excess, zero));
+        v128_bitselect(
+            f64x2_div(heat, self.ice_capacity),
+            f64x2_div(liquid_heat, self.water_capacity),
+            f64x2_lt(heat, zero),
+        )
+    }
+}
+
+fn conduct_two(a: &Conduction, b: &Conduction) -> (f64, f64) {
+    // Each lane owns a different column, preserving the dependency between interfaces in a
+    // single column, as required by its layerwise heat budget (Bartelt & Lehning 2002, Part I).
+    let hot = ThermalLanes::new(a.hot, b.hot);
+    let cold = ThermalLanes::new(a.cold, b.cold);
+    let factor = f64x2(a.factor, b.factor);
+    let half = f64x2_splat(0.5);
+    let mut lo = f64x2_splat(0.0);
+    let mut hi = f64x2(a.upper, b.upper);
+    for _ in 0..BISECTION_STEPS {
+        let middle = f64x2_add(lo, f64x2_mul(f64x2_sub(hi, lo), half));
+        let target = f64x2_sub(
+            hot.temperature(f64x2_sub(hot.heat, middle)),
+            cold.temperature(f64x2_add(cold.heat, middle)),
+        );
+        let take_lower = f64x2_lt(middle, f64x2_mul(factor, target));
+        lo = v128_bitselect(middle, lo, take_lower);
+        hi = v128_bitselect(hi, middle, take_lower);
+    }
+    let moved = f64x2_mul(f64x2_add(lo, hi), half);
+    (
+        f64x2_extract_lane::<0>(moved),
+        f64x2_extract_lane::<1>(moved),
+    )
 }
 
 #[derive(Clone, Copy)]
@@ -192,8 +282,8 @@ struct Settings {
     cornice_upper_ratio: f64,
 }
 
-#[unsafe(no_mangle)]
-unsafe extern "C" fn snowpack_step(
+#[repr(C)]
+struct Job {
     packs: *mut Pack,
     caps: *mut Cornice,
     drift: *mut Pack,
@@ -209,158 +299,300 @@ unsafe extern "C" fn snowpack_step(
     width: usize,
     depth: usize,
     layers: usize,
+    work: *mut Work,
     dt: f64,
     world_dt: f64,
-) {
-    if width == 0 || depth == 0 || layers == 0 {
-        return;
-    }
-    let count = width * depth;
-    let pack = unsafe { slice::from_raw_parts_mut(packs, count * layers) };
-    let caps = unsafe { slice::from_raw_parts_mut(caps, count) };
-    let drift = unsafe { slice::from_raw_parts_mut(drift, count) };
-    let forcing = unsafe { slice::from_raw_parts(forcing, count) };
-    let eta = unsafe { slice::from_raw_parts(viscosity, count * layers) };
-    let strength = unsafe { slice::from_raw_parts(cohesion, count * layers) };
-    let previous_ice = unsafe { slice::from_raw_parts_mut(old_ice, count * layers) };
-    let runoff = unsafe { slice::from_raw_parts_mut(runoff, count) };
-    let discharge = unsafe { slice::from_raw_parts_mut(discharge, count) };
-    let output = unsafe { slice::from_raw_parts_mut(summary, count) };
-    let cover = unsafe { slice::from_raw_parts_mut(cover, count * 2) };
-    let cfg = unsafe { &*config };
-    drift.fill(Pack::zero());
+}
 
-    for i in 0..count {
-        let air = at(forcing, i);
-        let start = i * layers;
-        let top = at_mut(pack, start);
-        let snow = dt * air.snowfall;
-        top.add(Pack {
-            mass: snow,
-            heat: snow * CI * air.air_celsius.min(0.0),
-            depth: snow / air.fresh_density,
-        });
-        let speed = sqrt(air.friction_x * air.friction_x + air.friction_z * air.friction_z);
-        let mut surface = start;
-        while surface + 1 < start + layers && at(pack, surface).mass == 0.0 {
-            surface += 1;
-        }
-        let top = at_mut(pack, surface);
-        let scours = speed >= cfg.wind_threshold * cfg.cornice_upper_ratio;
-        let held = if scours { 0.0 } else { at(caps, i).mass };
-        let available = (top.mass - top.liquid() - held).max(0.0);
-        if speed <= cfg.wind_threshold || available == 0.0 {
-            continue;
-        }
-        // Pomeroy–Gray equilibrium flux, sent to adjacent columns in the wind direction.
-        let critical = cfg.wind_threshold;
-        let flux = 0.68 * air.air_density * critical * (speed * speed - critical * critical)
-            / (cfg.gravity * speed);
-        let sx = air.friction_x / speed;
-        let sz = air.friction_z / speed;
-        let x = i % width;
-        let z = i / width;
-        let face_x = if sx > 0.0 && x + 1 < width {
-            Some(i + 1)
-        } else if sx < 0.0 && x > 0 {
-            Some(i - 1)
+#[repr(C)]
+#[derive(Default)]
+struct Work {
+    columns: f64,
+    layers: f64,
+    conduction_interfaces: f64,
+    paired_interfaces: f64,
+    bisection_iterations: f64,
+}
+
+impl Job {
+    fn nonzero_width(&self) -> core::num::NonZeroUsize {
+        if let Some(width) = core::num::NonZeroUsize::new(self.width) {
+            width
         } else {
-            None
-        };
-        let face_z = if sz > 0.0 && z + 1 < depth {
-            Some(i + width)
-        } else if sz < 0.0 && z > 0 {
-            Some(i - width)
-        } else {
-            None
-        };
-        let share_x = if face_x.is_some() { sx.abs() } else { 0.0 };
-        let share_z = if face_z.is_some() { sz.abs() } else { 0.0 };
-        let shares = share_x + share_z;
-        if shares == 0.0 {
-            continue;
+            core::arch::wasm32::unreachable()
         }
-        let moved = (dt * flux * shares / cfg.spacing).min(available);
-        let solid = Pack {
-            mass: moved,
-            heat: top.heat.min(0.0) * moved / top.mass,
-            depth: top.depth * moved / (top.mass - top.liquid()),
-        };
-        top.take(solid);
-        if scours {
-            let cap = at_mut(caps, i);
-            if cap.mass > 0.0 {
-                let remaining = (cap.mass - moved).max(0.0) / cap.mass;
-                cap.mass *= remaining;
-                cap.east *= remaining;
-                cap.south *= remaining;
+    }
+
+    fn count(&self) -> Option<usize> {
+        let count = self.width.checked_mul(self.depth)?;
+        let words = count.checked_mul(self.layers)?;
+        if words == 0
+            || words > isize::MAX as usize / size_of::<Pack>()
+            || count > isize::MAX as usize / size_of::<Forcing>()
+        {
+            None
+        } else {
+            Some(count)
+        }
+    }
+
+    // Runs on the caller before the barrier. Each ordered drift source may write its neighbours.
+    unsafe fn prepare(&self, count: usize) {
+        let width = self.nonzero_width().get();
+        let depth = self.depth;
+        let layers = self.layers;
+        let dt = self.dt;
+        let pack = unsafe { slice::from_raw_parts_mut(self.packs, count * layers) };
+        let caps = unsafe { slice::from_raw_parts_mut(self.caps, count) };
+        let drift = unsafe { slice::from_raw_parts_mut(self.drift, count) };
+        let forcing = unsafe { slice::from_raw_parts(self.forcing, count) };
+        let cfg = unsafe { &*self.config };
+        drift.fill(Pack::zero());
+
+        for i in 0..count {
+            let air = at(forcing, i);
+            let start = i * layers;
+            let top = at_mut(pack, start);
+            let snow = dt * air.snowfall;
+            top.add(Pack {
+                mass: snow,
+                heat: snow * CI * air.air_celsius.min(0.0),
+                depth: snow / air.fresh_density,
+            });
+            let speed = sqrt(air.friction_x * air.friction_x + air.friction_z * air.friction_z);
+            let mut surface = start;
+            while surface + 1 < start + layers && at(pack, surface).mass == 0.0 {
+                surface += 1;
             }
-        }
-        let mut send = |neighbour: Option<usize>, share: f64, dx: f64, dz: f64| {
-            if let Some(j) = neighbour {
-                let pulse = solid.scale(share / shares);
-                let rim = if !scours
-                    && air.ground - at(forcing, j).ground > cfg.cliff_slope * cfg.spacing
-                {
-                    cfg.cornice_efficiency
-                } else {
-                    0.0
-                };
-                let caught = pulse.scale(rim);
+            let top = at_mut(pack, surface);
+            let scours = speed >= cfg.wind_threshold * cfg.cornice_upper_ratio;
+            let held = if scours { 0.0 } else { at(caps, i).mass };
+            let available = (top.mass - top.liquid() - held).max(0.0);
+            if speed <= cfg.wind_threshold || available == 0.0 {
+                continue;
+            }
+            // Pomeroy–Gray equilibrium saltation flux, accumulated in canonical source order.
+            // See Lehning et al. (2008), §2, for the distinct redistribution mechanisms.
+            let critical = cfg.wind_threshold;
+            let flux = 0.68 * air.air_density * critical * (speed * speed - critical * critical)
+                / (cfg.gravity * speed);
+            let sx = air.friction_x / speed;
+            let sz = air.friction_z / speed;
+            let x = i % width;
+            let z = i / width;
+            let face_x = if sx > 0.0 && x + 1 < width {
+                Some(i + 1)
+            } else if sx < 0.0 && x > 0 {
+                Some(i - 1)
+            } else {
+                None
+            };
+            let face_z = if sz > 0.0 && z + 1 < depth {
+                Some(i + width)
+            } else if sz < 0.0 && z > 0 {
+                Some(i - width)
+            } else {
+                None
+            };
+            let share_x = if face_x.is_some() { sx.abs() } else { 0.0 };
+            let share_z = if face_z.is_some() { sz.abs() } else { 0.0 };
+            let shares = share_x + share_z;
+            if shares == 0.0 {
+                continue;
+            }
+            let moved = (dt * flux * shares / cfg.spacing).min(available);
+            let solid = Pack {
+                mass: moved,
+                heat: top.heat.min(0.0) * moved / top.mass,
+                depth: top.depth * moved / (top.mass - top.liquid()),
+            };
+            top.take(solid);
+            if scours {
                 let cap = at_mut(caps, i);
-                cap.mass += caught.mass;
-                cap.east += dx * caught.mass;
-                cap.south += dz * caught.mass;
-                at_mut(drift, i).add(caught);
-                at_mut(drift, j).add(pulse.scale(1.0 - rim));
+                if cap.mass > 0.0 {
+                    let remaining = (cap.mass - moved).max(0.0) / cap.mass;
+                    cap.mass *= remaining;
+                    cap.east *= remaining;
+                    cap.south *= remaining;
+                }
             }
-        };
-        send(face_x, share_x, sx.signum(), 0.0);
-        send(face_z, share_z, 0.0, sz.signum());
+            let mut send = |neighbour: Option<usize>, share: f64, dx: f64, dz: f64| {
+                if let Some(j) = neighbour {
+                    let pulse = solid.scale(share / shares);
+                    let rim = if !scours
+                        && air.ground - at(forcing, j).ground > cfg.cliff_slope * cfg.spacing
+                    {
+                        cfg.cornice_efficiency
+                    } else {
+                        0.0
+                    };
+                    let caught = pulse.scale(rim);
+                    let cap = at_mut(caps, i);
+                    cap.mass += caught.mass;
+                    cap.east += dx * caught.mass;
+                    cap.south += dz * caught.mass;
+                    at_mut(drift, i).add(caught);
+                    at_mut(drift, j).add(pulse.scale(1.0 - rim));
+                }
+            };
+            send(face_x, share_x, sx.signum(), 0.0);
+            send(face_z, share_z, 0.0, sz.signum());
+        }
     }
 
-    for i in 0..count {
-        let air = at(forcing, i);
-        let start = i * layers;
-        at_mut(pack, start).add(*at(drift, i));
+    // Every participant owns disjoint columns of each mutable plane after preparation.
+    unsafe fn columns(&self, count: usize, part: u32, parts: core::num::NonZeroU32) {
+        let pairs = (count / 2) as u64;
+        let begin = 2 * (pairs * u64::from(part) / u64::from(parts.get())) as usize;
+        let end = 2 * (pairs * u64::from(part + 1) / u64::from(parts.get())) as usize;
+        let has_tail = part + 1 == parts.get() && count % 2 != 0;
+        let columns = end - begin + usize::from(has_tail);
+        let mut work = Work {
+            columns: columns as f64,
+            layers: (columns * self.layers) as f64,
+            ..Work::default()
+        };
+        let dt = self.dt;
+        for i in (begin..end).step_by(2) {
+            let mut a = unsafe { Column::new(self, i) };
+            let mut b = unsafe { Column::new(self, i + 1) };
+            let first = a.first.min(b.first);
+            let last = a.last.max(b.last);
+            for j in (first + 1)..=last {
+                match (a.interface(j, dt), b.interface(j, dt)) {
+                    (Some(left), Some(right)) => {
+                        let (moved_left, moved_right) = conduct_two(&left, &right);
+                        left.accept(a.pack, moved_left);
+                        right.accept(b.pack, moved_right);
+                        work.conduction_interfaces += 2.0;
+                        work.paired_interfaces += 2.0;
+                    }
+                    (Some(link), None) => {
+                        link.accept(a.pack, link.scalar());
+                        work.conduction_interfaces += 1.0;
+                    }
+                    (None, Some(link)) => {
+                        link.accept(b.pack, link.scalar());
+                        work.conduction_interfaces += 1.0;
+                    }
+                    (None, None) => {}
+                }
+            }
+            a.finish(count);
+            b.finish(count);
+        }
+        if has_tail {
+            let mut column = unsafe { Column::new(self, end) };
+            for j in (column.first + 1)..=column.last {
+                if let Some(link) = column.interface(j, dt) {
+                    link.accept(column.pack, link.scalar());
+                    work.conduction_interfaces += 1.0;
+                }
+            }
+            column.finish(count);
+        }
+        if !self.work.is_null() {
+            work.bisection_iterations = work.conduction_interfaces * f64::from(BISECTION_STEPS);
+            unsafe { self.work.add(part as usize).write(work) };
+        }
+    }
+}
+
+struct Column<'a> {
+    job: &'a Job,
+    index: usize,
+    pack: &'a mut [Pack],
+    previous_ice: &'a mut [f64],
+    first: usize,
+    last: usize,
+    previous: usize,
+    drain: f64,
+    drain_heat: f64,
+    unused: f64,
+}
+
+impl<'a> Column<'a> {
+    /// The caller owns this column for the phase and never borrows another participant's pack.
+    unsafe fn new(job: &'a Job, index: usize) -> Self {
+        let layers = job.layers;
+        let start = index * layers;
+        let air = unsafe { &*job.forcing.add(index) };
+        let pack = unsafe { slice::from_raw_parts_mut(job.packs.add(start), layers) };
+        let previous_ice = unsafe { slice::from_raw_parts_mut(job.old_ice.add(start), layers) };
+        let dt = job.dt;
+        at_mut(pack, 0).add(unsafe { *job.drift.add(index) });
         let mut first = layers;
         let mut last = 0;
         for j in 0..layers {
-            let layer = *at(pack, start + j);
-            *at_mut(previous_ice, start + j) = layer.mass - layer.liquid();
+            let layer = *at(pack, j);
+            *at_mut(previous_ice, j) = layer.mass - layer.liquid();
             if layer.mass > 0.0 {
                 first = first.min(j);
                 last = j;
             }
         }
-        let rain = dt * air.rain;
-        let liquid_heat = LF + CW * air.air_celsius.max(0.0);
-        let mut drain = rain;
-        let mut drain_heat = rain * liquid_heat;
+        let drain = dt * air.rain;
+        let drain_heat = drain * (LF + CW * air.air_celsius.max(0.0));
         let mut unused = dt * (air.top_heat + air.bottom_heat);
+        if first < layers {
+            at_mut(pack, first).add(Pack {
+                mass: drain,
+                heat: drain_heat,
+                depth: 0.0,
+            });
+            at_mut(pack, first).heat += dt * air.top_heat;
+            at_mut(pack, last).heat += dt * air.bottom_heat;
+            unused = 0.0;
+        }
+        Self {
+            job,
+            index,
+            pack,
+            previous_ice,
+            first,
+            last,
+            previous: first,
+            drain,
+            drain_heat,
+            unused,
+        }
+    }
+
+    fn interface(&mut self, j: usize, dt: f64) -> Option<Conduction> {
+        if j > self.first && j <= self.last && at(self.pack, j).mass > 0.0 {
+            let previous = self.previous;
+            self.previous = j;
+            Conduction::between(self.pack, previous, j, dt)
+        } else {
+            None
+        }
+    }
+
+    fn finish(self, count: usize) {
+        let i = self.index;
+        let layers = self.job.layers;
+        let start = i * layers;
+        let width = self.job.nonzero_width().get();
+        let depth = self.job.depth;
+        let dt = self.job.dt;
+        let world_dt = self.job.world_dt;
+        let forcing = unsafe { slice::from_raw_parts(self.job.forcing, count) };
+        let air = at(forcing, i);
+        let cfg = unsafe { &*self.job.config };
+        let eta = unsafe { slice::from_raw_parts(self.job.viscosity.add(start), layers) };
+        let strength = unsafe { slice::from_raw_parts(self.job.cohesion.add(start), layers) };
+        let cap = unsafe { &mut *self.job.caps.add(i) };
+        let pack = self.pack;
+        let previous_ice = self.previous_ice;
+        let first = self.first;
+        let last = self.last;
+        let mut drain = self.drain;
+        let mut drain_heat = self.drain_heat;
+        let mut unused = self.unused;
         let mut slab_depth = 0.0;
         let mut slab_mass = 0.0;
         let mut stability = f64::INFINITY;
         if first < layers {
-            at_mut(pack, start + first).add(Pack {
-                mass: rain,
-                heat: rain * liquid_heat,
-                depth: 0.0,
-            });
-            at_mut(pack, start + first).heat += dt * air.top_heat;
-            at_mut(pack, start + last).heat += dt * air.bottom_heat;
-            unused = 0.0;
-            let mut previous = start + first;
-            for j in (first + 1)..=last {
-                let k = start + j;
-                let lower = *at(pack, k);
-                if lower.mass > 0.0 {
-                    let mut updated = lower;
-                    conduct(at_mut(pack, previous), &mut updated, dt);
-                    *at_mut(pack, k) = updated;
-                    previous = k;
-                }
-            }
             let x = i % width;
             let z = i / width;
             let west = if x > 0 { i - 1 } else { i };
@@ -386,7 +618,7 @@ unsafe extern "C" fn snowpack_step(
             drain = 0.0;
             drain_heat = 0.0;
             for j in first..=last {
-                let k = start + j;
+                let k = j;
                 let layer = at_mut(pack, k);
                 layer.add(Pack {
                     mass: drain,
@@ -439,8 +671,8 @@ unsafe extern "C" fn snowpack_step(
             }
             let normal = normal_weight * overburden;
             if normal * slope > 0.0 {
-                let factor = (*at(strength, start + last) + air.support + cfg.friction * normal)
-                    / (normal * slope);
+                let factor =
+                    (*at(strength, last) + air.support + cfg.friction * normal) / (normal * slope);
                 if factor < stability {
                     stability = factor;
                     slab_depth = elevation;
@@ -455,7 +687,7 @@ unsafe extern "C" fn snowpack_step(
         let mut surface = air.air_celsius;
         let mut seen = false;
         for j in 0..layers {
-            let layer = *at(pack, start + j);
+            let layer = *at(pack, j);
             if layer.mass > 0.0 && !seen {
                 surface = layer.temp();
                 seen = true;
@@ -464,8 +696,7 @@ unsafe extern "C" fn snowpack_step(
             depth += layer.depth;
             water += layer.liquid();
         }
-        let top = *at(pack, start);
-        let cap = at_mut(caps, i);
+        let top = *at(pack, 0);
         let fraction = if cap.mass > 0.0 {
             ((top.mass - top.liquid()) / cap.mass).min(1.0)
         } else {
@@ -475,11 +706,12 @@ unsafe extern "C" fn snowpack_step(
         cap.east *= fraction;
         cap.south *= fraction;
         let cross_section = cfg.spacing / (cfg.cornice_density * cfg.cornice_thickness);
-        *at_mut(runoff, i) = drain / (WATER * world_dt);
-        *at_mut(discharge, i) = *at(runoff, i) * cfg.spacing * cfg.spacing;
-        *at_mut(cover, 2 * i) = air.ground as f32;
-        *at_mut(cover, 2 * i + 1) = depth as f32;
-        *at_mut(output, i) = Output {
+        let runoff = drain / (WATER * world_dt);
+        unsafe { *self.job.runoff.add(i) = runoff };
+        unsafe { *self.job.discharge.add(i) = runoff * cfg.spacing * cfg.spacing };
+        unsafe { *self.job.cover.add(2 * i) = air.ground as f32 };
+        unsafe { *self.job.cover.add(2 * i + 1) = depth as f32 };
+        let output = Output {
             mass,
             liquid: water,
             temperature: surface + 273.15,
@@ -493,5 +725,75 @@ unsafe extern "C" fn snowpack_step(
             runoff_energy: drain_heat / world_dt,
             slab_mass,
         };
+        unsafe { *self.job.summary.add(i) = output };
     }
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn snowpack_step(
+    packs: *mut Pack,
+    caps: *mut Cornice,
+    drift: *mut Pack,
+    forcing: *const Forcing,
+    viscosity: *const f64,
+    cohesion: *const f64,
+    old_ice: *mut f64,
+    config: *const Settings,
+    runoff: *mut f64,
+    discharge: *mut f64,
+    summary: *mut Output,
+    cover: *mut f32,
+    width: usize,
+    depth: usize,
+    layers: usize,
+    dt: f64,
+    world_dt: f64,
+    work: *mut Work,
+) -> u32 {
+    let job = Job {
+        packs,
+        caps,
+        drift,
+        forcing,
+        viscosity,
+        cohesion,
+        old_ice,
+        config,
+        runoff,
+        discharge,
+        summary,
+        cover,
+        width,
+        depth,
+        layers,
+        work,
+        dt,
+        world_dt,
+    };
+    let Some(count) = job.count() else { return 1 };
+    unsafe {
+        job.prepare(count);
+        job.columns(count, 0, core::num::NonZeroU32::MIN);
+    }
+    0
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn snowpack_prepare(job: &Job) -> u32 {
+    let Some(count) = job.count() else { return 1 };
+    unsafe { job.prepare(count) };
+    0
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn snowpack_thread_phase(job: &Job, stage: u32, part: u32, parts: u32) -> u32 {
+    let Some(count) = job.count() else { return 1 };
+    let Some(parts) = core::num::NonZeroU32::new(parts) else {
+        return 1;
+    };
+    if stage != 0 || part >= parts.get() {
+        return 1;
+    }
+    unsafe { job.columns(count, part, parts) };
+    0
 }

@@ -12,10 +12,12 @@ export class Snowpack implements Solver<SnowpackParams> {
     readonly columnField: FieldDescriptor;
     private constructor();
     static load(options?: SnowpackLoadOptions): Promise<Snowpack>;
+    [Symbol.dispose](): void;
     describe(): SolverDescription;
     init(host: SolverHost, params: SnowpackParams): void;
     importPorts(): void;
     step(context: StepContext, dt: number): void;
+    readNativeWork(): SnowpackWorkCounts | undefined;
     exportPorts(tick: number): readonly Port[];
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
@@ -54,6 +56,7 @@ export interface SnowpackLayer {
 export interface SnowpackLoadOptions {
     readonly id?: string;
     readonly signal?: AbortSignal;
+    readonly threads?: number;
     readonly inputs?: Readonly<Partial<Record<InputName, SnowpackInput>>>;
     readonly followTerrain?: boolean;
 }
@@ -101,6 +104,19 @@ export interface SnowpackSample {
     readonly runoff: number;
     readonly unusedHeat: number;
     readonly runoffHeat: number;
+}
+
+export interface SnowpackWorkCounts extends SnowpackWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly SnowpackWorkerWork[];
+}
+
+export interface SnowpackWorkerWork {
+    readonly columns: number;
+    readonly layers: number;
+    readonly conductionInterfaces: number;
+    readonly pairedInterfaces: number;
+    readonly bisectionIterations: number;
 }
 
 // Not exported from this entry, but used by the exports above:

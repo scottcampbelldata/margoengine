@@ -115,6 +115,11 @@ type NativePhaseSolver =
       readonly subject: 'Pack ice';
       readonly phaseExport: 'pack_ice_thread_phase';
       readonly phase: 'planar floe drift';
+    }
+  | {
+      readonly subject: 'Snowpack';
+      readonly phaseExport: 'snowpack_thread_phase';
+      readonly phase: 'column enthalpy';
     };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };

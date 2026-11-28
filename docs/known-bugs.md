@@ -24384,3 +24384,7 @@ A narrow moving rain cell kept its cloud-base peak below the cloud even though l
 ### Fixed: ICE-04 pack ice read foreign flow from the world arena and exported a stale origin
 
 Registered flow and rigid rows now use the bank declared by the port. The solver stages positions and forcing values before calling a field, then reacquires the arena views for the step. A late bad flow leaves accepted floes, reaction impulses and work intact. New ports name the live host cell, including after an origin shift or restore. See `packages/physics/tests/coupling/pack-ice.test.js`.
+
+### Fixed: ICE-01 could overwrite accepted snow and runoff during an invalid native step
+
+Snowpack copies registered forcing from the owning memory, then samples wind without retaining that bank's views. Native snow, cover, heat and meltwater update candidate regions. A nonfinite candidate leaves the previous publications and render revision intact. After an origin shift, new ports use the live host cell. See `packages/physics/tests/coupling/snowpack.test.js`.

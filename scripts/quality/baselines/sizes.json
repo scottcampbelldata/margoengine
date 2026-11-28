@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22049824,
+  "total": 22053128,
   "history": [
     {
       "date": "2026-10-24",
@@ -15857,6 +15857,12 @@
       "commit": "storm-sky-step-2",
       "reason": "VolumetricClouds scud under a rain deck (type 'scud', `above`, `shear`; WMO pannus, AMS Glossary scud, Schneider and Vos 2015): gzip measured on the same workstation build (build-modern --only=sky) from the step-1 landing c138b39b0d to now: sky/volumetric-clouds 17,152 to 18,769 B, compat-clouds 30,733 to 32,779, and from their last record cloud-shadows 8,588 to 9,323 and shafts 12,467 to 13,195. The lazy part is now the storm field and the scud shape together (4,617 to 4,763 B; the scud shape alone is a few hundred bytes and loads only for a scud layer), so the base rows are renamed: volumetric-clouds base 14,586, compat-clouds base 28,344, cloud-shadows base 5,169, shafts base 9,075. Ceilings to measured plus headroom. The base bytes are the layer link (upper deck transmittance, base glow, ground lights through the lower layer), the air band between layers, the camera-ordered draw, the linked environment-map shader, the `shear` lean in the shared cloud field and the type's defaults and checks; they run in the shaders and uniform the entry already builds, and every linked or sheared layer uses them, so a split would add a second pipeline build to each storm scene. Core and stage unchanged.",
       "grew": 12
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "ice-01-native-snow-columns",
+      "reason": "ICE-01 @margoengine/physics/snowpack 4916 to 8220 B gzip, ceiling 5172 to 8476 B. Snowpack stages its native candidate snow, cover, enthalpy and discharge as one state. Splitting would duplicate column and phase coupling. Optional helpers evolve disjoint columns after ordered drift and preserve the deterministic solver. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16777,7 +16783,7 @@
     "@margoengine/physics/sediment": 8037,
     "@margoengine/physics/seismic": 5266,
     "@margoengine/physics/ship": 36541,
-    "@margoengine/physics/snowpack": 5172,
+    "@margoengine/physics/snowpack": 8476,
     "@margoengine/physics/soft": 193804,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 65533,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 127671,

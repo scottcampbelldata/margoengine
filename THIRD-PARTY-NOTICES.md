@@ -696,3 +696,7 @@ Its figures, PDF, fitted curves and software are absent from the package.
 ### ICE-04 measured towing resistance
 
 Yanzhuo Xue, Kai Zhong, Bao-Yu Ni, Zhiyuan Li, Martin Bergström, Jonas W. Ringsberg and Luofeng Huang (2024), [Ocean Engineering 292, 116476](https://doi.org/10.1016/j.oceaneng.2023.116476), CC BY 4.0. The diagnostic transcribes four measured model-tow resistance values and their repeated-trial uncertainty in Table 3. Geometry, floe properties and measured friction come from the experimental setup. The diagnostic implements the comparison in Margo.
+
+### ICE-01 Col de Porte snowpack observations
+
+Samuel Morin, Yves Lejeune, Bernard Lesaffre, Jean-Michel Panel, Daniel Poncet, Pierre David and Marcel Sudul (2012), [Col de Porte meteorology and snow measurements](https://doi.org/10.1594/PANGAEA.774249), CC BY 3.0. The diagnostic separately downloads the hourly forcing, hourly snow depth and daily snow water equivalent. It reads initialization values once and uses later observations only for comparison. [Dataset paper](https://doi.org/10.5194/essd-4-13-2012)

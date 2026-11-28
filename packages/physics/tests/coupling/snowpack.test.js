@@ -279,3 +279,96 @@ test('both slot-free binary variants leave every byte of populated world memory 
     assert.deepEqual(bytes, expected);
   }
 });
+
+test('foreign snowpack heat, memory growth and a late native overflow preserve accepted outputs', async () => {
+  const memory = worldMemory(false);
+  const world = worldWith({ memory });
+  const bank = new WebAssembly.Memory({ initial: 1 });
+  const heat = {
+    name: 'probe:heat',
+    kind: 'uniformGrid',
+    quantity: 'energyFlux',
+    unit: 'W/m^2',
+    centring: 'cell',
+  };
+  const region = {
+    name: 'foreign heat',
+    type: 'f64',
+    layout: 1,
+    byteOffset: 192,
+    byteLength: 16,
+    memory: bank,
+  };
+  const watts = new Float64Array(bank.buffer, region.byteOffset, 2);
+  watts.set([500, 100]);
+  let grow = true;
+  const wind = {
+    medium: 'air',
+    cell: [0, 0, 0],
+    sample(_x, _y, _z, _time, out) {
+      if (grow) {
+        grow = false;
+        memory.grow(1);
+      }
+      out.velocity[0] = 0;
+      out.velocity[2] = 0;
+      out.density = 1.225;
+      return out;
+    },
+  };
+  const pack = add(world, await Snowpack.load({ inputs: { topHeat: { field: heat } } }), {
+    width: 2,
+    depth: 1,
+    wind,
+    secondsPerSecond: 6000,
+    layers: [{ mass: 10, density: 250, temperature: freeze - 5 }],
+  });
+  const port = { field: heat.name, region, tick: 0, cell: [0, 0, 0] };
+  const context = { tick: 0, level: 0, cell: [0, 0, 0], seed: 2, inputs: new Map([[heat.name, port]]) };
+  pack.step(context, dt);
+  assert.equal(grow, false);
+  assert.ok(pack.read(0, 0).temperature > pack.read(1, 0).temperature);
+  const accepted = world.takeSnapshot();
+  const acceptedCover = pack.fieldData();
+  const version = pack.version;
+  watts[1] = Number.MAX_VALUE;
+  assert.throws(
+    () => pack.step({ ...context, tick: 1 }, dt),
+    (error) => error.name === 'MargoError' && error.code === 'failed' && /Reduce.*errors#snowpack/.test(error.message),
+  );
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+  assert.deepEqual(pack.fieldData(), acceptedCover);
+  assert.equal(pack.version, version);
+  watts[1] = 100;
+  pack.step({ ...context, tick: 1 }, dt);
+  const corrected = world.takeSnapshot().bytes;
+  assert.notDeepEqual(corrected, accepted.bytes);
+  world.restoreSnapshot(accepted.bytes);
+  pack.step({ ...context, tick: 1 }, dt);
+  assert.deepEqual(world.takeSnapshot().bytes, corrected);
+});
+
+test('snowpack publications retain the correct signed host cell through a shift and restore', async () => {
+  const world = worldWith();
+  const pack = add(world, await Snowpack.load(), { layers: [{ mass: 1 }] });
+  world.setCell('snowpack', [-2, 1, 3]);
+  world.advance(1);
+  const accepted = world.takeSnapshot();
+  const cover = pack.fieldData();
+  assert.deepEqual(
+    pack.exportPorts(1).map(({ cell }) => cell),
+    Array(4).fill([-2, 1, 3]),
+  );
+  world.shiftOrigin([5, 2, -3]);
+  assert.deepEqual(
+    pack.exportPorts(1).map(({ cell }) => cell),
+    Array(4).fill([-7, -1, 6]),
+  );
+  assert.deepEqual(pack.fieldData(), cover);
+  world.restoreSnapshot(accepted.bytes);
+  assert.deepEqual(
+    pack.exportPorts(1).map(({ cell }) => cell),
+    Array(4).fill([-2, 1, 3]),
+  );
+  assert.deepEqual(pack.fieldData(), cover);
+});

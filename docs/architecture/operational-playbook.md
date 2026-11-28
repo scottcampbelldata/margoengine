@@ -12274,3 +12274,7 @@ The existing falling Rust kernel partitions its RK4 body rows in shared memory a
 ### ICE-04 native pack drift and ordered contact
 
 The pack-ice kernel splits only its independent planar drift rows between native participants. Each substep joins before ordered grid insertion and contact, then commits floes, metrics and vessel impulses together. Registered input banks and the live solver cell are explicit. Node and live Chromium compare replay on the shared variants. The independent model tank checks resistance change by concentration and retains the observed friction sensitivity.
+
+### ICE-01 accepted snowpack heat, cover and water
+
+Snowpack reads forcing from its owning memory and copies it before callbacks, uses ordered surface transport, and joins independent native column solves before accepting a step. Published cover and runoff change together after the candidate finite check. The fixed-camera scene exercises live atmospheric heat and shallow-water coupling on both renderers. The independent station comparison retains the warm water-equivalent bias in the limits record.

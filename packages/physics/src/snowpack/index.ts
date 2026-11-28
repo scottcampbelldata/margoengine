@@ -1,9 +1,8 @@
-import { MargoError } from '@margoengine/math/errors';
 import type { Wind } from '@margoengine/math/fields';
 import { gravityMagnitude } from '@margoengine/math/gravity';
 import { exp, ln, pow } from '@margoengine/math/pinned';
 import { BED_FIELD, BED_LAYOUT } from '../earth/bed.js';
-import { canShareMemory, isShared, regionWords, STACK_BYTES } from '../world/memory.js';
+import { regionWords } from '../world/memory.js';
 import type {
   Cell,
   FieldDescriptor,
@@ -16,13 +15,17 @@ import type {
   StepContext,
 } from '../world/solver.js';
 
+import { snowpackError } from './errors.js';
+import { bindSnowpackKernel, loadSnowpackBuilds, type SnowpackBuilds, type SnowpackWorkCounts } from './kernel.js';
+
+export type { SnowpackWorkCounts, SnowpackWorkerWork } from './kernel.js';
+
 const FREEZING = 273.15;
 const FUSION = 333700;
 const ICE_CP = 2100;
 const LAYOUT = 1;
 const INPUT = 11;
 const OUTPUT = 12;
-const ORIGIN: Cell = [0, 0, 0];
 
 /** A scalar over the pack or a row-major array with x increasing fastest. */
 export type SnowpackGridValue = number | ArrayLike<number>;
@@ -122,6 +125,8 @@ export interface SnowpackInput {
 export interface SnowpackLoadOptions {
   readonly id?: string;
   readonly signal?: AbortSignal;
+  /** Native participants including the caller. Use 1 (default), 2 or 4 with shared memory. */
+  readonly threads?: number;
   readonly inputs?: Readonly<Partial<Record<InputName, SnowpackInput>>>;
   /** Read heights from a same-cell TerrainBed with the same cell counts and spacing. Default false. */
   readonly followTerrain?: boolean;
@@ -150,33 +155,9 @@ export interface SnowpackSample {
   readonly runoffHeat: number;
 }
 
-interface Kernel extends WebAssembly.Exports {
-  snowpack_step(
-    pack: number,
-    caps: number,
-    drift: number,
-    forcing: number,
-    viscosity: number,
-    cohesion: number,
-    oldIce: number,
-    config: number,
-    runoff: number,
-    discharge: number,
-    summary: number,
-    cover: number,
-    width: number,
-    depth: number,
-    layers: number,
-    dt: number,
-    worldDt: number,
-  ): void;
-  readonly __stack_pointer: WebAssembly.Global;
-  readonly __data_end: WebAssembly.Global;
-}
-
 interface State {
   readonly host: SolverHost;
-  readonly kernel: Kernel;
+  readonly kernel: ReturnType<typeof bindSnowpackKernel>;
   readonly width: number;
   readonly depth: number;
   readonly spacing: number;
@@ -202,19 +183,19 @@ interface State {
   readonly summary: Region;
   readonly cover: Region;
   readonly clock: Region;
+  readonly stagedForcing: Float64Array;
+  readonly trial: Pick<State, 'pack' | 'cornices' | 'runoff' | 'discharge' | 'summary' | 'cover'>;
 }
 
 function checked(label: string, value: number, min = -Infinity, max = Infinity): number {
   if (!Number.isFinite(value) || value < min || value > max)
-    throw new RangeError(
-      `Invalid snowpack ${label}; pass finite values from ${min} to ${max} in the documented units.`,
-    );
+    throw snowpackError(`Invalid snowpack ${label}; pass finite values from ${min} to ${max} in the documented units.`);
   return value;
 }
 
 function gridValue(value: SnowpackGridValue, i: number, n: number, name: string, min?: number, max?: number): number {
-  if (typeof value !== 'number' && value.length !== n)
-    throw new RangeError(`Invalid snowpack ${name} length; supply a scalar or ${n} column values.`);
+  if (typeof value !== 'number' && value?.length !== n)
+    throw snowpackError(`Invalid snowpack ${name} length; supply a scalar or ${n} column values.`);
   return checked(name, typeof value === 'number' ? value : value[i]!, min, max);
 }
 
@@ -222,24 +203,20 @@ function words(s: State, region: Region): Float64Array {
   return regionWords(s.host.memory, region) as Float64Array;
 }
 
-function descriptor(name: string, quantity: string, unit: string): FieldDescriptor {
-  return { name, quantity, unit, kind: 'uniformGrid', centring: 'cell' };
+function inputWords(s: State, port: Port) {
+  try {
+    return regionWords(port.region.memory ?? s.host.memory, port.region);
+  } catch (cause) {
+    throw snowpackError(
+      'The snowpack input region is outside or misaligned. Publish its region with the memory that owns it.',
+      'state',
+      cause,
+    );
+  }
 }
 
-async function loadModule(url: URL, signal?: AbortSignal): Promise<WebAssembly.Module> {
-  signal?.throwIfAborted();
-  if (url.protocol === 'file:') {
-    const node = 'node:fs/promises';
-    const { readFile } = await import(/* @vite-ignore */ node);
-    return WebAssembly.compile(await readFile(url, { signal }));
-  }
-  const response = await fetch(url, { signal });
-  if (!response.ok)
-    throw new MargoError(
-      'failed',
-      'Snowpack Wasm could not be fetched; serve both assets with the optional snowpack entry.',
-    );
-  return WebAssembly.compile(await response.arrayBuffer());
+function descriptor(name: string, quantity: string, unit: string): FieldDescriptor {
+  return { name, quantity, unit, kind: 'uniformGrid', centring: 'cell' };
 }
 
 /** Layered snow mass, enthalpy and settling with conservative surface drift and runoff. */
@@ -256,10 +233,12 @@ export class Snowpack implements Solver<SnowpackParams> {
   private readonly inputs: readonly (readonly [InputName, Required<SnowpackInput>])[];
   private readonly flowSample = { velocity: [0, 0, 0] as [number, number, number], density: 0, temperature: 0 };
   private state?: State;
+  private stepping = false;
+  private disposed = false;
+  private nativeWork?: SnowpackWorkCounts;
 
   private constructor(
-    private readonly plain: WebAssembly.Module,
-    private readonly shared: WebAssembly.Module | undefined,
+    private readonly builds: SnowpackBuilds,
     options: SnowpackLoadOptions,
   ) {
     this.id = options.id ?? 'snowpack';
@@ -271,10 +250,12 @@ export class Snowpack implements Solver<SnowpackParams> {
     this.inputs = (Object.keys(SOURCES) as InputName[]).flatMap((name) => {
       const input = options.inputs?.[name];
       if (!input) return [];
+      if (!(typeof input.field?.name === 'string' && input.field.name.length > 0))
+        throw snowpackError('A snowpack input needs a registered field. Pass its field descriptor.');
       const unit = SOURCES[name].unit;
       const waterEquivalent = (name === 'rain' || name === 'snowfall') && input.field.unit === 'm/s';
       if (!waterEquivalent && input.field.unit !== unit)
-        throw new RangeError(`Invalid snowpack ${name} field; bind a field with unit ${unit}.`);
+        throw snowpackError(`Invalid snowpack ${name} field; bind a field with unit ${unit}.`);
       const weights = [...(input.weights ?? [1])];
       const stride = input.stride ?? weights.length;
       if (
@@ -283,7 +264,7 @@ export class Snowpack implements Solver<SnowpackParams> {
         weights.length === 0 ||
         !weights.every(Number.isFinite)
       )
-        throw new RangeError(
+        throw snowpackError(
           `Invalid snowpack ${name} input layout; give finite weights and a stride of at least their count.`,
         );
       if (waterEquivalent) for (let i = 0; i < weights.length; i++) weights[i]! *= 1000;
@@ -293,15 +274,23 @@ export class Snowpack implements Solver<SnowpackParams> {
 
   /** Load the optional native kernels for the available memory modes. */
   static async load(options: SnowpackLoadOptions = {}): Promise<Snowpack> {
-    const { signal } = options;
-    const [plain, shared] = await Promise.all([
-      loadModule(new URL(/* @vite-ignore */ './snowpack-kernel.wasm?no-inline', import.meta.url), signal),
-      canShareMemory()
-        ? loadModule(new URL(/* @vite-ignore */ './snowpack-kernel-shared.wasm?no-inline', import.meta.url), signal)
-        : undefined,
-    ]);
-    signal?.throwIfAborted();
-    return new Snowpack(plain, shared, options);
+    const id = options.id ?? 'snowpack';
+    if (!(typeof id === 'string' && id.trim().length > 0))
+      throw snowpackError('A snowpack solver ID must be nonempty. Pass a unique name.');
+    const builds = await loadSnowpackBuilds(options.signal, options.threads);
+    try {
+      return new Snowpack(builds, options);
+    } catch (cause) {
+      builds[Symbol.dispose]();
+      throw cause;
+    }
+  }
+
+  /** Release optional helper threads after the world finishes using this solver. */
+  [Symbol.dispose](): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.builds[Symbol.dispose]();
   }
 
   describe(): SolverDescription {
@@ -314,8 +303,32 @@ export class Snowpack implements Solver<SnowpackParams> {
   }
 
   init(host: SolverHost, params: SnowpackParams): void {
-    if (!params) throw new RangeError('Snowpack has no grid; pass width, depth and an optional sample spacing.');
-    const { width, depth } = params;
+    if (this.disposed) throw snowpackError('The snowpack solver was disposed. Load a new instance.', 'disposed');
+    if (this.state && this.builds.pool)
+      throw snowpackError('The snowpack helpers belong to a world. Load a new solver for another world.');
+    try {
+      this.initialize(host, params);
+    } catch (cause) {
+      if (this.builds.pool) this[Symbol.dispose]();
+      throw cause;
+    }
+  }
+
+  private initialize(host: SolverHost, params: SnowpackParams): void {
+    if (!params) throw snowpackError('Snowpack has no grid; pass width, depth and an optional sample spacing.');
+    const { width, depth, wind } = params;
+    if (
+      wind &&
+      !(
+        (wind.medium === undefined || wind.medium === 'air') &&
+        wind.cell?.length === 3 &&
+        wind.cell.every(Number.isSafeInteger) &&
+        typeof wind.sample === 'function'
+      )
+    )
+      throw snowpackError(
+        'Snowpack wind needs an air field with a valid origin. Pass a Wind with a finite cell and sample method.',
+      );
     const count = width * depth;
     const profiles = params.layers ?? [];
     const layers = profiles.length + 1;
@@ -327,13 +340,13 @@ export class Snowpack implements Solver<SnowpackParams> {
       !Number.isSafeInteger(count * layers * 24) ||
       count * layers * 24 >= 0x100000000
     )
-      throw new RangeError(
+      throw snowpackError(
         'Invalid snowpack grid; choose positive whole dimensions and layer state within Wasm32 address space.',
       );
     const spacing = checked('sample spacing', params.cellSize ?? 1, Number.MIN_VALUE);
     const roughness = checked('roughness', params.roughness ?? 0.0001, Number.MIN_VALUE, 10);
     if (roughness === 10)
-      throw new RangeError('Invalid snowpack roughness; use a length below its 10 m sampling height.');
+      throw snowpackError('Invalid snowpack roughness; use a length below its 10 m sampling height.');
     const from = params.origin ?? [0, 0];
     const origin = [checked('origin X', from[0]), checked('origin Z', from[1])] as const;
     const settings = [
@@ -348,21 +361,7 @@ export class Snowpack implements Solver<SnowpackParams> {
       checked('cornice density', params.corniceDensity ?? 300, Number.MIN_VALUE, 917),
       checked('cornice upper wind ratio', params.corniceUpperRatio ?? 2, 1),
     ];
-    const module =
-      isShared(host.memory) || Object.prototype.toString.call(host.memory.buffer) === '[object SharedArrayBuffer]'
-        ? this.shared
-        : this.plain;
-    if (!module)
-      throw new MargoError('unsupported', 'Shared snowpack memory is unavailable; choose a plain world on this host.');
-    const stack = host.allocate('snowpack-stack', STACK_BYTES + 8, 'u8', LAYOUT);
-    const kernel = new WebAssembly.Instance(module, { env: { memory: host.memory } }).exports as Kernel;
-    if (
-      !(kernel.__stack_pointer instanceof WebAssembly.Global) ||
-      !(kernel.__data_end instanceof WebAssembly.Global) ||
-      kernel.__data_end.value !== 0
-    )
-      throw new MargoError('failed', 'Unexpected snowpack Wasm layout; rebuild the slot-free snowpack assets.');
-    kernel.__stack_pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
+    const kernel = bindSnowpackKernel(host, this.builds);
     const allocate = (name: string, n: number): Region => host.allocate(`snowpack-${name}`, 8 * n, 'f64', LAYOUT);
     const wordsPerPack = count * layers;
     const s: State = {
@@ -393,6 +392,15 @@ export class Snowpack implements Solver<SnowpackParams> {
       summary: allocate('summary', OUTPUT * count),
       cover: host.allocate('snowpack-cover', 2 * count * 4, 'f32', LAYOUT),
       clock: allocate('clock', 4),
+      stagedForcing: new Float64Array(INPUT * count),
+      trial: {
+        pack: allocate('trial-pack', 3 * wordsPerPack),
+        cornices: allocate('trial-cornices', 3 * count),
+        runoff: allocate('trial-runoff', count),
+        discharge: allocate('trial-discharge', count),
+        summary: allocate('trial-summary', OUTPUT * count),
+        cover: host.allocate('snowpack-trial-cover', 2 * count * 4, 'f32', LAYOUT),
+      },
     };
     words(s, s.config).set(settings);
     const pack = words(s, s.pack),
@@ -429,7 +437,7 @@ export class Snowpack implements Solver<SnowpackParams> {
         const temperature = value(layer.temperature ?? 268.15, 'layer temperature', Number.MIN_VALUE, FREEZING);
         const liquid = value(layer.liquidFraction ?? 0, 'layer liquid fraction', 0, 1);
         if (liquid > 0 && temperature !== FREEZING)
-          throw new RangeError(
+          throw snowpackError(
             'Invalid wet snow temperature; initialize any liquid water at the melting point (273.15 K).',
           );
         const k = i * layers + j + 1;
@@ -439,8 +447,9 @@ export class Snowpack implements Solver<SnowpackParams> {
         if (layer.viscosity !== undefined) override[k] = value(layer.viscosity, 'layer viscosity', Number.MIN_VALUE);
       }
     }
+    this.run(s, { tick: -1, level: 0, seed: 0, cell: host.cell, inputs: new Map() }, 0);
     this.state = s;
-    this.run(s, { tick: -1, level: 0, seed: 0, cell: ORIGIN, inputs: new Map() }, 0);
+    this.nativeWork = undefined;
   }
 
   importPorts(): void {
@@ -448,11 +457,23 @@ export class Snowpack implements Solver<SnowpackParams> {
   }
 
   step(context: StepContext, dt: number): void {
-    this.run(this.requireState(), context, dt);
+    if (this.disposed) throw snowpackError('The snowpack solver was disposed. Load a new instance.', 'disposed');
+    checked('step duration', dt, Number.MIN_VALUE);
+    if (this.stepping)
+      throw snowpackError(
+        'A snowpack field callback re-entered the step. Sample a separate field during the callback.',
+      );
+    this.stepping = true;
+    try {
+      this.run(this.requireState(), context, dt);
+    } finally {
+      this.stepping = false;
+    }
   }
 
   private run(s: State, context: StepContext, dt: number): void {
-    const input = words(s, s.forcing);
+    const scaledDt = checked('physical step duration', dt * s.timeScale, 0);
+    const input = s.stagedForcing;
     input.set(words(s, s.defaults));
     for (const [name, binding] of this.inputs) {
       const port = context.inputs.get(binding.field.name);
@@ -463,11 +484,11 @@ export class Snowpack implements Solver<SnowpackParams> {
         (region.type !== 'f32' && region.type !== 'f64') ||
         !sameCell(port.cell, context.cell)
       )
-        throw new RangeError(`Invalid snowpack ${name} input; publish a layout-1 float port in the same world cell.`);
-      const values = regionWords(s.host.memory, region);
+        throw snowpackError(`Invalid snowpack ${name} input; publish a layout-1 float port in the same world cell.`);
+      const values = inputWords(s, port);
       const uniform = values.length === binding.stride;
       if (!uniform && values.length !== binding.stride * s.count)
-        throw new RangeError(`Invalid snowpack ${name} input size; send one patch or one value row for each column.`);
+        throw snowpackError(`Invalid snowpack ${name} input size; send one patch or one value row for each column.`);
       const spec = SOURCES[name];
       for (let i = 0; i < s.count; i++) {
         const start = uniform ? 0 : i * binding.stride;
@@ -485,19 +506,19 @@ export class Snowpack implements Solver<SnowpackParams> {
         region.byteLength !== 4 * (s.width + 1) * (s.depth + 1) ||
         !sameCell(bed.cell, context.cell)
       )
-        throw new RangeError('Invalid snowpack terrain port; attach a matching TerrainBed in the same world cell.');
-      const height = regionWords(s.host.memory, region);
+        throw snowpackError('Invalid snowpack terrain port; attach a matching TerrainBed in the same world cell.');
+      const height = inputWords(s, bed);
       const stride = s.depth + 1;
       // A cell centre falls on the same diagonal used by the TerrainBed triangles.
       for (let z = 0; z < s.depth; z++)
         for (let x = 0; x < s.width; x++) {
           const low = z + x * stride;
-          input[INPUT * (x + z * s.width)] = 0.5 * (height[low + 1]! + height[low + stride]!);
+          input[INPUT * (x + z * s.width)] = checked(
+            'terrain height',
+            0.5 * (height[low + 1]! + height[low + stride]!),
+          );
         }
     }
-    const eta = words(s, s.viscosity),
-      override = words(s, s.prescribedViscosity),
-      packs = words(s, s.pack);
     const wind = s.wind;
     for (let i = 0; i < s.count; i++) {
       const k = INPUT * i;
@@ -505,17 +526,38 @@ export class Snowpack implements Solver<SnowpackParams> {
       if (input[k + 6] === 0) input[k + 6] = 67.92 + 51.25 * exp(Math.min(0, air) / 2.59);
       if (wind && dt > 0) {
         const shift = (axis: number) => (context.cell[axis]! - wind.cell[axis]!) * s.worldCellSize;
-        const gust = wind.sample(
-          s.origin[0] + (i % s.width) * s.spacing + shift(0),
-          input[k]! + 10 + shift(1),
-          s.origin[1] + Math.floor(i / s.width) * s.spacing + shift(2),
-          context.tick * dt,
-          this.flowSample,
-        );
+        let gust: ReturnType<Wind['sample']>;
+        try {
+          gust = wind.sample(
+            s.origin[0] + (i % s.width) * s.spacing + shift(0),
+            input[k]! + 10 + shift(1),
+            s.origin[1] + Math.floor(i / s.width) * s.spacing + shift(2),
+            context.tick * dt,
+            this.flowSample,
+          );
+        } catch (cause) {
+          throw snowpackError(
+            'A snowpack wind sample failed. Supply an air field that covers the requested coordinates and time.',
+            'failed',
+            cause,
+          );
+        }
+        if (!gust?.velocity || gust.velocity.length !== 3)
+          throw snowpackError(
+            'Snowpack wind returned an invalid velocity. Supply three finite components and an air density.',
+          );
         input[k + 7] = checked('wind X', gust.velocity[0]) * s.windToFriction;
         input[k + 8] = checked('wind Z', gust.velocity[2]) * s.windToFriction;
         input[k + 9] = checked('air density', gust.density, 0);
       }
+    }
+    words(s, s.forcing).set(input);
+    const eta = words(s, s.viscosity);
+    const override = words(s, s.prescribedViscosity);
+    const packs = words(s, s.pack);
+    for (let i = 0; i < s.count; i++) {
+      const k = INPUT * i;
+      const air = input[k + 3]!;
       for (let j = 0; j < s.layers; j++) {
         const layer = i * s.layers + j;
         const mass = packs[3 * layer]!,
@@ -524,35 +566,77 @@ export class Snowpack implements Solver<SnowpackParams> {
         const solid = mass - Math.min(mass, Math.max(0, energy / FUSION));
         const density = solid > 0 && volume > 0 ? solid / volume : input[k + 6]!;
         const temperature = mass > 0 ? Math.min(0, energy / (ICE_CP * mass)) : Math.min(0, air);
-        eta[layer] = override[layer] || 0.007 * pow(density, 4.75 - temperature / 40);
+        eta[layer] =
+          override[layer] ||
+          checked('layer viscosity', 0.007 * pow(density, 4.75 - temperature / 40), Number.MIN_VALUE);
       }
     }
-    s.kernel.snowpack_step(
-      s.pack.byteOffset,
-      s.cornices.byteOffset,
+    const { trial } = s;
+    words(s, trial.pack).set(packs);
+    words(s, trial.cornices).set(words(s, s.cornices));
+    const status = s.kernel.snowpack_step(
+      trial.pack.byteOffset,
+      trial.cornices.byteOffset,
       s.drift.byteOffset,
       s.forcing.byteOffset,
       s.viscosity.byteOffset,
       s.cohesion.byteOffset,
       s.priorIce.byteOffset,
       s.config.byteOffset,
-      s.runoff.byteOffset,
-      s.discharge.byteOffset,
-      s.summary.byteOffset,
-      s.cover.byteOffset,
+      trial.runoff.byteOffset,
+      trial.discharge.byteOffset,
+      trial.summary.byteOffset,
+      trial.cover.byteOffset,
       s.width,
       s.depth,
       s.layers,
-      dt * s.timeScale,
+      scaledDt,
       dt || 1,
     );
+    if (status !== 0)
+      throw snowpackError(
+        'The native snowpack step failed. Check shared memory and use finite physical inputs.',
+        'failed',
+      );
+    this.publishTrial(s);
     words(s, s.clock).set([...context.cell, context.tick + 1]);
+    if (dt > 0) this.nativeWork = s.kernel.workCounts();
+  }
+
+  /** Copy the native work completed during the last accepted physical step. */
+  readNativeWork(): SnowpackWorkCounts | undefined {
+    const work = this.nativeWork;
+    return work && { ...work, workers: work.workers.map((worker) => ({ ...worker })) };
+  }
+
+  private publishTrial(s: State): void {
+    const { trial } = s;
+    const depth = regionWords(s.host.memory, trial.cover) as Float32Array;
+    if (
+      !words(s, trial.pack).every(Number.isFinite) ||
+      !words(s, trial.cornices).every(Number.isFinite) ||
+      !words(s, trial.runoff).every(Number.isFinite) ||
+      !words(s, trial.discharge).every(Number.isFinite) ||
+      !depth.every(Number.isFinite) ||
+      !words(s, trial.summary).every(
+        (value, slot) => Number.isFinite(value) || (slot % OUTPUT === 4 && value === Infinity),
+      )
+    )
+      throw snowpackError(
+        'The snowpack step exceeded its finite range. Reduce the forcing, physical time scale or extreme input sizes.',
+        'failed',
+      );
+    words(s, s.pack).set(words(s, trial.pack));
+    words(s, s.cornices).set(words(s, trial.cornices));
+    words(s, s.runoff).set(words(s, trial.runoff));
+    words(s, s.discharge).set(words(s, trial.discharge));
+    words(s, s.summary).set(words(s, trial.summary));
+    (regionWords(s.host.memory, s.cover) as Float32Array).set(depth);
   }
 
   exportPorts(tick: number): readonly Port[] {
     const s = this.requireState();
-    const [x, y, z] = words(s, s.clock);
-    const cell: Cell = [x!, y!, z!];
+    const cell = s.host.cell;
     return [
       { field: this.runoffField.name, region: s.runoff, tick, cell },
       { field: this.dischargeField.name, region: s.discharge, tick, cell },
@@ -586,7 +670,7 @@ export class Snowpack implements Solver<SnowpackParams> {
   read(x: number, z: number): SnowpackSample {
     const s = this.requireState();
     if (!Number.isInteger(x) || !Number.isInteger(z) || x < 0 || x >= s.width || z < 0 || z >= s.depth)
-      throw new RangeError('Invalid snowpack column; pass whole X and Z indices inside the grid.');
+      throw snowpackError('Invalid snowpack column; pass whole X and Z indices inside the grid.');
     const i = x + z * s.width;
     const row = words(s, s.summary).subarray(i * OUTPUT, (i + 1) * OUTPUT);
     return {
@@ -619,7 +703,7 @@ export class Snowpack implements Solver<SnowpackParams> {
       layer < 0 ||
       layer >= s.layers
     )
-      throw new RangeError('Invalid snowpack layer; pass whole X, Z and layer indices inside the model.');
+      throw snowpackError('Invalid snowpack layer; pass whole X, Z and layer indices inside the model.');
     const words = regionWords(s.host.memory, s.pack);
     const start = 3 * (layer + s.layers * (x + z * s.width));
     return [words[start]!, words[start + 1]!, words[start + 2]!];
@@ -669,8 +753,7 @@ export class Snowpack implements Solver<SnowpackParams> {
   }
 
   private requireState(): State {
-    if (!this.state)
-      throw new MargoError('state', 'Snowpack is not attached; add it to a PhysicsWorld with a grid first.');
+    if (!this.state) throw snowpackError('Snowpack is not attached; add it to a PhysicsWorld with a grid first.');
     return this.state;
   }
 }

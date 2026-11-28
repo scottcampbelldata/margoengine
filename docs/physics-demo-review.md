@@ -527,3 +527,8 @@ Not in the catalog: staged construction (placement of pieces, stacking, scaffold
 
 - `packages/water/test/pack-ice-film.browser.mjs` displays accepted floe poses, ridge volume and a real rigid launch in a fixed camera. Floes move aside and their reaction slows the launch. The control retains the same initial ice and vessel but withholds vessel contact. Both backends replay complete accepted state and frames independently.
 - The cutaway shows fixed-mass disk contacts and two-dimensional piling. Floe fracture, wave-mediated overturning, under-hull transport and original shot integration remain open.
+
+### ICE-01 automated snowmelt and basin flow
+
+- `packages/weather/tests/snowmelt-film.browser.mjs` links accepted atmospheric heat to snowmelt and routes registered discharge into real shallow water. Weather Snow and Water each read accepted fields. WebGPU and WebGL2 independently reproduce all accepted snapshot bytes and full frames. The matched cold take remains snow-covered and dry.
+- The authored basin sends each outlet's volume once, under the illustrated routing. Snow time advances at four simulated hours per screen second. The receiving water remains on its ordinary clock. The original film shots and avalanche release remain open.

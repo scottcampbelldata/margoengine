@@ -15794,8 +15794,8 @@
         "gzip": 5197
       },
       "./snowpack": {
-        "raw": 11964,
-        "gzip": 4916
+        "raw": 21766,
+        "gzip": 8220
       },
       "./airborne": {
         "raw": 28184,
@@ -19485,14 +19485,14 @@
       "brotli": 7569
     },
     "packages/physics/dist/snowpack-kernel.wasm": {
-      "raw": 6455,
-      "gzip": 2811,
-      "brotli": 2595
+      "raw": 11383,
+      "gzip": 4552,
+      "brotli": 4107
     },
     "packages/physics/dist/snowpack-kernel-shared.wasm": {
-      "raw": 6455,
-      "gzip": 2811,
-      "brotli": 2611
+      "raw": 11383,
+      "gzip": 4552,
+      "brotli": 4109
     },
     "packages/physics/dist/glacier-kernel.wasm": {
       "raw": 15437,

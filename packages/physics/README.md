@@ -7108,7 +7108,7 @@ import { Snowpack } from '@margoengine/physics/snowpack';
 import { PhysicsWorld } from '@margoengine/physics/world';
 
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
-const snowpack = await Snowpack.load();
+using snowpack = await Snowpack.load({ threads: 1 });
 world.add(snowpack, {
   width: 3, depth: 3, cellSize: 4, origin: [-4, -4],
   layers: [{ mass: 50, density: 250, temperature: 273.15 }],
@@ -7132,6 +7132,8 @@ or one row for each column. Bind `SurfaceEnergySolver.energyFluxField` as `topHe
 - `columnField` gives layout-1 f64 rows of mass, liquid, temperature, depth, stability, slab depth, the X and Z overhang,
   overhang mass, unused heat, drained heat and slab mass. `read(column, row)` exposes the same values with units and
   `layer(column, row, layer)` gives the physical layer's mass, enthalpy and depth.
+
+Snowpack loads one native participant by default. Set `threads` to 2 or 4 in Node or an isolated browser worker with a shared-memory world. Surface saltation uses its original order. Workers update independent layers in their own columns. `readNativeWork()` copies the counts from the last accepted physical step. Dispose the solver after the world has finished with it. A rejected input leaves accepted cover and discharge available to readers.
 
 ## Aeolian transport
 
