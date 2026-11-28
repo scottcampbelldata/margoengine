@@ -481,8 +481,6 @@ function writeOrCompare() {
         mergeScopedApiSurface(readFileSync(join(root, 'docs', 'api-surface.md'), 'utf8'), {
           packageName: scopedPackage.name,
           row: surfaceRow(reports[0]),
-          entries: reports[0].length,
-          exports: reports[0].reduce((sum, item) => sum + item.counts.exports, 0),
         }),
         entrySizes(),
       )

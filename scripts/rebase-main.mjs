@@ -16,7 +16,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { mergeApiSurfaceRows } from './api-report-scope.mjs';
+import { mergeApiSurfaceRows, surfaceCountConflicts, withSurfaceTotals } from './api-report-scope.mjs';
 import { historyMissing, historyRepeated, staleTotal } from './quality/ratchet.js';
 import { conflictMarkers } from './support/conflict-markers.mjs';
 
@@ -125,16 +125,20 @@ function regenerate() {
       shell: process.platform === 'win32',
     });
   if (hit(/^docs\/guides\/imports\.md$/)) script('scripts/umbrella.mjs');
+  // Rows whose summed counts the two sides changed differently: only their package's report gives the figure.
+  let recount = [];
   if (branch.includes(SURFACE) && upstream.has(SURFACE)) {
     const base = git(['merge-base', onto, head]).stdout.trim();
     const [before, theirs, mine] = [base, onto, head].map((rev) => git(['show', `${rev}:${SURFACE}`]).stdout);
     writeFileSync(resolve(root, SURFACE), mergeApiSurfaceRows(before, theirs, mine));
+    recount = surfaceCountConflicts(before, theirs, mine).map((name) => name.replace('@margoengine/', ''));
   }
   // A report only one side changed is already right. One both sides changed is built again, for its package alone, so
   // a re-export package (margoengine, a kit) only when its own report changed on both sides.
   const packages = new Set(
     [...conflicts, ...branch.filter((file) => upstream.has(file))]
       .map((file) => /^api\/([^./]+)[^/]*\.api\.md$/.exec(file)?.[1])
+      .concat(recount)
       .filter((name) => name && existsSync(resolve(root, 'packages', name, 'package.json'))),
   );
   console.log(`rebase:main: API reports to build: ${[...packages].sort().join(', ') || 'none'}`);
@@ -317,6 +321,29 @@ function refreshBaselineTotals() {
   console.log(`rebase:main: ${fixed.join(', ')} held a stale total; set to the sum of its items and committed`);
 }
 
+/**
+ * docs/api-surface.md's totals line must be the sum of its rows. A replay that merges the file without a conflict runs
+ * no generator, and two commits that wrote the same totals line merge to a stale one (KB-REBASE-SURFACE1). It is counted
+ * again here, as its own commit.
+ */
+function refreshSurfaceTotals() {
+  const file = resolve(root, SURFACE);
+  if (!existsSync(file)) return;
+  const text = readFileSync(file, 'utf8'),
+    counted = withSurfaceTotals(text);
+  if (counted === text) return;
+  writeFileSync(file, counted);
+  git(['add', '--', SURFACE]);
+  if (git(['diff', '--cached', '--quiet'], { allowFail: true }).status === 0) return;
+  const commit = commitTree(
+    rev('HEAD'),
+    git(['write-tree']).stdout.trim(),
+    'chore: docs/api-surface.md totals match its rows\n',
+  );
+  git(['update-ref', '-m', 'rebase:main: API surface totals', 'HEAD', commit]);
+  console.log(`rebase:main: ${SURFACE} held stale totals; counted from its rows and committed`);
+}
+
 function main() {
   root = git(['rev-parse', '--show-toplevel']).stdout.trim();
   if (!rebasing() && !existsSync(ledger())) {
@@ -350,6 +377,7 @@ function main() {
   refreshErrorsPage();
   refreshSizesPage();
   refreshBaselineTotals();
+  refreshSurfaceTotals();
   const markers = conflictMarkers(root);
   if (markers.length) stop(`Conflict markers are left in:\n  ${markers.join('\n  ')}\nRemove them before you push.`);
   // The commits to push must not delete or revert on a mass scale (the ff88a70e7 sync); a failure stops before "push".

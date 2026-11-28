@@ -405,3 +405,49 @@ test('a sizes.json ceiling raised without its total gets the total summed, in it
   assert.equal(repo.read(SIZES), sizes({ a: 10, b: 25 }), 'only the total line changes');
   assert.equal(repo.git('log', '-1', '--format=%s').trim(), 'chore: quality baseline totals match their items');
 });
+
+test('two commits that wrote the same api-surface totals line get the totals counted again (KB-REBASE-SURFACE1)', (t) => {
+  // Each side added two exports to its own row and wrote the same totals line, so git merges the file without a conflict.
+  const rows = (biomes, scatter) =>
+    [biomes, 'b', 'c', 'd', 'e', 'f', 'g', 'h', scatter].map((value, index) =>
+      row(`@margoengine/p${index}`, `\`.\` ${typeof value === 'number' ? value : 1}`),
+    );
+  const repo = repository(t, {
+    'docs/a.md': ['a\n', 'a\n', 'a\n'],
+    'docs/b.md': ['b\n', 'b\n', 'b\n'],
+    'site/llms.txt': ['a\nb\n', 'a\nb\n', 'a\nb\n'],
+    'docs/api-surface.md': [
+      surface('9 packages, 9 entries, 15 exported names.', rows(4, 4)),
+      surface('9 packages, 9 entries, 17 exported names.', rows(6, 4)),
+      surface('9 packages, 9 entries, 17 exported names.', rows(4, 6)),
+    ],
+  });
+  const result = repo.rebase();
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(repo.read('docs/api-surface.md'), surface('9 packages, 9 entries, 19 exported names.', rows(6, 6)));
+  assert.equal(repo.git('log', '-1', '--format=%s').trim(), 'chore: docs/api-surface.md totals match its rows');
+  assert.equal(repo.git('status', '--porcelain'), '');
+});
+
+test('an Unexported figure both sides changed alike is counted once, a different one builds the report (KB-REBASE-SURFACE1)', (t) => {
+  // main's webgl2-compat cell read 304, 307, 310, 313 over four landings while the reports held 307.
+  const name = '@margoengine/webgl2-compat';
+  const at = (unexported) => surface('1 packages, 1 entries, 4 exported names.', [row(name, '`.` 4', unexported)]);
+  const alike = repository(t, {
+    ...generators,
+    'docs/api-surface.md': [at(304), at(307), at(307).replace('1,000', '1,001')],
+    'packages/webgl2-compat/package.json': ['{}\n', '{}\n', '{}\n'],
+  });
+  const same = alike.rebase();
+  assert.equal(same.status, 0, same.stderr);
+  assert.equal(alike.read('docs/api-surface.md'), at(307).replace('1,000', '1,001'));
+  assert.equal(reports(alike), '', 'no API report runs');
+  const differing = repository(t, {
+    ...generators,
+    'docs/api-surface.md': [at(304), at(307), at(309)],
+    'packages/webgl2-compat/package.json': ['{}\n', '{}\n', '{}\n'],
+  });
+  const result = differing.rebase();
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(reports(differing), '--update --package=webgl2-compat\n');
+});

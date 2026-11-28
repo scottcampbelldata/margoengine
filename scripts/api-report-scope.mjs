@@ -42,8 +42,8 @@ export function mergeScopedApiSurface(current, replacement) {
   const summaryIndex = lines.findIndex((line) => /\d+ packages, \d+ entries, \d+ exported names\./.test(line));
   if (summaryIndex < 0) throw new Error('docs/api-surface.md has no package summary line');
 
-  const summary = lines[summaryIndex].match(/^(\d+) packages, (\d+) entries, (\d+) exported names\.$/);
-  if (!summary) throw new Error(`Unrecognized API surface summary: ${lines[summaryIndex]}`);
+  if (!/^\d+ packages, \d+ entries, \d+ exported names\.$/.test(lines[summaryIndex]))
+    throw new Error(`Unrecognized API surface summary: ${lines[summaryIndex]}`);
 
   const headerIndex = lines.indexOf('| Package | Exports per entry | Unexported | `any` | Gzip |');
   if (headerIndex < 0) throw new Error('docs/api-surface.md has no package table');
@@ -53,8 +53,6 @@ export function mergeScopedApiSurface(current, replacement) {
 
   const prefix = `| ${replacement.packageName} |`;
   const rowIndex = lines.findIndex((line, index) => index >= firstRow && index < endRow && line.startsWith(prefix));
-  const previous = rowIndex < 0 ? { entries: 0, exports: 0 } : rowCounts(lines[rowIndex]);
-
   if (rowIndex >= 0) lines[rowIndex] = replacement.row;
   else {
     const insertAt = lines.findIndex(
@@ -63,11 +61,47 @@ export function mergeScopedApiSurface(current, replacement) {
     lines.splice(insertAt < 0 ? endRow : insertAt, 0, replacement.row);
   }
 
-  const packageCount = Number(summary[1]) + (rowIndex < 0 ? 1 : 0);
-  const entryCount = Number(summary[2]) - previous.entries + replacement.entries;
-  const exportCount = Number(summary[3]) - previous.exports + replacement.exports;
-  lines[summaryIndex] = `${packageCount} packages, ${entryCount} entries, ${exportCount} exported names.`;
-  return lines.join('\n');
+  return withSurfaceTotals(lines.join('\n'));
+}
+
+const PACKAGE_ROW = /^\| (?:@margoengine\/[^|]+|margoengine) \|/;
+
+/**
+ * docs/api-surface.md text with its totals line counted from the package rows; everything else (line ends too) kept.
+ * The totals are derived, so no merge may carry them: two commits that each added five exports to different rows wrote
+ * the same totals line, git merged it without a conflict and the total stayed five short (KB-REBASE-SURFACE1).
+ */
+export function withSurfaceTotals(text) {
+  const counts = text
+    .split('\n')
+    .filter((line) => PACKAGE_ROW.test(line))
+    .map(rowCounts);
+  const sum = (field) => counts.reduce((total, count) => total + count[field], 0);
+  return text.replace(
+    /^\d+ packages, \d+ entries, \d+ exported names\./m,
+    `${counts.length} packages, ${sum('entries')} entries, ${sum('exports')} exported names.`,
+  );
+}
+
+const surfaceRows = (text) =>
+  new Map(
+    text
+      .replaceAll('\r\n', '\n')
+      .split('\n')
+      .filter((line) => PACKAGE_ROW.test(line))
+      .map((line) => [packageName(line), line]),
+  );
+
+/**
+ * The packages whose Unexported or `any` cell the two sides changed to different figures. Each is a sum over a
+ * package's entries that no merge of the cells can settle for certain, so its report is built again.
+ */
+export function surfaceCountConflicts(base, ours, theirs) {
+  const [b, o, t] = [base, ours, theirs].map(surfaceRows);
+  return [...t.keys()].filter((name) => {
+    const [before, mine, branch] = [b, o, t].map((rows) => (rows.get(name) ?? '||||||').split('|'));
+    return [3, 4].some((c) => mine[c] !== before[c] && branch[c] !== before[c] && mine[c] !== branch[c]);
+  });
 }
 
 /**
@@ -75,27 +109,15 @@ export function mergeScopedApiSurface(current, replacement) {
  * totals line following the rows. scripts/rebase-main.mjs uses it in place of an API report run (KB-REBASE-SLOW1).
  */
 export function mergeApiSurfaceRows(base, ours, theirs) {
-  const rows = (text) =>
-    new Map(
-      text
-        .replaceAll('\r\n', '\n')
-        .split('\n')
-        .filter((line) => /^\| (?:@margoengine\/|margoengine )/.test(line))
-        .map((line) => [packageName(line), line]),
-    );
-  const [b, o, t] = [base, ours, theirs].map(rows);
+  const [b, o, t] = [base, ours, theirs].map(surfaceRows);
   let merged = ours.replaceAll('\r\n', '\n');
   for (const name of new Set([...b.keys(), ...t.keys()])) {
     if (b.get(name) === t.get(name)) continue;
     if (!t.has(name)) throw new Error(`${API_SURFACE}: the branch removed the ${name} row; run npm run api:update`);
     const row = o.has(name) ? mergeRow(b.get(name), o.get(name), t.get(name)) : t.get(name);
-    merged = mergeScopedApiSurface(merged, {
-      packageName: name,
-      row,
-      ...rowCounts(row),
-    });
+    merged = mergeScopedApiSurface(merged, { packageName: name, row });
   }
-  return merged;
+  return withSurfaceTotals(merged);
 }
 
 /** One package row: the branch's entry changes applied to `ours`, its count changes added, a Gzip cell it set kept. */
@@ -118,7 +140,12 @@ function mergeRow(base = '||||||', ours, theirs) {
       list.splice(next ?? list.length, 0, [entry, branch.get(entry)]);
     }
   }
-  const sum = (column) => Number(o[column]) + Number(t[column]) - Number(b[column] ?? 0) || '';
+  // A figure both sides changed alike is one change: adding both differences counted it twice, and once more at each
+  // later rebase (KB-REBASE-SURFACE1).
+  const sum = (column) => {
+    const [from, upstream, replayed] = [b, o, t].map((cells) => Number(cells[column] ?? 0));
+    return (upstream === replayed ? upstream : upstream + replayed - from) || '';
+  };
   o[2] = ` ${list.map(([entry, count]) => `${entry} ${count}`).join(', ')} `;
   o[3] = ` ${sum(3)} `;
   o[4] = ` ${sum(4)} `;
