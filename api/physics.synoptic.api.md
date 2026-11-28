@@ -89,6 +89,14 @@ export class SynopticWeather implements Solver<SynopticParams> {
         water?: boolean;
         signal?: AbortSignal;
     }): Promise<SynopticWeather>;
+    static load(options: {
+        id?: string;
+        water?: boolean;
+        signal?: AbortSignal;
+        threads?: 1 | 2 | 4;
+    }): Promise<SynopticWeather>;
+    [Symbol.dispose](): void;
+    readNativeWork(): SynopticWorkCounts | undefined;
     describe(): {
         id: string;
         rate: 0;
@@ -126,6 +134,17 @@ export class SynopticWeather implements Solver<SynopticParams> {
         substeps: number;
     };
     get layerSubsteps(): number;
+}
+
+export interface SynopticWorkCounts extends SynopticWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly SynopticWorkerWork[];
+}
+
+export interface SynopticWorkerWork {
+    readonly rows: number;
+    readonly pairedRows: number;
+    readonly layerRows: number;
 }
 
 // Not exported from this entry, but used by the exports above:

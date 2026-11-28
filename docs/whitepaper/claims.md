@@ -7248,3 +7248,7 @@ The legged wrapper checks signed intent, load and rigid rows before preparing it
 ### LIFE-05 accepted pedestrian publication and measured headway gap
 
 The pedestrian solver reads signed force and intent rows from their owning memory. Ground callbacks can grow the arena, and a rejected callback leaves every accepted field and the native receipt intact. Optional participants evaluate independent drive and wall integration while preserving the pair sequence. A fixed-camera NavMesh witness uses accepted motion to place the articulated walkers on both renderers. Independent single-file timing identifies the remaining steady following deficit. [Measured station results](../limits.md#life-05-measured-single-file-walking)
+
+### ATMO-10 accepted atmosphere and independent gauge limits
+
+The stepped atmosphere, layered fields, budget and borrowed shallow-water forcing publish only after the whole trial succeeds. The native SIMD phase partitions disjoint publication cells with deterministic accepted bytes at one, two and four participants. The atmospheric recurrences keep their order. A fixed map witness feeds HYDRO-02 and the Weather adapter from accepted rain and cloud. Independent OLYMPEX gauges quantify the mountain precipitation deficit and sensitivity to lapse. The upstream IVT is derived from supplied sounding data, and downstream measured IVT remains open. [Gauge evidence](../limits.md#atmo-10-observed-olympex-warm-sector-rainfall)

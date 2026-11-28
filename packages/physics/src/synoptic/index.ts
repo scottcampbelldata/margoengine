@@ -1,4 +1,3 @@
-import { MargoError } from '@margoengine/math/errors';
 import type { Bed, FlowSample, Wind } from '@margoengine/math/fields';
 import { cos, exp, hypot, ln, sin } from '@margoengine/math/pinned';
 import {
@@ -7,8 +6,18 @@ import {
   SURFACE_WATER_FORCING_FIELD,
   SURFACE_WATER_LAYOUT,
 } from '../hydro/index.js';
-import { canShareMemory, isShared, MAX_MEMORY_PAGES, regionWords, STACK_BYTES } from '../world/memory.js';
+import { isShared, MAX_MEMORY_PAGES, regionWords, STACK_BYTES } from '../world/memory.js';
 import type { Cell, FieldDescriptor, Port, Region, Solver, SolverHost, StepContext } from '../world/solver.js';
+import { synopticError } from './errors.js';
+import {
+  bindSynopticPublication,
+  loadSynopticKernels,
+  type SynopticKernelBuilds,
+  type SynopticPublication,
+  type SynopticWorkCounts,
+} from './kernel.js';
+
+export { type SynopticWorkerWork, type SynopticWorkCounts } from './kernel.js';
 
 const SEA_LEVEL = 101325;
 const AIR_GAS = 287.05;
@@ -58,7 +67,7 @@ export interface SynopticParams {
   readonly spacing?: readonly [number, number];
   /** Local position of the first cell centre. Default [0, 0]. */
   readonly origin?: readonly [number, number];
-  /** Whole-number world cell used for terrain alignment. Default [0, 0, 0]. */
+  /** Initial terrain alignment in whole world cells. Defaults to the solver's cell. */
   readonly cell?: Cell;
   /** Linear scale between the clock and meteorological time. Default 1. */
   readonly timeScale?: number;
@@ -166,12 +175,22 @@ type Layers = {
   altitudes: readonly [number, number];
 };
 
+type AtmosphereBanks = {
+  readonly data: Region;
+  readonly diagnostic: Region;
+  readonly output: Region;
+  readonly config: Region;
+  readonly forcing?: Region;
+  readonly layers?: Layers;
+};
+
 function bad(message: string): never {
-  throw new MargoError('state', `Invalid synoptic settings; ${message.charAt(0).toLowerCase()}${message.slice(1)}`);
+  throw synopticError(message);
 }
 
 function number(value: number, label: string, min = -Infinity): number {
-  if (!Number.isFinite(value) || value < min) bad(`Pass a finite ${label} at or above ${min}.`);
+  if (!Number.isFinite(value) || value < min)
+    bad(min === -Infinity ? `Pass a finite ${label}.` : `Pass a finite ${label} at or above ${min}.`);
   return value;
 }
 
@@ -190,19 +209,6 @@ function valueOf(input: GridInput, x: number, z: number) {
   return typeof input === 'function' ? input(x, z) : input;
 }
 
-async function compile(url: URL, signal?: AbortSignal) {
-  signal?.throwIfAborted();
-  if (url.protocol === 'file:') {
-    const fs = 'node:fs/promises';
-    const { readFile } = await import(/* @vite-ignore */ fs);
-    return WebAssembly.compile(await readFile(url, { signal }));
-  }
-  const response = await fetch(url, { signal });
-  if (!response.ok)
-    throw new MargoError('failed', 'Synoptic Wasm could not load. Serve the native assets beside synoptic.js.');
-  return WebAssembly.compile(await response.arrayBuffer());
-}
-
 const mod = (i: number, n: number) => ((i % n) + n) % n;
 
 function neutralOceanDrag(speed: number): number {
@@ -217,6 +223,10 @@ export class SynopticWeather implements Solver<SynopticParams> {
   readonly wind: Wind;
   private host!: SolverHost;
   private kernel!: Native;
+  private publication!: SynopticPublication;
+  private trial!: AtmosphereBanks;
+  private readonly copies: { accepted: Region; candidate: Region; seed: boolean }[] = [];
+  private disposed = false;
   private nx = 0;
   private nz = 0;
   private count = 0;
@@ -241,8 +251,7 @@ export class SynopticWeather implements Solver<SynopticParams> {
 
   private constructor(
     readonly id: string,
-    private readonly plain: WebAssembly.Module,
-    private readonly shared: WebAssembly.Module | undefined,
+    private readonly builds: SynopticKernelBuilds,
     private readonly connectWater: boolean,
   ) {
     this.field = {
@@ -265,18 +274,35 @@ export class SynopticWeather implements Solver<SynopticParams> {
   }
 
   /** Loads only the optional SIMD kernels; pass water to declare the existing surface fields. */
-  static async load(options: { id?: string; water?: boolean; signal?: AbortSignal } = {}): Promise<SynopticWeather> {
-    const [plain, shared] = await Promise.all([
-      compile(new URL(/* @vite-ignore */ './synoptic-kernel.wasm?no-inline', import.meta.url), options.signal),
-      canShareMemory()
-        ? compile(
-            new URL(/* @vite-ignore */ './synoptic-kernel-shared.wasm?no-inline', import.meta.url),
-            options.signal,
-          )
-        : undefined,
-    ]);
-    options.signal?.throwIfAborted();
-    return new SynopticWeather(options.id ?? 'synoptic', plain, shared, options.water ?? false);
+  static load(options?: { id?: string; water?: boolean; signal?: AbortSignal }): Promise<SynopticWeather>;
+  static load(options: {
+    id?: string;
+    water?: boolean;
+    signal?: AbortSignal;
+    threads?: 1 | 2 | 4;
+  }): Promise<SynopticWeather>;
+  static async load(
+    options: { id?: string; water?: boolean; signal?: AbortSignal; threads?: 1 | 2 | 4 } = {},
+  ): Promise<SynopticWeather> {
+    const id = options.id ?? 'synoptic';
+    if (typeof id !== 'string' || id === '') bad('Choose a nonempty synoptic solver id.');
+    return new SynopticWeather(
+      id,
+      await loadSynopticKernels(options.signal, options.threads ?? 1),
+      options.water ?? false,
+    );
+  }
+
+  /** Releases the optional diagnostic helpers after stopping the world. */
+  [Symbol.dispose](): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.builds[Symbol.dispose]();
+  }
+
+  /** Work completed for the most recent accepted atmospheric publication. */
+  readNativeWork(): SynopticWorkCounts | undefined {
+    return this.publication?.workCounts();
   }
 
   describe() {
@@ -298,10 +324,11 @@ export class SynopticWeather implements Solver<SynopticParams> {
   }
 
   init(host: SolverHost, params: SynopticParams = {}): void {
-    if (this.host) bad('Load a new solver before attaching to another world.');
+    if (this.disposed) throw synopticError('Load a new synoptic solver after disposing its helpers.', 'disposed');
+    if (this.host) throw synopticError('Load a new solver before attaching to another world.', 'attached');
     const [nx, nz] = (params.cells ?? [32, 32]).map(powerOfTwo) as [number, number];
     const count = nx * nz;
-    const bytes = 8 * count * (5 + 8 + 3 + 4 + 7 + 3 * SYNOPTIC_WORDS + (params.layers ? 21 : 0));
+    const bytes = 8 * count * (2 * (5 + 8) + 3 + 4 + 7 + 3 * SYNOPTIC_WORDS + (params.layers ? 28 : 0));
     if (!Number.isSafeInteger(bytes) || bytes >= MAX_MEMORY_PAGES * 65536)
       bad('Reduce the grid to fit the wasm32 world arena.');
     this.nx = nx;
@@ -313,8 +340,8 @@ export class SynopticWeather implements Solver<SynopticParams> {
     this.z0 = number(params.origin?.[1] ?? 0, 'north origin');
     this.speed = positive(params.timeScale ?? 1, 'time scale');
     this.lapse = number(params.lapseRate ?? 0.0065, 'temperature lapse rate', 0);
-    const cell = params.cell ?? ZERO;
-    if (!cell.every((component) => Number.isInteger(component) && component === (component | 0)))
+    const cell = params.cell ?? host.cell;
+    if (cell.length !== 3 || !cell.every((component) => Number.isInteger(component) && component === (component | 0)))
       bad('Use a signed integer for each coordinate of the origin cell.');
     this.water = this.waterTarget(params.water);
     const latitude = number(params.latitude ?? Math.PI / 4, 'latitude');
@@ -327,23 +354,21 @@ export class SynopticWeather implements Solver<SynopticParams> {
     if (params.layers && fidelity !== 'high') bad('Choose the high fidelity tier for a two-layer atmosphere.');
     const native =
       isShared(host.memory) || Object.prototype.toString.call(host.memory.buffer) === '[object SharedArrayBuffer]'
-        ? this.shared
-        : this.plain;
+        ? this.builds.shared
+        : this.builds.plain;
     if (!native)
-      throw new MargoError(
-        'failed',
-        'The shared synoptic kernel is unavailable. You must attach to a plain-memory world.',
-      );
+      throw synopticError('Use shared world memory for synoptic helpers, or choose one participant.', 'unsupported');
     this.host = host;
     const stack = host.allocate('synoptic-stack', STACK_BYTES, 'u8', SYNOPTIC_LAYOUT);
-    this.kernel = new WebAssembly.Instance(native, { env: { memory: host.memory } }).exports as Native;
+    const instance = new WebAssembly.Instance(native, { env: { memory: host.memory } });
+    this.kernel = instance.exports as Native;
     if (
       typeof this.kernel.advance_synoptic !== 'function' ||
       typeof this.kernel.advance_synoptic_layers !== 'function' ||
       typeof this.kernel.filter_orography !== 'function' ||
       !(this.kernel.__stack_pointer instanceof WebAssembly.Global)
     )
-      throw new MargoError('failed', 'Synoptic kernel layout differs. You must rebuild both native variants.');
+      throw synopticError('Rebuild both synoptic kernel variants and load matching assets.', 'version');
     this.kernel.__stack_pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
     const area = (label: string, words: number) => host.allocate(label, words * 8, 'f64', SYNOPTIC_LAYOUT);
     this.data = area('synoptic-prognostics', 5 * count);
@@ -389,14 +414,43 @@ export class SynopticWeather implements Solver<SynopticParams> {
     this.words(this.config).set(cell, CELL_OFFSET);
     this.initialize(params);
     if (fidelity === 'high' && params.bed) this.initializeOrography(params, f);
-    this.advanceNative(0);
+    this.publication = bindSynopticPublication(host, this.builds, native, instance);
+    this.advanceNative(0, {
+      data: this.data,
+      diagnostic: this.diagnostic,
+      output: this.output,
+      config: this.config,
+      layers: this.layers,
+    });
+    this.publication.accept();
+    const duplicate = (accepted: Region, seed = true): Region => {
+      const candidate = area(accepted.name + '-trial', accepted.byteLength / 8);
+      this.copies.push({ accepted, candidate, seed });
+      return candidate;
+    };
+    this.trial = {
+      data: duplicate(this.data),
+      diagnostic: duplicate(this.diagnostic),
+      output: duplicate(this.output, false),
+      config: duplicate(this.config),
+      forcing: this.forcing && duplicate(this.forcing, false),
+      layers: this.layers && {
+        ...this.layers,
+        state: duplicate(this.layers.state),
+        output: duplicate(this.layers.output, false),
+        config: duplicate(this.layers.config),
+      },
+    };
   }
 
   private waterTarget(target: SynopticWaterTarget | undefined): SynopticWaterTarget | undefined {
     if (Boolean(target) !== this.connectWater)
       bad('Provide the matching water grid and load with {water: true} to couple surface water.');
     if (!target) return undefined;
-    if (![target.columns, target.rows].every((x) => Number.isSafeInteger(x) && x > 0))
+    if (
+      ![target.columns, target.rows].every((x) => Number.isSafeInteger(x) && x > 0) ||
+      target.columns * target.rows * FORCING_WORDS * 16 >= MAX_MEMORY_PAGES * 65536
+    )
       bad('Use positive integer water grid dimensions.');
     return {
       ...target,
@@ -412,9 +466,7 @@ export class SynopticWeather implements Solver<SynopticParams> {
   }
 
   private get worldCell(): Cell {
-    if (!this.config) return ZERO;
-    const values = this.words(this.config);
-    return [values[CELL_OFFSET]!, values[CELL_OFFSET + 1]!, values[CELL_OFFSET + 2]!];
+    return this.host?.cell ?? ZERO;
   }
 
   private initialize(params: SynopticParams): void {
@@ -427,7 +479,7 @@ export class SynopticWeather implements Solver<SynopticParams> {
       n = table.length / 2;
     const bed = params.bed,
       metres = positive(params.cellSize ?? 4096, 'bed origin cell size');
-    const originOffset = bed ? this.worldCell.map((i, axis) => (i - bed.cell[axis]!) * metres) : ZERO;
+    const originOffset = bed ? (params.cell ?? this.worldCell).map((i, axis) => (i - bed.cell[axis]!) * metres) : ZERO;
     for (let i = 0; i < n; i++) {
       const angle = (2 * Math.PI * i) / n;
       table[2 * i] = cos(angle);
@@ -579,106 +631,108 @@ export class SynopticWeather implements Solver<SynopticParams> {
     );
   }
 
-  private advanceNative(seconds: number): void {
-    this.words(this.config)[4] = seconds;
-    const layers = this.layers;
+  private advanceNative(seconds: number, banks: AtmosphereBanks): void {
+    this.words(banks.config)[4] = seconds;
+    const layers = banks.layers;
     if (layers) {
       const count = this.kernel.advance_synoptic_layers(
         layers.state.byteOffset,
         layers.output.byteOffset,
         layers.work.byteOffset,
-        this.data.byteOffset,
+        banks.data.byteOffset,
         layers.modes.byteOffset,
         this.table.byteOffset,
-        this.config.byteOffset,
+        banks.config.byteOffset,
         layers.config.byteOffset,
       );
       if (!Number.isFinite(count)) bad('Reduce the wind shear or time scale so the layered solve can make progress.');
       this.words(layers.config)[5]! += count;
+      if (
+        !this.words(layers.state).every(Number.isFinite) ||
+        !this.words(layers.output).every(Number.isFinite) ||
+        !Number.isFinite(this.words(layers.config)[5]!)
+      )
+        bad('Reduce wind shear or the time scale so both atmospheric layers remain finite.');
     }
     const work = this.kernel.advance_synoptic(
-      this.data.byteOffset,
-      this.diagnostic.byteOffset,
+      banks.data.byteOffset,
+      banks.diagnostic.byteOffset,
       this.work.byteOffset,
       this.geometry.byteOffset,
       this.modes.byteOffset,
       this.table.byteOffset,
-      this.config.byteOffset,
+      banks.config.byteOffset,
     );
     if (!Number.isFinite(work)) bad('Reduce wind or time scale so a positive transport step fits the grid.');
-    const q = this.words(this.data),
-      d = this.words(this.diagnostic),
-      result = this.words(this.output),
-      n = this.count;
-    const temperatureAnomaly = layers ? this.words(layers.output).subarray(4 * n) : undefined;
-    for (let i = 0; i < n; i++) {
-      const at = i * SYNOPTIC_WORDS,
-        vapour = q[n + i]!,
-        u = d[n + i]!,
-        v = d[2 * n + i]!;
-      if (!(d[3 * n + i]! > 0) || !Number.isFinite(vapour) || !Number.isFinite(u) || !Number.isFinite(v))
-        bad('Reduce pressure anomalies or wind and resolve the wet region with a finer grid.');
-      result[at] = d[3 * n + i]!;
-      result[at + 1] = u;
-      result[at + 2] = v;
-      result[at + 3] = d[4 * n + i]!;
-      result[at + 4] = d[6 * n + i]! + (temperatureAnomaly?.[i] ?? 0);
-      result[at + 5] = d[7 * n + i]! + (temperatureAnomaly?.[i] ?? 0);
-      result[at + 6] = vapour;
-      result[at + 7] = q[2 * n + i]!;
-      result[at + 8] = q[3 * n + i]!;
-      result[at + 9] = d[5 * n + i]!;
-      result[at + 10] = vapour * u;
-      result[at + 11] = vapour * v;
-    }
+    if (!this.words(banks.data).every(Number.isFinite) || !this.words(banks.diagnostic).every(Number.isFinite))
+      bad('Reduce wind or time scale to keep the atmosphere and water budget finite.');
+    this.publication.run(this.count, banks.data, banks.diagnostic, banks.output, layers?.output);
   }
 
   step(context: StepContext, dt: number): void {
-    this.words(this.config).set(context.cell, CELL_OFFSET);
-    this.advanceNative(positive(dt * this.speed, 'meteorological time step'));
-    if (this.forcing && this.water) this.forceWater(context, this.forcing, this.water);
+    if (this.disposed)
+      throw synopticError('Use a live synoptic solver and dispose it after the world stops stepping.', 'disposed');
+    if (!this.trial) bad('Add the synoptic solver to a PhysicsWorld before stepping.');
+    const seconds = positive(dt * this.speed, 'meteorological time step');
+    const trial = this.trial;
+    for (const { accepted, candidate, seed } of this.copies) if (seed) this.words(candidate).set(this.words(accepted));
+    this.words(trial.config).set(context.cell, CELL_OFFSET);
+    this.advanceNative(seconds, trial);
+    if (trial.forcing && this.water) this.forceWater(context, trial, this.water);
+    for (const { accepted, candidate } of this.copies) this.words(accepted).set(this.words(candidate));
+    this.publication.accept();
   }
 
-  private forceWater(context: StepContext, region: Region, grid: SynopticWaterTarget): void {
-    const forces = this.words(region);
+  private forceWater(context: StepContext, trial: AtmosphereBanks, grid: SynopticWaterTarget): void {
+    const forces = this.words(trial.forcing!);
     forces.fill(0);
     const water = context.inputs.get(SURFACE_WATER_FIELD.name);
     if (!water) return;
+    const region = water.region;
+    const bytes = 12 * grid.columns * grid.rows;
     if (
-      water.region.layout !== SURFACE_WATER_LAYOUT ||
-      water.region.type !== 'f32' ||
-      water.region.byteLength !== 12 * grid.columns * grid.rows
+      water.field !== SURFACE_WATER_FIELD.name ||
+      region.layout !== SURFACE_WATER_LAYOUT ||
+      region.type !== 'f32' ||
+      region.byteLength !== bytes
     )
-      bad('Bind the water target to the matching layout-1 ShallowWaterSolver grid.');
-    const depth = regionWords(this.host.memory, water.region) as Float32Array;
+      throw synopticError('Bind the water target to the matching layout-1 ShallowWaterSolver grid.', 'version');
+    const memory = region.memory ?? this.host.memory;
+    const offset = region.byteOffset;
+    if (!Number.isSafeInteger(offset) || offset < 0 || offset % 4 || offset > memory.buffer.byteLength - bytes)
+      bad('Publish aligned shallow-water rows within the memory that owns the water field.');
+    const depth = new Float32Array(memory.buffer, offset, bytes / 4);
     const [dx, dz] = grid.spacing,
       metres = grid.cellSize!;
     const x0 = grid.origin[0] + (water.cell[0] - context.cell[0]) * metres;
     const z0 = grid.origin[1] + (water.cell[2] - context.cell[2]) * metres;
     const air: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
+    const pressure = (east: number, north: number) => this.interpolate(east, north, 0, trial.output);
     for (let j = 0; j < grid.rows; j++)
       for (let i = 0; i < grid.columns; i++) {
         const index = i + j * grid.columns,
-          h = depth[index * 3]!,
+          h = number(depth[index * 3]!, 'water depth', 0),
+          east = number(depth[index * 3 + 1]!, 'east water momentum'),
+          north = number(depth[index * 3 + 2]!, 'north water momentum'),
           at = index * FORCING_WORDS;
         if (h <= 0) continue;
         const x = x0 + i * dx,
           z = z0 + j * dz;
-        const px = (this.interpolate(x + dx / 2, z, 0) - this.interpolate(x - dx / 2, z, 0)) / dx;
-        const pz = (this.interpolate(x, z + dz / 2, 0) - this.interpolate(x, z - dz / 2, 0)) / dz;
+        const px = (pressure(x + dx / 2, z) - pressure(x - dx / 2, z)) / dx;
+        const pz = (pressure(x, z + dz / 2) - pressure(x, z - dz / 2)) / dz;
         let stressX = 0,
           stressZ = 0;
         if (grid.windStress !== false) {
-          this.air(x, 10, z, air);
-          const u = air.velocity[0] - depth[3 * index + 1]! / h;
-          const v = air.velocity[2] - depth[3 * index + 2]! / h;
+          this.air(x, 10, z, air, trial.output, trial.layers);
+          const u = air.velocity[0] - east / h;
+          const v = air.velocity[2] - north / h;
           const speed = hypot(u, v),
             drag = air.density * neutralOceanDrag(speed) * speed;
           stressX = drag * u;
           stressZ = drag * v;
         }
-        forces[at] = (stressX - h * px) / grid.waterDensity!;
-        forces[at + 1] = (stressZ - h * pz) / grid.waterDensity!;
+        forces[at] = number((stressX - h * px) / grid.waterDensity!, 'east atmospheric water forcing');
+        forces[at + 1] = number((stressZ - h * pz) / grid.waterDensity!, 'north atmospheric water forcing');
       }
   }
 
@@ -756,19 +810,26 @@ export class SynopticWeather implements Solver<SynopticParams> {
     };
   }
 
-  private air(x: number, y: number, z: number, out: FlowSample): FlowSample {
-    const base = this.interpolate(x, z, 4);
+  private air(
+    x: number,
+    y: number,
+    z: number,
+    out: FlowSample,
+    output = this.output,
+    layers = this.layers,
+  ): FlowSample {
+    const base = this.interpolate(x, z, 4, output);
     out.temperature = positive(base - this.lapse * y, 'local absolute air temperature');
-    const pressure = this.interpolate(x, z, 0) * exp((-GRAVITY * y) / (AIR_GAS * base));
+    const pressure = this.interpolate(x, z, 0, output) * exp((-GRAVITY * y) / (AIR_GAS * base));
     out.density = pressure / (AIR_GAS * out.temperature);
-    out.velocity[0] = this.interpolate(x, z, 1);
-    out.velocity[1] = this.interpolate(x, z, 3);
-    out.velocity[2] = this.interpolate(x, z, 2);
-    if (this.layers) {
-      const [lower, upper] = this.layers.altitudes;
+    out.velocity[0] = this.interpolate(x, z, 1, output);
+    out.velocity[1] = this.interpolate(x, z, 3, output);
+    out.velocity[2] = this.interpolate(x, z, 2, output);
+    if (layers) {
+      const [lower, upper] = layers.altitudes;
       const fraction = Math.min(1, Math.max(0, (y - lower) / (upper - lower)));
-      const u = this.interpolate(x, z, 2 * this.count, this.layers.output, 1);
-      const v = this.interpolate(x, z, 3 * this.count, this.layers.output, 1);
+      const u = this.interpolate(x, z, 2 * this.count, layers.output, 1);
+      const v = this.interpolate(x, z, 3 * this.count, layers.output, 1);
       out.velocity[0] += fraction * (u - out.velocity[0]);
       out.velocity[2] += fraction * (v - out.velocity[2]);
     }

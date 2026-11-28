@@ -906,6 +906,9 @@ the arms' fluxes, the levee cap and the tube against the open channel.
 precipitation. Advance the physics world on the film clock. WeatherDrive uses the sampled state without advancing
 its own preset machine.
 
+Pass finite positive droplet radii and moisture scale heights in metres. Invalid values produce a
+remedy at [synoptic errors](https://margoengine.com/errors#synoptic).
+
 ```ts
 import { Engine } from '@margoengine/core';
 import { SynopticWeather } from '@margoengine/physics/synoptic';

@@ -15630,8 +15630,8 @@
         "gzip": 9181
       },
       "./synoptic": {
-        "raw": 15555,
-        "gzip": 6377
+        "raw": 24466,
+        "gzip": 9456
       },
       "./clouds": {
         "raw": 31804,
@@ -19074,8 +19074,8 @@
         "gzip": 9463
       },
       "./synoptic": {
-        "raw": 1954,
-        "gzip": 940
+        "raw": 2030,
+        "gzip": 964
       },
       "./audio": {
         "raw": 4442,
@@ -19615,14 +19615,14 @@
       "brotli": 15719
     },
     "packages/physics/dist/synoptic-kernel.wasm": {
-      "raw": 23185,
-      "gzip": 7734,
-      "brotli": 6729
+      "raw": 24580,
+      "gzip": 8410,
+      "brotli": 7251
     },
     "packages/physics/dist/synoptic-kernel-shared.wasm": {
-      "raw": 23185,
-      "gzip": 7734,
-      "brotli": 6729
+      "raw": 24580,
+      "gzip": 8410,
+      "brotli": 7274
     },
     "packages/physics/dist/seismic-kernel.wasm": {
       "raw": 4031,

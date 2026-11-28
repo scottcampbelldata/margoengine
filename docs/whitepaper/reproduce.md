@@ -5530,3 +5530,9 @@ Burton et al. provide the original lab geometry and an orientation trace. The tr
 - Build Physics with `node packages/physics/scripts/build.js`. Run `node --test packages/physics/tests/pedestrians.test.js packages/physics/tests/coupling/pedestrians.test.js packages/physics/tests/coupling/pedestrian-workers.test.js`.
 - Run `npm run test:gpu:pedestrian-workers -w @margoengine/physics` and `npm run test:gpu:pedestrian-film -w @margoengine/physics` for the native participants and the fixed-camera signed NavMesh witness.
 - Run `node packages/physics/scripts/life05-pedestrian-measured.mjs` for ordinary single-file station observations, wall and turn sensitivity and the settled speed comparison.
+
+### ATMO-10 accepted atmosphere, native cells and gauge diagnostic
+
+- Build Physics and Weather with their package build scripts. Run `node --test packages/physics/tests/coupling/synoptic.test.js packages/physics/tests/coupling/synoptic-workers.test.js packages/weather/tests/synoptic-drive.test.js`.
+- Run `npm run test:gpu:synoptic-workers -w @margoengine/physics` for the native publication workers and `npm run test:gpu:synoptic-film -w @margoengine/physics` for the fixed-map atmosphere and runoff witness on both renderers.
+- Run `node packages/physics/scripts/atmo10-synoptic-measured.mjs` for the measured storm comparison, station, terrain resolution and lapse sensitivity. It fetches the public USGS 3DEP GeoTIFF by default and accepts that same TIFF as an optional local path.

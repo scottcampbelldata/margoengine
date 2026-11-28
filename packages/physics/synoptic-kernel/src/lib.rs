@@ -8,6 +8,7 @@ use core::slice::SliceIndex;
 use margoengine_physics_kernel_common::pinned::exp;
 
 mod layers;
+mod publication;
 
 struct ArenaOnly;
 unsafe impl core::alloc::GlobalAlloc for ArenaOnly {

@@ -8776,7 +8776,7 @@ transport. The atmosphere and its water budget share the PhysicsWorld clock.
 import { SynopticWeather } from '@margoengine/physics/synoptic';
 import { PhysicsWorld } from '@margoengine/physics/world';
 
-const weather = await SynopticWeather.load();
+using weather = await SynopticWeather.load();
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(weather, {
   cells: [32, 16],
   spacing: [50_000, 50_000],
@@ -8807,7 +8807,14 @@ by default. The weather and water readers use the winds from the same physical f
 mm/h to `PrecipitationField`. Set its `base` just above the ground when the upstream physics has already accounted for
 fallout. Load with `{water: true}` and pass the grid of a `ShallowWaterSolver` to accumulate pressure gradients and wind
 stress on it. Arrange the pair in a staggered coupling, and give the water the weather's `timeScale` (the world refuses
-the pair at two scales). `@margoengine/weather/synoptic` adapts the same solve for Sky.
+the pair at two scales). `@margoengine/weather/synoptic` adapts the same solve for Sky. Registered fields carry
+the solver's signed cell. The water field can live in its own memory. The atmosphere and its water contribution
+are accepted together, so a bad water input preserves the previous atmosphere, forcing and budgets.
+
+The optional native publication uses one participant by default. Pass `threads: 2` or `threads: 4` to
+`load()` with shared world memory in Node or an isolated browser worker. Independent cells publish paired
+temperatures and IVT products with SIMD. `readNativeWork()` reports accepted cells and work per participant.
+Stop advancing the world before disposing the solver.
 
 ## Explosive sources (`@margoengine/physics/explosive`)
 

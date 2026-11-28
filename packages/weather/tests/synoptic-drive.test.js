@@ -70,7 +70,10 @@ test('cold columns snow, and out-of-range values are held to the state bounds', 
   near(coarse.humidity, 1, 1e-12, 'saturated at the given scale height');
   assert.equal(coarse.rain, 0);
   for (const options of [{ dropletRadius: 0 }, { moistureHeight: -1 }, { moistureHeight: Infinity }])
-    assert.throws(() => synopticDrive(column({}), () => [0, 0, 0], options), RangeError);
+    assert.throws(() => synopticDrive(column({}), () => [0, 0, 0], options), {
+      code: 'state',
+      message: /finite positive cloud radii and moisture heights.*#synoptic/,
+    });
 });
 
 test('the adapter reads a running synoptic solver', async () => {

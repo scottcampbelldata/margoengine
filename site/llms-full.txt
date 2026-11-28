@@ -15876,15 +15876,33 @@ The high tier filters the mean wind's terrain wave with a fixed moist stratifica
 direct upslope component. The advected temperature sets the saturation capacity in the assumed exponential
 moisture column. Dry ascent uses up the column's saturation deficit before any cloud forms. Saturated ascent,
 descent, conversion and fallout conserve the available water in the column budget. The phase-change tests are
-manufactured calculations. The independent river transport and mountain rainfall comparisons remain open.
+manufactured calculations. The gauge comparison below documents reduced-model limits. A measured downstream
+vapour-transport comparison remains open.
 Cloud output is column mass and Weather uses a display opacity derived from it. The atmosphere uses
 fixed stratification, upper and lower pressure levels, and a vertically integrated moisture budget. Nonhydrostatic
 vertical momentum, explicit ice microphysics, latent heating feedback and data assimilation require separate models.
 Forecasts and film-length time acceleration use different clock scales. Keep coupled physical budgets on the same scale.
 
-The optional Physics entry measures 7,237 B gzip within a 7,497 B ceiling. The Weather adapter measures 940 B gzip
-within a 1,196 B ceiling. Both optional native assets are 23,185 B raw and 7,734 B gzip.
+The optional Physics entry measures 9,456 B gzip against a 9,740 B ceiling. The Weather adapter measures 964 B gzip
+within a 1,196 B ceiling. Both optional native assets are 24,580 B raw and 8,410 B gzip.
 These entries leave Core, Stage, Physics World and the Weather root unchanged.
+
+Independent native cells prepare the 12-column publication, using f64x2 temperature and vapour-transport products.
+The Fourier transport and moisture ledger remain in fixed order. The trial bank adds 200 B per atmospheric cell,
+56 B more per cell with two layers, and two f64 values per water cell for its candidate force. Atmospheric and layer
+ledgers and the force state accept together. A bad borrowed water row leaves the accepted atmosphere and the native
+work receipt intact.
+
+#### ATMO-10 observed OLYMPEX warm-sector rainfall
+
+At Quinault 4 NE and Buckinghorse, the observed 8 December 2015, 13:00–17:00 UTC totals were 32.60 and 35.56 mm.
+Four-kilometre simulations initialized from the earlier Quillayute sounding and 3DEP terrain give 13.56 and
+23.84 mm. Simulated totals are lower by 19.04 and 11.72 mm. Refining from 8 km raises modeled rain by 0.30 and 2.49 mm.
+At 8 km, using the independently observed 3.524 K/km shallow sounding lapse instead of the default 6.5 K/km gives
+zero rain at both stations. Height on the four-kilometre model grid interpolates to 146 and 1,197 m, compared with
+station elevations of 87 and 1,478 m. The observed hourly rainfall amounts were withheld from the atmosphere.
+The diagnostic uses a frozen initial sounding, wide periodic domain, uncertain point-gauge exposure and a reduced
+column closure. The upstream sounding IVT is an input-derived value. [OLYMPEX event context](https://doi.org/10.1175/JAS-D-23-0177.1) [USCRN hourly records](https://www.ncei.noaa.gov/pub/data/uscrn/products/hourly02/2015/CRNH0203-2015-WA_Quinault_4_NE.txt) [Buckinghorse gauge](https://wcc.sc.egov.usda.gov/nwcc/site?sitenum=1107)
 
 ### Cloud-to-ground discharge (ATMO-07)
 
@@ -41739,8 +41757,7 @@ The regional fields transport fronts, rain and IVT through a fixed map frame. Th
 of shear disturbances in two coupled layers. Orographic cloud formation uses saturation and the temperature of
 the transported air. A browser fixture applies the fields to Sky on both renderers. The RITS, WIND and CF
 production scenes still need bindings to the solved fields. SEA-07's surge port needs an adapter once its input
-layout is available. The published solver applies the corresponding inputs to shallow water today. The audit
-also tracks independent rainfall and IVT evidence, combined-layer moisture flux and measured drag validation.
+layout is available. The published solver applies the corresponding inputs to shallow water today. The [Olympic gauge comparison](limits.md#atmo-10-observed-olympex-warm-sector-rainfall) quantifies rainfall underprediction and lapse sensitivity. Downstream measured IVT, layer moisture flux and measured drag remain open.
 The staggered same-clock runoff check closes the liquid handoff volume on both ledgers.
 
 ### Continuous lightning weather and calibrated thunder (ATMO-07)

@@ -192,6 +192,11 @@ type NativePhaseSolver =
       readonly phase: 'walker drive and wall integration';
     }
   | {
+      readonly subject: 'Synoptic weather';
+      readonly phaseExport: 'synoptic_publish_phase';
+      readonly phase: 'regional diagnostics';
+    }
+  | {
       readonly subject: 'Seismic';
       readonly phaseExport: 'seismic_thread_phase';
       readonly phase: 'velocity and stress stencil';

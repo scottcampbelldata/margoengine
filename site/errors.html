@@ -146,6 +146,11 @@
       <p><strong>Cause.</strong> A rigid body, collider, shape, scene query or world setting got an input it cannot use (code unsupported): a position, velocity, force, direction or box that is not three finite numbers (or a zero direction), a rotation that is not a quaternion of finite numbers, a mass, density, damping, size, radius, speed or time that is negative or not finite, a shape name or body type that does not exist, a body, collider or row that was removed or belongs to another world, a body of the wrong type for the call (a next velocity on a body that is not kinematicPosition), a mesh from another engine, a solver option outside its range, or a hierarchy deeper than 64 nodes.</p>
       <p><strong>Fix.</strong> Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (<code>dynamic</code>, <code>fixed</code>, <code>kinematicPosition</code>, <code>kinematicVelocity</code>), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.</p>
     </section>
+    <section id="synoptic">
+      <h2><a href="#synoptic">@margoengine/physics/synoptic regional atmosphere, weather drive and shallow-water forcing</a></h2>
+      <p><strong>Cause.</strong> Regional settings, an atmospheric trial or a shallow-water field cannot produce finite accepted weather.</p>
+      <p><strong>Fix.</strong> Use a resolvable grid, finite temperatures and pressure, and a positive meteorological step. Match the water grid and publish aligned water rows in their owning memory. Reduce wind or time scale if transport cannot advance.</p>
+    </section>
     <section id="pedestrians">
       <h2><a href="#pedestrians">@margoengine/physics/pedestrians walking motion, ground and force fields</a></h2>
       <p><strong>Cause.</strong> An input row, ground sample or candidate pedestrian step cannot produce a finite accepted pose or force.</p>

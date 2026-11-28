@@ -1,4 +1,5 @@
 import type { Vec3 } from '@margoengine/math';
+import { MargoError } from '@margoengine/math/errors';
 import { exp, hypot, pow } from '@margoengine/math/pinned';
 import type { SynopticWeather } from '@margoengine/physics/synoptic';
 import { RAIN_RATE_AT_FULL } from './air.js';
@@ -25,7 +26,10 @@ export function synopticDrive(
   const radius = options.dropletRadius ?? 1e-5;
   const scale = options.moistureHeight ?? 2400;
   if (!(radius > 0 && scale > 0 && Number.isFinite(radius) && Number.isFinite(scale)))
-    throw new RangeError('Synoptic cloud radii and moisture heights must be positive. Use finite values in metres.');
+    throw new MargoError(
+      'state',
+      'Use finite positive cloud radii and moisture heights in metres. See https://margoengine.com/errors#synoptic',
+    );
   return {
     get state(): WeatherState {
       const [x, y, z] = position();

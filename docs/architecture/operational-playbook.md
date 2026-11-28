@@ -12484,3 +12484,8 @@ The legged wrapper checks alignment and bounds in the owning memory of input row
 ### LIFE-05 accepted pedestrian state and local native phases
 
 Independent drives and wall integration are partitioned into native SIMD phases. Spatial order, anticipation accumulation, density and walker-to-walker contact use the existing serial sequence. Intent and force are read in their owning memory. The ground projection reacquires views after each callback and publishes signed pose, route cursor and contacts only when all are valid. The fixed camera renders accepted activity beside a matched control. Single-file measurements bound the steady speed error.
+
+
+### ATMO-10 atomic coupled weather and optional diagnostic cells
+
+One trial holds prognostics, layered variables, atmospheric budget, diagnostic columns and water forces. Borrowed signed water rows are checked in their owning memory before accepting the weather and forcing together. Optional native workers calculate whole pairs of 12-column output cells with the existing spectral and transport order preserved. A fixed-map witness reads the accepted rain in Weather and the runoff ledger. The independent gauge diagnostic records the simplified model's rain deficit.

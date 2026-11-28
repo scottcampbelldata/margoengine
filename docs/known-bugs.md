@@ -24654,8 +24654,7 @@ The regional fields transport fronts, rain and IVT through a fixed map frame. Th
 of shear disturbances in two coupled layers. Orographic cloud formation uses saturation and the temperature of
 the transported air. A browser fixture applies the fields to Sky on both renderers. The RITS, WIND and CF
 production scenes still need bindings to the solved fields. SEA-07's surge port needs an adapter once its input
-layout is available. The published solver applies the corresponding inputs to shallow water today. The audit
-also tracks independent rainfall and IVT evidence, combined-layer moisture flux and measured drag validation.
+layout is available. The published solver applies the corresponding inputs to shallow water today. The [Olympic gauge comparison](limits.md#atmo-10-observed-olympex-warm-sector-rainfall) quantifies rainfall underprediction and lapse sensitivity. Downstream measured IVT, layer moisture flux and measured drag remain open.
 The staggered same-clock runoff check closes the liquid handoff volume on both ledgers.
 
 ### Continuous lightning weather and calibrated thunder (ATMO-07)

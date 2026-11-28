@@ -3,7 +3,7 @@ import test from 'node:test';
 import { PrecipitationField } from '@margoengine/weather/precipitation';
 import { CloudSolver } from '../../dist/clouds.js';
 import { TerrainBed } from '../../dist/earth.js';
-import { ShallowWaterSolver } from '../../dist/hydro.js';
+import { ShallowWaterSolver, SURFACE_WATER_FIELD } from '../../dist/hydro.js';
 import { RainfallRunoff } from '../../dist/runoff.js';
 import { SYNOPTIC_LAYOUT, SYNOPTIC_WORDS, SynopticWeather } from '../../dist/synoptic.js';
 import { PhysicsWorld, regionWords, worldMemory } from '../../dist/world.js';
@@ -535,6 +535,75 @@ test('a shifted regional wind cell restores with the snapshot and preserves all 
   world.restoreSnapshot(snapshot.bytes);
   assert.equal(world.hash(), snapshot.hash);
   assert.deepEqual(weather.wind.cell, cell);
+});
+
+test('late invalid water forcing preserves the accepted atmosphere, coupled fields and native work', async () => {
+  const cell = [-8, 2, 5];
+  const world = new PhysicsWorld({ rate });
+  const terrain = new TerrainBed();
+  world.add(
+    terrain,
+    {
+      columns: 2,
+      rows: 2,
+      width: 2 * spacing,
+      depth: 2 * spacing,
+      centre: [spacing, spacing],
+      elevations: new Float64Array(9).fill(-2),
+    },
+    cell,
+  );
+  const water = new ShallowWaterSolver();
+  world.add(water, { bed: terrain.bed, level: 0 }, cell);
+  using atmosphere = await SynopticWeather.load({ water: true });
+  world.add(
+    atmosphere,
+    {
+      ...options,
+      meanWind: [16, 5],
+      hydrometeors: 0.1,
+      layers: { altitudes: [1500, 5000] },
+      water: { columns: 2, rows: 2, spacing: [spacing, spacing], origin: [spacing / 2, spacing / 2] },
+    },
+    cell,
+  );
+  world.couple([water.describe().id, atmosphere.id], 'staggered');
+  world.advance(3);
+  const first = world.takeSnapshot().bytes.slice();
+  const work = atmosphere.readNativeWork();
+  const before = atmosphere.budget;
+  const layers = atmosphere.layerSubsteps;
+  const owned = world.fields.port(SURFACE_WATER_FIELD.name);
+  const memory = new WebAssembly.Memory({ initial: 1 });
+  const borrowed = { ...owned, region: { ...owned.region, memory, byteOffset: 32 } };
+  const state = new Float32Array(memory.buffer, 32, 12);
+  state.set(regionWords(world.memory, owned.region));
+  const context = { tick: 3, level: 0, seed: 0, cell, inputs: new Map([[owned.field, borrowed]]) };
+  state[11] = NaN;
+  assert.throws(() => atmosphere.step(context, 1 / 60), {
+    code: 'state',
+    message: /finite north water momentum.*#synoptic/,
+  });
+  assert.deepEqual(world.takeSnapshot().bytes, first);
+  assert.deepEqual(atmosphere.budget, before);
+  assert.deepEqual(atmosphere.readNativeWork(), work);
+  assert.equal(atmosphere.layerSubsteps, layers);
+  borrowed.region.byteOffset = 33;
+  assert.throws(() => atmosphere.step(context, 1 / 60), {
+    code: 'state',
+    message: /aligned shallow-water rows.*#synoptic/,
+  });
+  assert.deepEqual(world.takeSnapshot().bytes, first);
+  borrowed.region.byteOffset = 32;
+  state.set(regionWords(world.memory, owned.region));
+  atmosphere.step(context, 1 / 60);
+  const advanced = world.takeSnapshot().bytes.slice();
+  world.restoreSnapshot(first);
+  atmosphere.step(context, 1 / 60);
+  assert.deepEqual(world.takeSnapshot().bytes, advanced);
+  world.shiftOrigin([2, -4, 6]);
+  assert.deepEqual(atmosphere.wind.cell, [-10, 6, -1]);
+  for (const port of atmosphere.exportPorts(3)) assert.deepEqual(port.cell, atmosphere.wind.cell);
 });
 
 test('Phillips shear mode grows at the exact discrete two-layer rate, including thickness and altitude wind', async () => {

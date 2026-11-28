@@ -150,6 +150,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'synoptic',
+    title: '@margoengine/physics/synoptic regional atmosphere, weather drive and shallow-water forcing',
+    kind: 'family',
+    messages: [],
+    cause: 'Regional settings, an atmospheric trial or a shallow-water field cannot produce finite accepted weather.',
+    fix: 'Use a resolvable grid, finite temperatures and pressure, and a positive meteorological step. Match the water grid and publish aligned water rows in their owning memory. Reduce wind or time scale if transport cannot advance.',
+  },
+  {
     id: 'pedestrians',
     title: '@margoengine/physics/pedestrians walking motion, ground and force fields',
     kind: 'family',
