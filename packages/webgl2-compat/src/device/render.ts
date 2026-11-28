@@ -266,7 +266,8 @@ export class LinkedProgram {
     const device = this.device,
       gl = device.gl;
     if (this.warmFence === undefined) {
-      const colours = targets.flatMap((t, i) => (t ? [i] : []));
+      // A target with write mask 0 has its draw buffer off at every draw (CompatRenderPipeline.splits), so off here too.
+      const colours = targets.flatMap((t, i) => (t && t.writeMask !== 0 ? [i] : []));
       if (this.refusal !== '' || device.destroyed || !/Direct3D|D3D11/.test(device.adapter.capabilities.renderer)) {
         this.warmFence = null;
         return true;
@@ -554,10 +555,15 @@ export class CompatRenderPipeline {
       };
     });
     this.sameTargets = this.targetGL.every((x) => x.key === this.targetGL[0].key && x.mask === this.targetGL[0].mask);
-    if (!device.ext.indexed) {
+    // A target with write mask 0 may have no fragment output (WebGPU createRenderPipeline validation), and WebGL2 refuses
+    // a draw whose active draw buffers miss an output whatever the colour mask ("Active draw buffers with missing
+    // fragment shader outputs", WebGL 2.0 5.x draw validation in ANGLE): its draw buffer is off for the pipeline's draws.
+    const silent = this.targets.some((t) => t?.writeMask === 0);
+    if (silent && device.ext.indexed) this.splits = [this.targets.flatMap((t, i) => (t && t.writeMask !== 0 ? [i] : []))];
+    else if (!device.ext.indexed) {
       const groups = new Map<string, number[]>();
       this.targets.forEach((t, i) => {
-        if (!t) return;
+        if (!t || t.writeMask === 0) return;
         const key = targetKey(t);
         groups.set(key, [...(groups.get(key) ?? []), i]);
       });
@@ -578,7 +584,7 @@ export class CompatRenderPipeline {
             "colour targets with different blend states or write masks together with depth or stencil writes (this WebGL2 has no OES_draw_buffers_indexed, so the layer draws once per target state, and later draws would see the first one's depth and stencil)",
           );
         this.splits = [...groups.values()];
-      }
+      } else if (silent) this.splits = [[...groups.values()][0] ?? []];
     }
     const vertexModule = descriptor.vertex.module as unknown as CompatShaderModule,
       fragmentModule = descriptor.fragment?.module as unknown as CompatShaderModule | undefined;

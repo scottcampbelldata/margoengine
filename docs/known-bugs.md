@@ -1046,6 +1046,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression test:** `packages/sky/test/volumetric-clouds.test.js` (a low haze layer in the sky dims and veils the
   clouds seen through it).
 
+### Fixed 2026-11-28: the WebGL2 layer refused targets with write mask 0 and no fragment output (KB-COMPAT-SILENTTARGET1, webgl2-compat)
+
+- **Repro (before):** `node packages/webgl2-compat/test/silent-targets-browser.mjs`: a three-target pass with depth
+  writes and an async pipeline whose fragment writes only location 0, targets 1 and 2 with write mask 0 (valid WebGPU);
+  on ANGLE Direct3D 11 the warm draw and every draw raised GL_INVALID_OPERATION "Active draw buffers with missing
+  fragment shader outputs", reported as an internal GPU error. Found by `ssr.add(raw)` with a depth-only raw mesh.
+- **Cause:** the layer kept every target's draw buffer on (`CompatRenderPipeline`, `CompatProgram.warmed` in
+  `packages/webgl2-compat/src/device/render.ts`); WebGL2 checks the active draw buffers against the program's outputs
+  whatever the colour mask.
+- **Fix:** a target with write mask 0 has its draw buffer off for the pipeline's draws (one split group of the written
+  targets, through the existing split path) and in the warm draw.
+
 ### Fixed 2026-11-27: TAA gave instanced primitives camera motion only (KB-TAA-INSTMOTION1, taa, gltf)
 
 - **Repro (before):** `node packages/taa/test/instance-velocity-browser.mjs`: two Box.glb instances (gltf/pbr
