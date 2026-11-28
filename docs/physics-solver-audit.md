@@ -3249,3 +3249,14 @@ Three-dimensional and nonlinear site response, evolving pore pressure, richer ru
 - Point 8 (539f1f526a). `packages/physics/scripts/ice05-channel-freezing-measured.mjs` uses measured plate temperatures and compares held-out optical thicknesses. At 120 minutes the slab predicts 27.57 and 27.48 mm at both stations. The observed ranges are 13.47–20.69 and 9.68–19.08 mm, respectively. It misses all 16 samples. The separately forced bulk-water sensitivity misses 15 of 16. [Measured limits](limits.md#ice-05-freshwater-flow-over-a-cold-plate)
 
 Distributed heat storage, brine and surface snow evolution, local water-flow feedback and inferred wind-dependent icicle transfer remain open. The row stays REOPENED at four points.
+
+### FIRE-06 Heat conduction and phase change
+
+#### FIRE-06 four-point pass
+
+- Point 5 (127472895c). `packages/physics/tests/coupling/thermal-stress.test.js` checks coded material and restraint errors, live signed heat and solid publications, byte-exact registered rewind, separate input memories and rejection of a late liquid cell or misaligned lease before replacing the mechanical solution. `packages/physics/tests/coupling/thermal-workers.test.js` checks that an invalid extraction in a remote range retains all accepted heat banks and the prior work receipt.
+- Point 6 (127472895c). `packages/physics/tests/coupling/thermal-workers.test.js` compares explicit native 1, 2 and 4 participants byte for byte on odd grids and through subdivision and replay. `packages/physics/tests/thermal-workers.browser.mjs` observes three simultaneous helpers and 560 paired stencil cells out of 665, plus 1,328 paired decodes out of 1,330. Radiation stays caller-ordered and the implicit solver stays single-participant.
+- Point 7 (127472895c). `packages/physics/tests/thermal-film.browser.mjs` renders live heat-to-emission and heat-to-stress coupling. Its exposed kiln specimen loses 66,113 J and bows 0.587 mm in 24 s, with an exactly unchanged insulated control. WebGPU and WebGL2 each repeat complete accepted state and RGBA at held frames, restore, advance and rewind.
+- Point 8 (127472895c). `packages/physics/scripts/fire06-gallium-measured.mjs` compares independent measured fronts and tests grid and boundary sensitivity. At 17 min the solver predicts a flat 30.67 mm front and the measured span is 23.7–70.3 mm. Only one of nine samples overlaps the estimated figure and sensitivity range. [Measured limits](limits.md#fire-06-gallium-melting-across-a-heated-vertical-plate)
+
+Mushy melting, temperature-dependent materials, melt convection, a scalable implicit solve and installation in the original kiln and turbofan shots remain open. The row stays REOPENED at four points.
